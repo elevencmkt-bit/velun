@@ -29,16 +29,21 @@ function formatDate(date: string) {
 export function PendingList({
   rows,
   categoryColors,
+  kind,
 }: {
   rows: PendingRow[];
   categoryColors: Record<string, CategoryColorPair>;
+  kind: "pay" | "receive";
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   if (rows.length === 0) {
     return (
-      <p className="text-sm text-(--text-muted)">Nenhuma conta pendente nos próximos 30 dias.</p>
+      <p className="text-sm text-(--text-muted)">
+        {kind === "pay" ? "Nenhuma conta a pagar" : "Nenhuma conta a receber"} nos próximos 30
+        dias.
+      </p>
     );
   }
 
@@ -89,7 +94,7 @@ export function PendingList({
               })
             }
           >
-            Marcar como paga
+            {kind === "pay" ? "Marcar como paga" : "Marcar como recebida"}
           </Button>
         </div>
       ))}

@@ -362,7 +362,7 @@ export default async function MesPage({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-card-title">Contas a pagar</CardTitle>
+            <CardTitle className="text-card-title">A vencer</CardTitle>
           </CardHeader>
           <CardContent>
             {pendingPreview.length === 0 ? (

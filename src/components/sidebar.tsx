@@ -18,7 +18,7 @@ const ICON_PROPS = { size: 20, strokeWidth: 1.8 };
 const NAV = [
   { href: "/mes", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
-  { href: "/a-pagar", label: "A pagar", icon: CalendarClock },
+  { href: "/a-pagar", label: "A vencer", icon: CalendarClock },
   { href: "/fluxo-de-caixa", label: "Fluxo de caixa", icon: TrendingUp },
   { href: "/relatorios", label: "Relatórios", icon: PieChart },
   { href: "/contas", label: "Contas", icon: Wallet },

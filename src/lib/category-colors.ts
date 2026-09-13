@@ -35,7 +35,7 @@ export function buildCategoryColorMap(expenseCategoryNames: string[]): Map<strin
 }
 
 // Busca as categorias de despesa do household e monta o mapa de cores —
-// reaproveitado pela tela Mês (donut) e pelos badges de Transações/A pagar,
+// reaproveitado pela tela Mês (donut) e pelos badges de Transações/A vencer,
 // para que a mesma categoria tenha sempre a mesma cor em todo o app.
 export async function getExpenseCategoryColorMap(
   supabase: SupabaseClient,

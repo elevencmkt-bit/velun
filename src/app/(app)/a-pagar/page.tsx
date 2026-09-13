@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getExpenseCategoryColorMap } from "@/lib/category-colors";
-import { Card, CardContent } from "@/components/ui/card";
+import { formatCents } from "@/lib/money";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecurrenceForm } from "./recurrence-form";
 import { PendingList, type PendingRow } from "./pending-list";
 import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
@@ -16,7 +17,7 @@ function addDaysISO(days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export default async function APagarPage() {
+export default async function AVencerPage() {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
   const today = todayISO();
@@ -70,6 +71,11 @@ export default async function APagarPage() {
     is_overdue: row.date < today,
   }));
 
+  const toPay = pendingRows.filter((r) => r.direction === "out");
+  const toReceive = pendingRows.filter((r) => r.direction === "in");
+  const totalToPay = toPay.reduce((sum, r) => sum + r.amount_cents, 0);
+  const totalToReceive = toReceive.reduce((sum, r) => sum + r.amount_cents, 0);
+
   const recurrenceRows: RecurrenceRow[] = (recurrencesRaw ?? []).map((row) => {
     const template = row.template as {
       direction: "in" | "out";
@@ -90,14 +96,43 @@ export default async function APagarPage() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-page-title">A pagar</h1>
+          <h1 className="text-page-title">A vencer</h1>
           <p className="text-page-subtitle">Próximos 30 dias, atrasadas em destaque.</p>
         </div>
-        <Card>
-          <CardContent>
-            <PendingList rows={pendingRows} categoryColors={Object.fromEntries(colorMap)} />
-          </CardContent>
-        </Card>
+
+        <div className="grid grid-cols-2 gap-5">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-card-title">A pagar</CardTitle>
+              <span className="font-semibold tabular-nums" style={{ color: "var(--expense)" }}>
+                {formatCents(totalToPay)}
+              </span>
+            </CardHeader>
+            <CardContent>
+              <PendingList
+                rows={toPay}
+                categoryColors={Object.fromEntries(colorMap)}
+                kind="pay"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-card-title">A receber</CardTitle>
+              <span className="font-semibold tabular-nums" style={{ color: "var(--income)" }}>
+                {formatCents(totalToReceive)}
+              </span>
+            </CardHeader>
+            <CardContent>
+              <PendingList
+                rows={toReceive}
+                categoryColors={Object.fromEntries(colorMap)}
+                kind="receive"
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
