@@ -2,7 +2,7 @@
 
 Ver a especificação completa no Google Drive: `ECM_HUB/000_Eleven_CM/DASHBOARD/spec-dashboard-financeiro.md`.
 
-Status: **Fase 6 concluída** (Fases 2/3 de importação de extrato puladas por ora — só entrada manual). Contas, lançamento manual, transações com filtros/edição/bulk, recorrências, A pagar, transferências, tela Mês, fluxo de caixa projetado, e direção visual (sidebar, cards, badges de categoria) inspirada em referência trazida pelo usuário — substituiu a paleta minimalista original da seção 7 da spec. Projeto Supabase já conectado e rodando.
+Status: **Fase 6 concluída** (Fases 2/3 de importação de extrato puladas por ora — só entrada manual). Contas, lançamento manual, transações com filtros/edição/bulk, recorrências, A pagar, transferências, tela Dashboard (ex-Mês), fluxo de caixa projetado. Direção visual final segue o "UI Style Specs" que o usuário passou por escrito (tokens completos em `src/app/globals.css`) — substituiu tanto a paleta minimalista da seção 7 da spec original quanto o polimento inicial da Fase 6. Projeto Supabase já conectado e rodando.
 
 ## Stack
 
