@@ -37,12 +37,19 @@ export async function updateProfile(formData: FormData) {
     avatarUrl = `${publicUrl.publicUrl}?v=${Date.now()}`;
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("members")
     .update({ display_name: name, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) })
-    .eq("id", memberId);
+    .eq("id", memberId)
+    .select("id");
 
   if (error) throw new Error(error.message);
+  // RLS bloqueando o update não gera erro, só devolve 0 linhas — sem
+  // essa checagem a escrita falha em silêncio (foi exatamente o bug
+  // antes da policy de UPDATE em `members` existir).
+  if (!data || data.length === 0) {
+    throw new Error("Não foi possível salvar o perfil (permissão negada).");
+  }
 
   revalidatePath("/", "layout");
 }
