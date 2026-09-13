@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatCents } from "@/lib/money";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 import { markTransactionPaid } from "@/lib/actions/transactions";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/category-badge";
@@ -30,10 +30,12 @@ export function PendingList({
   rows,
   categoryColors,
   kind,
+  currency = "USD",
 }: {
   rows: PendingRow[];
   categoryColors: Record<string, CategoryColorPair>;
   kind: "pay" | "receive";
+  currency?: CurrencyCode;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -80,7 +82,7 @@ export function PendingList({
             }}
           >
             {row.direction === "out" ? "-" : "+"}
-            {formatCents(row.amount_cents)}
+            {formatCents(row.amount_cents, currency)}
           </span>
           <Button
             size="sm"

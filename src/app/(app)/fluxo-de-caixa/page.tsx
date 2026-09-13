@@ -9,7 +9,7 @@ import { CashFlowChart } from "./cash-flow-chart";
 const HORIZON_DAYS = 90;
 
 export default async function FluxoDeCaixaPage() {
-  const { householdId } = await getCurrentMember();
+  const { householdId, currency } = await getCurrentMember();
   const supabase = await createClient();
 
   const { points, currentTotal, lowestPoint, finalPoint } = await getCashFlowProjection(
@@ -38,7 +38,7 @@ export default async function FluxoDeCaixaPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-kpi-label">Saldo atual</span>
-              <span className="text-kpi-value">{formatCents(currentTotal)}</span>
+              <span className="text-kpi-value">{formatCents(currentTotal, currency)}</span>
             </div>
           </CardContent>
         </Card>
@@ -67,7 +67,7 @@ export default async function FluxoDeCaixaPage() {
                 className="text-kpi-value"
                 style={{ color: finalPoint.balance_cents < 0 ? "var(--expense)" : undefined }}
               >
-                {formatCents(finalPoint.balance_cents)}
+                {formatCents(finalPoint.balance_cents, currency)}
               </span>
             </div>
           </CardContent>
@@ -86,7 +86,7 @@ export default async function FluxoDeCaixaPage() {
                 className="text-kpi-value"
                 style={{ color: lowestPoint.balance_cents < 0 ? "var(--expense)" : undefined }}
               >
-                {formatCents(lowestPoint.balance_cents)}
+                {formatCents(lowestPoint.balance_cents, currency)}
               </span>
               <span className="text-xs text-(--text-muted)">em {lowestPoint.label}</span>
             </div>
@@ -96,7 +96,7 @@ export default async function FluxoDeCaixaPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <CashFlowChart points={points} />
+          <CashFlowChart points={points} currency={currency} />
         </CardContent>
       </Card>
     </div>

@@ -140,7 +140,7 @@ export default async function MesPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const { householdId } = await getCurrentMember();
+  const { householdId, currency } = await getCurrentMember();
   const supabase = await createClient();
   const { month } = await searchParams;
   const { year, monthIndex } = parseMonthParam(month);
@@ -237,7 +237,7 @@ export default async function MesPage({
       <div className="grid grid-cols-3 gap-5">
         <StatCard
           label="Entrou"
-          value={formatCents(entrou)}
+          value={formatCents(entrou, currency)}
           icon={ArrowUpCircle}
           badgeBg="var(--badge-green-bg)"
           badgeFg="var(--badge-green-fg)"
@@ -246,7 +246,7 @@ export default async function MesPage({
         />
         <StatCard
           label="Saiu"
-          value={formatCents(saiu)}
+          value={formatCents(saiu, currency)}
           icon={ArrowDownCircle}
           badgeBg="var(--badge-red-bg)"
           badgeFg="var(--badge-red-fg)"
@@ -255,7 +255,7 @@ export default async function MesPage({
         />
         <StatCard
           label="Sobrou"
-          value={formatCents(sobrou)}
+          value={formatCents(sobrou, currency)}
           icon={PiggyBank}
           badgeBg="var(--badge-blue-bg)"
           badgeFg="var(--badge-blue-fg)"
@@ -270,7 +270,7 @@ export default async function MesPage({
             <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
           </CardHeader>
           <CardContent>
-            <MonthDonut slices={slices} compact />
+            <MonthDonut slices={slices} compact currency={currency} />
           </CardContent>
         </Card>
         <Card>
@@ -278,7 +278,7 @@ export default async function MesPage({
             <CardTitle className="text-card-title">Entradas vs saídas</CardTitle>
           </CardHeader>
           <CardContent>
-            <TrendBarChart points={trendPoints} compact />
+            <TrendBarChart points={trendPoints} compact currency={currency} />
           </CardContent>
         </Card>
         <Card>
@@ -290,17 +290,17 @@ export default async function MesPage({
               <div className="flex flex-col">
                 <span className="text-kpi-label">Saldo atual</span>
                 <span className="font-semibold tabular-nums text-(--text-primary)">
-                  {formatCents(cashFlow.currentTotal)}
+                  {formatCents(cashFlow.currentTotal, currency)}
                 </span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-kpi-label">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
                 <span className="font-semibold tabular-nums text-(--text-primary)">
-                  {formatCents(cashFlow.finalPoint.balance_cents)}
+                  {formatCents(cashFlow.finalPoint.balance_cents, currency)}
                 </span>
               </div>
             </div>
-            <CashFlowChart points={cashFlow.points} compact />
+            <CashFlowChart points={cashFlow.points} compact currency={currency} />
             <Link
               href="/fluxo-de-caixa"
               className="flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
@@ -344,7 +344,7 @@ export default async function MesPage({
                       }}
                     >
                       {row.direction === "out" ? "-" : "+"}
-                      {formatCents(row.amount_cents)}
+                      {formatCents(row.amount_cents, currency)}
                     </span>
                   </div>
                 ))}
@@ -387,7 +387,7 @@ export default async function MesPage({
                       }}
                     >
                       {row.direction === "out" ? "-" : "+"}
-                      {formatCents(row.amount_cents)}
+                      {formatCents(row.amount_cents, currency)}
                     </span>
                   </div>
                 ))}

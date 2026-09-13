@@ -18,7 +18,7 @@ function addDaysISO(days: number) {
 }
 
 export default async function AVencerPage() {
-  const { householdId } = await getCurrentMember();
+  const { householdId, currency } = await getCurrentMember();
   const supabase = await createClient();
   const today = todayISO();
   const horizon = addDaysISO(30);
@@ -105,7 +105,7 @@ export default async function AVencerPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-card-title">A pagar</CardTitle>
               <span className="font-semibold tabular-nums" style={{ color: "var(--expense)" }}>
-                {formatCents(totalToPay)}
+                {formatCents(totalToPay, currency)}
               </span>
             </CardHeader>
             <CardContent>
@@ -113,6 +113,7 @@ export default async function AVencerPage() {
                 rows={toPay}
                 categoryColors={Object.fromEntries(colorMap)}
                 kind="pay"
+                currency={currency}
               />
             </CardContent>
           </Card>
@@ -121,7 +122,7 @@ export default async function AVencerPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-card-title">A receber</CardTitle>
               <span className="font-semibold tabular-nums" style={{ color: "var(--income)" }}>
-                {formatCents(totalToReceive)}
+                {formatCents(totalToReceive, currency)}
               </span>
             </CardHeader>
             <CardContent>
@@ -129,6 +130,7 @@ export default async function AVencerPage() {
                 rows={toReceive}
                 categoryColors={Object.fromEntries(colorMap)}
                 kind="receive"
+                currency={currency}
               />
             </CardContent>
           </Card>
@@ -142,7 +144,7 @@ export default async function AVencerPage() {
         </div>
         <Card>
           <CardContent className="pt-6">
-            <RecurrencesList rows={recurrenceRows} />
+            <RecurrencesList rows={recurrenceRows} currency={currency} />
           </CardContent>
         </Card>
       </div>

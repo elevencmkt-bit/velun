@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatCents } from "@/lib/money";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 import { deactivateRecurrence } from "@/lib/actions/recurrences";
 import { Button } from "@/components/ui/button";
 
@@ -21,7 +21,13 @@ const FREQUENCY_LABELS: Record<RecurrenceRow["frequency"], string> = {
   yearly: "Anual",
 };
 
-export function RecurrencesList({ rows }: { rows: RecurrenceRow[] }) {
+export function RecurrencesList({
+  rows,
+  currency = "USD",
+}: {
+  rows: RecurrenceRow[];
+  currency?: CurrencyCode;
+}) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -52,7 +58,7 @@ export function RecurrencesList({ rows }: { rows: RecurrenceRow[] }) {
             }}
           >
             {row.direction === "out" ? "-" : "+"}
-            {formatCents(row.amount_cents)}
+            {formatCents(row.amount_cents, currency)}
           </span>
           <Button
             size="sm"

@@ -1,16 +1,18 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { formatCents } from "@/lib/money";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 
 export type TrendPoint = { label: string; entrou_cents: number; saiu_cents: number };
 
 export function TrendBarChart({
   points,
   compact = false,
+  currency = "USD",
 }: {
   points: TrendPoint[];
   compact?: boolean;
+  currency?: CurrencyCode;
 }) {
   return (
     <div className={compact ? "h-56 w-full" : "h-72 w-full"}>
@@ -30,7 +32,7 @@ export function TrendBarChart({
           />
           {compact ? null : (
             <YAxis
-              tickFormatter={(v: number) => formatCents(v)}
+              tickFormatter={(v: number) => formatCents(v, currency)}
               tick={{ fontSize: 11, fill: "var(--text-muted)" }}
               axisLine={false}
               tickLine={false}
@@ -40,7 +42,7 @@ export function TrendBarChart({
           <Tooltip
             cursor={{ fill: "var(--border-soft)" }}
             formatter={(value, name) => [
-              formatCents(Number(value)),
+              formatCents(Number(value), currency),
               name === "entrou_cents" ? "Entradas" : "Saídas",
             ]}
             contentStyle={{

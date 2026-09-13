@@ -16,7 +16,7 @@ export default async function RelatoriosPage({
 }: {
   searchParams: Promise<{ month?: string; view?: string }>;
 }) {
-  const { householdId } = await getCurrentMember();
+  const { householdId, currency } = await getCurrentMember();
   const supabase = await createClient();
   const { month, view: viewParam } = await searchParams;
   const view: ReportView = viewParam === "a-vencer" ? "a-vencer" : "realizado";
@@ -83,14 +83,14 @@ export default async function RelatoriosPage({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-card-title">{expenseTitle}</CardTitle>
             <span className="font-semibold tabular-nums" style={{ color: "var(--expense)" }}>
-              {formatCents(totalExpense)}
+              {formatCents(totalExpense, currency)}
             </span>
           </CardHeader>
           <CardContent>
             {expenseSlices.length === 0 ? (
               <p className="text-sm text-(--text-muted)">{expenseEmpty}</p>
             ) : (
-              <MonthDonut slices={expenseSlices} />
+              <MonthDonut slices={expenseSlices} currency={currency} />
             )}
           </CardContent>
         </Card>
@@ -99,7 +99,7 @@ export default async function RelatoriosPage({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-card-title">{incomeTitle}</CardTitle>
             <span className="font-semibold tabular-nums" style={{ color: "var(--income)" }}>
-              {formatCents(totalIncome)}
+              {formatCents(totalIncome, currency)}
             </span>
           </CardHeader>
           <CardContent>
@@ -117,7 +117,7 @@ export default async function RelatoriosPage({
                       {totalIncome > 0 ? Math.round((row.amount_cents / totalIncome) * 100) : 0}%
                     </span>
                     <span className="w-24 text-right font-semibold tabular-nums text-(--text-primary)">
-                      {formatCents(row.amount_cents)}
+                      {formatCents(row.amount_cents, currency)}
                     </span>
                   </div>
                 ))}

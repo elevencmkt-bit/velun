@@ -25,7 +25,7 @@ const ACCOUNT_TYPE_ICONS: Record<string, typeof Wallet> = {
 };
 
 export default async function ContasPage() {
-  const { householdId } = await getCurrentMember();
+  const { householdId, currency } = await getCurrentMember();
   const supabase = await createClient();
 
   const [{ data: accounts }, balances] = await Promise.all([
@@ -67,7 +67,7 @@ export default async function ContasPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-kpi-label">Saldo total</span>
-                <span className="text-kpi-value">{formatCents(total)}</span>
+                <span className="text-kpi-value">{formatCents(total, currency)}</span>
               </div>
             </CardContent>
           </Card>
@@ -118,7 +118,7 @@ export default async function ContasPage() {
                       className="text-kpi-value"
                       style={{ color: balance < 0 ? "var(--expense)" : undefined }}
                     >
-                      {formatCents(balance)}
+                      {formatCents(balance, currency)}
                     </span>
                   </CardContent>
                 </Card>

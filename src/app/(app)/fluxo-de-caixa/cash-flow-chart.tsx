@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatCents } from "@/lib/money";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 import type { CashFlowPoint } from "@/lib/cash-flow";
 
 function EndDot(props: { cx?: number; cy?: number; index?: number; totalPoints: number; color: string }) {
@@ -45,9 +45,11 @@ function buildStrokeStops(points: CashFlowPoint[]) {
 export function CashFlowChart({
   points,
   compact = false,
+  currency = "USD",
 }: {
   points: CashFlowPoint[];
   compact?: boolean;
+  currency?: CurrencyCode;
 }) {
   const gradientId = useId();
   const stops = buildStrokeStops(points);
@@ -77,7 +79,7 @@ export function CashFlowChart({
           />
           {compact ? null : (
             <YAxis
-              tickFormatter={(v: number) => formatCents(v)}
+              tickFormatter={(v: number) => formatCents(v, currency)}
               tick={{ fontSize: 11, fill: "var(--text-muted)" }}
               axisLine={false}
               tickLine={false}
@@ -85,7 +87,7 @@ export function CashFlowChart({
             />
           )}
           <Tooltip
-            formatter={(value) => [formatCents(Number(value)), "Saldo projetado"]}
+            formatter={(value) => [formatCents(Number(value), currency), "Saldo projetado"]}
             labelFormatter={compact ? (label) => label : undefined}
             contentStyle={{
               background: "var(--bg-surface)",

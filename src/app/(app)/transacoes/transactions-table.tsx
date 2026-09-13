@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatCents } from "@/lib/money";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 import { bulkUpdateCategory, updateTransactionCategory } from "@/lib/actions/transactions";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,11 +30,13 @@ export function TransactionsTable({
   accounts,
   categories,
   categoryColors,
+  currency = "USD",
 }: {
   rows: TransactionRow[];
   accounts: AccountOption[];
   categories: CategoryOption[];
   categoryColors: Record<string, CategoryColorPair>;
+  currency?: CurrencyCode;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -191,7 +193,7 @@ export function TransactionsTable({
                   }}
                 >
                   {row.direction === "out" ? "-" : "+"}
-                  {formatCents(row.amount_cents)}
+                  {formatCents(row.amount_cents, currency)}
                 </span>
                 <span className="flex items-center gap-0.5">
                   {row.transfer_group_id ? null : (

@@ -28,7 +28,7 @@ export default async function TransacoesPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { householdId } = await getCurrentMember();
+  const { householdId, currency } = await getCurrentMember();
   const supabase = await createClient();
   const params = await searchParams;
   const hasCustomRange = Boolean(params.from || params.to);
@@ -116,16 +116,16 @@ export default async function TransacoesPage({
   let totalColor: string;
   if (params.direction === "in") {
     totalLabel = "Total de entradas";
-    totalDisplay = `+${formatCents(totalIn)}`;
+    totalDisplay = `+${formatCents(totalIn, currency)}`;
     totalColor = "var(--income)";
   } else if (params.direction === "out") {
     totalLabel = "Total de saídas";
-    totalDisplay = `-${formatCents(totalOut)}`;
+    totalDisplay = `-${formatCents(totalOut, currency)}`;
     totalColor = "var(--expense)";
   } else {
     const net = totalIn - totalOut;
     totalLabel = "Saldo do período";
-    totalDisplay = `${net >= 0 ? "+" : "-"}${formatCents(Math.abs(net))}`;
+    totalDisplay = `${net >= 0 ? "+" : "-"}${formatCents(Math.abs(net), currency)}`;
     totalColor = net >= 0 ? "var(--income)" : "var(--expense)";
   }
 
@@ -164,6 +164,7 @@ export default async function TransacoesPage({
             accounts={accounts ?? []}
             categories={categories ?? []}
             categoryColors={Object.fromEntries(colorMap)}
+            currency={currency}
           />
         </CardContent>
       </Card>

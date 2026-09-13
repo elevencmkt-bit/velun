@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { CurrencyCode } from "@/lib/money";
 
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 350;
@@ -45,7 +46,12 @@ export async function getCurrentMember() {
   }
 
   const { data: member, error } = await withRetry(
-    () => supabase.from("members").select("id, household_id").eq("id", user.id).single(),
+    () =>
+      supabase
+        .from("members")
+        .select("id, household_id, households(currency)")
+        .eq("id", user.id)
+        .single(),
     (r) => Boolean(r.error) && r.error?.code !== "PGRST116",
   );
 
@@ -59,5 +65,15 @@ export async function getCurrentMember() {
     throw new Error("Usuário autenticado sem membership em nenhum household.");
   }
 
-  return { memberId: member.id as string, householdId: member.household_id as string };
+  // Sem tipos gerados do Supabase ainda, o builder infere `households`
+  // como array — na prática é o objeto único do lado "many-to-one".
+  const householdRaw = member.households as unknown as { currency: string } | { currency: string }[] | null;
+  const household = Array.isArray(householdRaw) ? householdRaw[0] : householdRaw;
+  const currency = (household?.currency as CurrencyCode) ?? "USD";
+
+  return {
+    memberId: member.id as string,
+    householdId: member.household_id as string,
+    currency,
+  };
 }

@@ -3,6 +3,31 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import type { CurrencyCode } from "@/lib/money";
+
+const VALID_CURRENCIES: CurrencyCode[] = ["BRL", "USD", "EUR"];
+
+export async function updateCurrency(currency: CurrencyCode) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  if (!VALID_CURRENCIES.includes(currency)) throw new Error("Moeda inválida.");
+
+  const { data, error } = await supabase
+    .from("households")
+    .update({ currency })
+    .eq("id", householdId)
+    .select("id");
+
+  if (error) throw new Error(error.message);
+  // RLS bloqueando o update não gera erro, só devolve 0 linhas — sem
+  // essa checagem a escrita falha em silêncio.
+  if (!data || data.length === 0) {
+    throw new Error("Não foi possível salvar a moeda (permissão negada).");
+  }
+
+  revalidateEverything();
+}
 
 function revalidateEverything() {
   for (const path of [

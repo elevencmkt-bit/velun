@@ -2,13 +2,39 @@
 // amount_cents (BIGINT), nunca float. Estas são as únicas duas
 // funções que cruzam a fronteira entre centavos e texto exibido.
 
-const formatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
+export type CurrencyCode = "BRL" | "USD" | "EUR";
 
-export function formatCents(cents: number): string {
-  return formatter.format(cents / 100);
+export const CURRENCY_LABELS: Record<CurrencyCode, string> = {
+  BRL: "Real (R$)",
+  USD: "Dólar (US$)",
+  EUR: "Euro (€)",
+};
+
+const LOCALE_BY_CURRENCY: Record<CurrencyCode, string> = {
+  BRL: "pt-BR",
+  USD: "en-US",
+  EUR: "de-DE",
+};
+
+// Um Intl.NumberFormat por moeda, reaproveitado entre chamadas — são
+// objetos imutáveis (sem estado por household), seguro reusar em
+// requests concorrentes de households diferentes.
+const formatters = new Map<CurrencyCode, Intl.NumberFormat>();
+
+function getFormatter(currency: CurrencyCode) {
+  let formatter = formatters.get(currency);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(LOCALE_BY_CURRENCY[currency], {
+      style: "currency",
+      currency,
+    });
+    formatters.set(currency, formatter);
+  }
+  return formatter;
+}
+
+export function formatCents(cents: number, currency: CurrencyCode = "USD"): string {
+  return getFormatter(currency).format(cents / 100);
 }
 
 export function parseToCents(input: string): number {
