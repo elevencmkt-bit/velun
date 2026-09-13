@@ -27,9 +27,20 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+
+  // Erro de rede/timeout ao consultar o Supabase (ex.: Gateway Timeout) não
+  // significa que a sessão expirou — só que não deu pra confirmar agora.
+  // Nesse caso deixamos a navegação passar em vez de chutar pro login;
+  // só redireciona quando o Supabase respondeu e realmente não há usuário.
+  const sessionCheckFailed = Boolean(error) && error?.name !== "AuthSessionMissingError";
+  if (sessionCheckFailed) {
+    console.error("[middleware] falha ao verificar sessão, deixando passar:", error?.message);
+    return supabaseResponse;
+  }
 
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();

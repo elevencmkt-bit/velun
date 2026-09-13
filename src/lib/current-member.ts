@@ -5,7 +5,16 @@ export async function getCurrentMember() {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  // Erro de rede/timeout ao falar com o Supabase (comum, passageiro) não é
+  // a mesma coisa que "sem sessão" — só quando o Supabase confirma que não
+  // há usuário (ou não há sessão nenhuma) é que faz sentido ir pro login.
+  // Do contrário a gente jogava fora uma sessão válida a cada instabilidade.
+  if (authError && authError.name !== "AuthSessionMissingError") {
+    throw new Error(`Falha ao verificar sessão, tente novamente: ${authError.message}`);
+  }
 
   if (!user) {
     redirect("/login");
