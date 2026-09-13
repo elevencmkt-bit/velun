@@ -3,10 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
-import { deleteCategory, updateCategoryName } from "@/lib/actions/categories";
-import { CategoryColorPicker } from "./category-color-picker";
+import { deleteCategory, updateCategoryColor, updateCategoryName } from "@/lib/actions/categories";
+import { findPaletteColorByFg } from "@/lib/category-colors";
+import { ColorSwatchGrid } from "./color-swatch-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -42,16 +44,20 @@ export function CategoryRow({
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState(category.name);
+  const [color, setColor] = useState<string | null>(findPaletteColorByFg(category.color)?.fg ?? null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  function onSaveName(event: React.FormEvent<HTMLFormElement>) {
+  function onSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     startTransition(async () => {
       try {
         await updateCategoryName(category.id, name);
+        if (category.kind === "expense") {
+          await updateCategoryColor(category.id, color);
+        }
         setEditOpen(false);
         router.refresh();
       } catch (err) {
@@ -69,19 +75,20 @@ export function CategoryRow({
 
   return (
     <div className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 last:border-0">
-      {category.kind === "expense" ? (
-        <CategoryColorPicker
-          categoryId={category.id}
-          color={category.color}
-          effectiveColor={effectiveColor ?? null}
-        />
-      ) : (
-        <div className="h-6 w-6 shrink-0 rounded-full" style={{ backgroundColor: "var(--income)" }} />
-      )}
+      <div
+        className="h-6 w-6 shrink-0 rounded-full"
+        style={{ backgroundColor: category.kind === "income" ? "var(--income)" : (effectiveColor ?? "var(--text-light)") }}
+      />
       <span className="text-table-body text-(--text-primary)">{category.name}</span>
 
       <span className="ml-auto flex items-center gap-0.5">
-        <Dialog open={editOpen} onOpenChange={(next) => { setEditOpen(next); if (!next) setError(null); }}>
+        <Dialog
+          open={editOpen}
+          onOpenChange={(next) => {
+            setEditOpen(next);
+            if (!next) setError(null);
+          }}
+        >
           <DialogTrigger asChild>
             <Button variant="ghost" size="icon-sm" aria-label="Editar categoria">
               <Pencil className="h-3.5 w-3.5" />
@@ -91,8 +98,23 @@ export function CategoryRow({
             <DialogHeader>
               <DialogTitle>Editar categoria</DialogTitle>
             </DialogHeader>
-            <form onSubmit={onSaveName} className="flex flex-col gap-4">
-              <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+            <form onSubmit={onSave} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-category-name">Nome</Label>
+                <Input
+                  id="edit-category-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              {category.kind === "expense" ? (
+                <div className="flex flex-col gap-2">
+                  <Label>Cor</Label>
+                  <ColorSwatchGrid value={color} onChange={setColor} />
+                </div>
+              ) : null}
               {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
               <Button type="submit" disabled={isPending}>
                 {isPending ? "Salvando..." : "Salvar"}

@@ -26,13 +26,26 @@ export async function createCategory(formData: FormData) {
 
   const name = String(formData.get("name") ?? "").trim();
   const kind = String(formData.get("kind") ?? "expense");
+  const colorInput = formData.get("color");
+  const color = typeof colorInput === "string" ? colorInput : null;
 
   if (!name) throw new Error("Nome da categoria é obrigatório.");
   if (kind !== "income" && kind !== "expense") throw new Error("Tipo de categoria inválido.");
 
+  // Cor manual só faz sentido pra despesa — receita é sempre o verde
+  // fixo de INCOME_COLOR, então qualquer valor aqui é ignorado.
+  if (kind === "expense" && color && !findPaletteColorByFg(color)) {
+    throw new Error("Cor inválida.");
+  }
+
   const { data, error } = await supabase
     .from("categories")
-    .insert({ household_id: householdId, name, kind, color: NO_MANUAL_COLOR })
+    .insert({
+      household_id: householdId,
+      name,
+      kind,
+      color: kind === "expense" && color ? color : NO_MANUAL_COLOR,
+    })
     .select("id")
     .single();
 
