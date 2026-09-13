@@ -7,6 +7,8 @@ export type TransactionRow = {
   direction: "in" | "out";
   status: "pending" | "cleared";
   import_id: string | null;
+  transfer_group_id: string | null;
+  account_id: string;
   category_id: string | null;
   account_name: string;
   category_name: string | null;

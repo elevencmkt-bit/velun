@@ -14,7 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CategoryOption, TransactionRow } from "./types";
+import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
+import { DeleteTransactionButton } from "@/components/delete-transaction-button";
+import type { AccountOption, CategoryOption, TransactionRow } from "./types";
 
 const NO_CATEGORY = "__none__";
 
@@ -25,10 +27,12 @@ function formatDayHeading(date: string) {
 
 export function TransactionsTable({
   rows,
+  accounts,
   categories,
   categoryColors,
 }: {
   rows: TransactionRow[];
+  accounts: AccountOption[];
   categories: CategoryOption[];
   categoryColors: Record<string, CategoryColorPair>;
 }) {
@@ -191,6 +195,29 @@ export function TransactionsTable({
                 >
                   {row.direction === "out" ? "-" : "+"}
                   {formatCents(row.amount_cents)}
+                </span>
+                <span className="flex items-center gap-0.5">
+                  {row.transfer_group_id ? null : (
+                    <EditTransactionDialog
+                      transaction={{
+                        id: row.id,
+                        date: row.date,
+                        account_id: row.account_id,
+                        category_id: row.category_id,
+                        direction: row.direction,
+                        amount_cents: row.amount_cents,
+                        description: row.description,
+                        notes: row.notes,
+                        status: row.status,
+                      }}
+                      accounts={accounts}
+                      categories={categories}
+                    />
+                  )}
+                  <DeleteTransactionButton
+                    transactionId={row.id}
+                    transferGroupId={row.transfer_group_id}
+                  />
                 </span>
               </div>
             ))}

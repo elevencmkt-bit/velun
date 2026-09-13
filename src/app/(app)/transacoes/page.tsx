@@ -36,7 +36,8 @@ export default async function TransacoesPage({
   let query = supabase
     .from("transactions")
     .select(
-      `id, date, description, notes, amount_cents, direction, status, import_id, category_id,
+      `id, date, description, notes, amount_cents, direction, status, import_id,
+       transfer_group_id, account_id, category_id,
        account:accounts(name),
        category:categories(name),
        creator:members!created_by(display_name)`,
@@ -69,6 +70,8 @@ export default async function TransacoesPage({
     direction: row.direction,
     status: row.status,
     import_id: row.import_id,
+    transfer_group_id: row.transfer_group_id,
+    account_id: row.account_id,
     category_id: row.category_id,
     account_name: single<{ name: string }>(row.account)?.name ?? "—",
     category_name: single<{ name: string }>(row.category)?.name ?? null,
@@ -89,6 +92,7 @@ export default async function TransacoesPage({
           </Suspense>
           <TransactionsTable
             rows={rows}
+            accounts={accounts ?? []}
             categories={categories ?? []}
             categoryColors={Object.fromEntries(colorMap)}
           />
