@@ -20,39 +20,39 @@ export default async function FluxoDeCaixaPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-bold">Fluxo de caixa</h1>
-      <p className="text-sm text-[--ink]/70">
-        Saldo atual mais as contas pendentes, projetado para os próximos {HORIZON_DAYS} dias.
-      </p>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-page-title">Fluxo de caixa</h1>
+        <p className="text-page-subtitle">
+          Saldo atual mais as contas pendentes, projetado para os próximos {HORIZON_DAYS} dias.
+        </p>
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 pt-6">
+        <Card>
+          <CardContent className="flex min-h-[116px] items-center gap-4">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
               style={{ backgroundColor: "var(--badge-blue-bg)" }}
             >
-              <Wallet className="h-5 w-5" style={{ color: "var(--badge-blue-fg)" }} />
+              <Wallet className="h-6 w-6" style={{ color: "var(--badge-blue-fg)" }} />
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm text-[--ink]/60">Saldo atual</span>
-              <span className="text-xl font-semibold tabular-nums">
-                {formatCents(currentTotal)}
-              </span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-kpi-label">Saldo atual</span>
+              <span className="text-kpi-value">{formatCents(currentTotal)}</span>
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 pt-6">
+        <Card>
+          <CardContent className="flex min-h-[116px] items-center gap-4">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
               style={{
                 backgroundColor:
                   finalPoint.balance_cents < 0 ? "var(--badge-red-bg)" : "var(--badge-green-bg)",
               }}
             >
               <TrendingUp
-                className="h-5 w-5"
+                className="h-6 w-6"
                 style={{
                   color:
                     finalPoint.balance_cents < 0
@@ -61,40 +61,40 @@ export default async function FluxoDeCaixaPage() {
                 }}
               />
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm text-[--ink]/60">Projetado em {HORIZON_DAYS} dias</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-kpi-label">Projetado em {HORIZON_DAYS} dias</span>
               <span
-                className="text-xl font-semibold tabular-nums"
-                style={{ color: finalPoint.balance_cents < 0 ? "var(--out)" : "var(--in)" }}
+                className="text-kpi-value"
+                style={{ color: finalPoint.balance_cents < 0 ? "var(--expense)" : undefined }}
               >
                 {formatCents(finalPoint.balance_cents)}
               </span>
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-3 pt-6">
+        <Card>
+          <CardContent className="flex min-h-[116px] items-center gap-4">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
               style={{ backgroundColor: "var(--badge-purple-bg)" }}
             >
-              <TrendingDown className="h-5 w-5" style={{ color: "var(--badge-purple-fg)" }} />
+              <TrendingDown className="h-6 w-6" style={{ color: "var(--badge-purple-fg)" }} />
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm text-[--ink]/60">Ponto mais baixo</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-kpi-label">Ponto mais baixo</span>
               <span
-                className="text-xl font-semibold tabular-nums"
-                style={{ color: lowestPoint.balance_cents < 0 ? "var(--out)" : "var(--ink)" }}
+                className="text-kpi-value"
+                style={{ color: lowestPoint.balance_cents < 0 ? "var(--expense)" : undefined }}
               >
                 {formatCents(lowestPoint.balance_cents)}
               </span>
-              <span className="text-xs text-[--ink]/50">em {lowestPoint.label}</span>
+              <span className="text-xs text-[--text-muted]">em {lowestPoint.label}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="shadow-sm">
+      <Card>
         <CardContent className="pt-6">
           <CashFlowChart points={points} />
         </CardContent>

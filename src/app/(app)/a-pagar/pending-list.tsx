@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { formatCents } from "@/lib/money";
 import { markTransactionPaid } from "@/lib/actions/transactions";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { CategoryBadge } from "@/components/category-badge";
+import type { CategoryColorPair } from "@/lib/category-colors";
 
 export type PendingRow = {
   id: string;
@@ -31,14 +31,14 @@ export function PendingList({
   categoryColors,
 }: {
   rows: PendingRow[];
-  categoryColors: Record<string, string>;
+  categoryColors: Record<string, CategoryColorPair>;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   if (rows.length === 0) {
     return (
-      <p className="text-sm text-[--ink]/70">Nenhuma conta pendente nos próximos 30 dias.</p>
+      <p className="text-sm text-[--text-muted]">Nenhuma conta pendente nos próximos 30 dias.</p>
     );
   }
 
@@ -47,14 +47,21 @@ export function PendingList({
       {rows.map((row) => (
         <div
           key={row.id}
-          className="flex items-center gap-3 border-b border-[--rule]/60 py-2 text-sm"
+          className="flex min-h-[50px] items-center gap-3 border-b border-[--border-soft] px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
         >
-          <span className="w-16 text-[--ink]/60">{formatDate(row.date)}</span>
+          <span className="text-table-body w-16">{formatDate(row.date)}</span>
           {row.is_overdue ? (
-            <Badge style={{ backgroundColor: "var(--flag)", color: "white" }}>Atrasada</Badge>
+            <span
+              className="inline-flex h-[26px] items-center rounded-[6px] px-2 text-[11px] font-medium"
+              style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
+            >
+              Atrasada
+            </span>
           ) : null}
-          <span className="w-48 truncate">{row.description}</span>
-          <span className="w-28 text-[--ink]/60">{row.account_name}</span>
+          <span className="text-table-body w-48 truncate text-[--text-primary]">
+            {row.description}
+          </span>
+          <span className="text-table-body w-28">{row.account_name}</span>
           <span className="w-32">
             <CategoryBadge
               name={row.category_name ?? ""}
@@ -63,8 +70,10 @@ export function PendingList({
             />
           </span>
           <span
-            className="ml-auto font-semibold tabular-nums"
-            style={{ color: row.direction === "out" ? "var(--out)" : "var(--in)" }}
+            className="ml-auto text-right font-semibold tabular-nums"
+            style={{
+              color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
+            }}
           >
             {row.direction === "out" ? "-" : "+"}
             {formatCents(row.amount_cents)}

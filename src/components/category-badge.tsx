@@ -1,8 +1,7 @@
-import { MUTED_SLICE_COLOR } from "@/lib/category-colors";
+import { INCOME_COLOR, MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 
-// Pills coloridos por categoria, no espírito do mockup — mas a cor é
-// sempre um "dot" ao lado do texto (nunca a cor do próprio texto), por
-// acessibilidade: texto usa token de ink, cor carrega identidade.
+// Pills de categoria (UI Style Specs, seção 17): fundo suave, texto
+// saturado, sem parecer botão — nada de dot ou borda.
 export function CategoryBadge({
   name,
   kind,
@@ -10,21 +9,19 @@ export function CategoryBadge({
 }: {
   name: string;
   kind: "income" | "expense" | null;
-  color?: string;
+  color?: CategoryColorPair;
 }) {
   if (!name) {
-    return <span className="text-xs text-[--ink]/50">Sem categoria</span>;
+    return <span className="text-xs text-[--text-light]">Sem categoria</span>;
   }
 
-  const dot = kind === "income" ? "var(--badge-green-fg)" : (color ?? MUTED_SLICE_COLOR);
-  const bg = kind === "income" ? "var(--badge-green-bg)" : `color-mix(in srgb, ${dot} 16%, white)`;
+  const pair = kind === "income" ? INCOME_COLOR : (color ?? MUTED_CATEGORY_COLOR);
 
   return (
     <span
-      className="inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-[--ink]"
-      style={{ backgroundColor: bg }}
+      className="inline-flex h-[26px] w-fit items-center rounded-[6px] px-2 text-[11px] font-medium"
+      style={{ backgroundColor: pair.bg, color: pair.fg }}
     >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: dot }} />
       {name}
     </span>
   );

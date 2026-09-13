@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getExpenseCategoryColorMap } from "@/lib/category-colors";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { RecurrenceForm } from "./recurrence-form";
 import { PendingList, type PendingRow } from "./pending-list";
 import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
@@ -89,13 +89,11 @@ export default async function APagarPage() {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-bold">A pagar</h1>
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-[--ink]/60">
-              Próximos 30 dias, atrasadas em destaque
-            </CardTitle>
-          </CardHeader>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-page-title">A pagar</h1>
+          <p className="text-page-subtitle">Próximos 30 dias, atrasadas em destaque.</p>
+        </div>
+        <Card>
           <CardContent>
             <PendingList rows={pendingRows} categoryColors={Object.fromEntries(colorMap)} />
           </CardContent>
@@ -104,10 +102,10 @@ export default async function APagarPage() {
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Recorrências</h2>
+          <h2 className="text-card-title">Recorrências</h2>
           <RecurrenceForm accounts={accounts ?? []} categories={categories ?? []} />
         </div>
-        <Card className="shadow-sm">
+        <Card>
           <CardContent className="pt-6">
             <RecurrencesList rows={recurrenceRows} />
           </CardContent>

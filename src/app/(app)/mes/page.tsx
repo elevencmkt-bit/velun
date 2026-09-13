@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ArrowDownCircle, ArrowRight, ArrowUpCircle, PiggyBank } from "lucide-react";
+import { ArrowDownCircle, ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, PiggyBank } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
-import { getExpenseCategoryColorMap, MUTED_SLICE_COLOR } from "@/lib/category-colors";
+import { getExpenseCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { getCashFlowProjection } from "@/lib/cash-flow";
 import {
   excludeTransfers,
@@ -86,14 +86,36 @@ async function fetchMonthTransactions(
   }));
 }
 
-function DeltaLabel({ current, previous }: { current: number; previous: number }) {
+// Badge de tendência (seção 13). A cor segue se a mudança é favorável
+// para esta métrica, não o sinal cru — Saiu caindo é bom (verde),
+// Entrou/Sobrou caindo é ruim (vermelho).
+function PercentBadge({
+  current,
+  previous,
+  favorable = "up",
+}: {
+  current: number;
+  previous: number;
+  favorable?: "up" | "down";
+}) {
   const change = percentChange(current, previous);
-  if (change === null) return <span className="text-xs text-[--ink]/50">sem dado anterior</span>;
-  const sign = change > 0 ? "+" : "";
+  if (change === null) {
+    return <span className="text-xs text-[--text-light]">sem dado anterior</span>;
+  }
+  const direction = change >= 0 ? "up" : "down";
+  const isFavorable = direction === favorable;
+  const Icon = direction === "up" ? ArrowUp : ArrowDown;
+
   return (
-    <span className="text-xs text-[--ink]/50">
-      {sign}
-      {change.toFixed(0)}% vs mês passado
+    <span
+      className="inline-flex w-fit items-center gap-0.5 rounded-full px-[7px] py-[2px] text-[11px] font-semibold"
+      style={{
+        backgroundColor: isFavorable ? "var(--income-soft)" : "var(--expense-soft)",
+        color: isFavorable ? "var(--income-dark)" : "var(--expense-dark)",
+      }}
+    >
+      <Icon className="h-3 w-3" />
+      {Math.abs(change).toFixed(0)}%
     </span>
   );
 }
@@ -101,7 +123,6 @@ function DeltaLabel({ current, previous }: { current: number; previous: number }
 function StatCard({
   label,
   value,
-  valueColor,
   icon: Icon,
   badgeBg,
   badgeFg,
@@ -109,28 +130,25 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  valueColor: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   badgeBg: string;
   badgeFg: string;
   delta: React.ReactNode;
 }) {
   return (
-    <Card className="shadow-sm">
-      <CardContent className="flex flex-col gap-3 pt-6">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: badgeBg }}
-          >
-            <Icon className="h-5 w-5" style={{ color: badgeFg }} />
-          </div>
-          <span className="text-sm text-[--ink]/60">{label}</span>
+    <Card>
+      <CardContent className="flex min-h-[116px] items-center gap-4">
+        <div
+          className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+          style={{ backgroundColor: badgeBg }}
+        >
+          <Icon className="h-6 w-6" style={{ color: badgeFg }} />
         </div>
-        <span className="text-2xl font-semibold tabular-nums" style={{ color: valueColor }}>
-          {value}
-        </span>
-        {delta}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-kpi-label">{label}</span>
+          <span className="text-kpi-value">{value}</span>
+          {delta}
+        </div>
       </CardContent>
     </Card>
   );
@@ -191,7 +209,7 @@ export default async function MesPage({
 
   const slices = groupExpensesByCategory(current).map((slice) => ({
     ...slice,
-    color: colorMap.get(slice.name) ?? MUTED_SLICE_COLOR,
+    color: (colorMap.get(slice.name) ?? MUTED_CATEGORY_COLOR).fg,
   }));
 
   const top5 = topExpenses(current, 5);
@@ -211,14 +229,12 @@ export default async function MesPage({
   if (householdIsEmpty) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="text-lg font-bold">Dashboard</h1>
+        <h1 className="text-page-title">Dashboard</h1>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-normal text-[--ink]/70">
-              Household vazio
-            </CardTitle>
+            <CardTitle className="text-card-title">Household vazio</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-[--ink]/70">
+          <CardContent className="text-sm text-[--text-secondary]">
             Nenhuma conta ainda. Cadastre uma conta em{" "}
             <span className="font-medium">Contas</span> ou lance algo em{" "}
             <span className="font-medium">Transações</span> para começar.
@@ -231,18 +247,23 @@ export default async function MesPage({
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Dashboard</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-page-title">Dashboard</h1>
+          <p className="text-page-subtitle">Resumo financeiro de {monthLabel(year, monthIndex)}.</p>
+        </div>
         <div className="flex items-center gap-3 text-sm">
           <Link
             href={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
-            className="text-[--ink]/60 hover:text-[--ink]"
+            className="text-[--text-muted] hover:text-[--text-primary]"
           >
             ← anterior
           </Link>
-          <span className="font-medium capitalize">{monthLabel(year, monthIndex)}</span>
+          <span className="font-medium capitalize text-[--text-primary]">
+            {monthLabel(year, monthIndex)}
+          </span>
           <Link
             href={`/mes?month=${monthParam(next.year, next.monthIndex)}`}
-            className="text-[--ink]/60 hover:text-[--ink]"
+            className="text-[--text-muted] hover:text-[--text-primary]"
           >
             próximo →
           </Link>
@@ -253,69 +274,61 @@ export default async function MesPage({
         <StatCard
           label="Entrou"
           value={formatCents(entrou)}
-          valueColor="var(--in)"
           icon={ArrowUpCircle}
           badgeBg="var(--badge-green-bg)"
           badgeFg="var(--badge-green-fg)"
-          delta={<DeltaLabel current={entrou} previous={entrouPrev} />}
+          delta={<PercentBadge current={entrou} previous={entrouPrev} favorable="up" />}
         />
         <StatCard
           label="Saiu"
           value={formatCents(saiu)}
-          valueColor="var(--out)"
           icon={ArrowDownCircle}
           badgeBg="var(--badge-red-bg)"
           badgeFg="var(--badge-red-fg)"
-          delta={<DeltaLabel current={saiu} previous={saiuPrev} />}
+          delta={<PercentBadge current={saiu} previous={saiuPrev} favorable="down" />}
         />
         <StatCard
           label="Sobrou"
           value={formatCents(sobrou)}
-          valueColor={sobrou < 0 ? "var(--out)" : "var(--in)"}
           icon={PiggyBank}
           badgeBg="var(--badge-blue-bg)"
           badgeFg="var(--badge-blue-fg)"
-          delta={<DeltaLabel current={sobrou} previous={sobrouPrev} />}
+          delta={<PercentBadge current={sobrou} previous={sobrouPrev} favorable="up" />}
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <Card className="shadow-sm">
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Despesas por categoria</CardTitle>
+            <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
           </CardHeader>
           <CardContent>
             <MonthDonut slices={slices} compact />
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Entradas vs saídas</CardTitle>
+            <CardTitle className="text-card-title">Entradas vs saídas</CardTitle>
           </CardHeader>
           <CardContent>
             <TrendBarChart points={trendPoints} compact />
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Fluxo de caixa</CardTitle>
+            <CardTitle className="text-card-title">Fluxo de caixa</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-center justify-between text-sm">
               <div className="flex flex-col">
-                <span className="text-xs text-[--ink]/50">Saldo atual</span>
-                <span className="font-semibold tabular-nums">
+                <span className="text-kpi-label">Saldo atual</span>
+                <span className="font-semibold tabular-nums text-[--text-primary]">
                   {formatCents(cashFlow.currentTotal)}
                 </span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-xs text-[--ink]/50">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
-                <span
-                  className="font-semibold tabular-nums"
-                  style={{
-                    color: cashFlow.finalPoint.balance_cents < 0 ? "var(--out)" : "var(--in)",
-                  }}
-                >
+                <span className="text-kpi-label">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
+                <span className="font-semibold tabular-nums text-[--text-primary]">
                   {formatCents(cashFlow.finalPoint.balance_cents)}
                 </span>
               </div>
@@ -323,7 +336,7 @@ export default async function MesPage({
             <CashFlowChart points={cashFlow.points} compact />
             <Link
               href="/fluxo-de-caixa"
-              className="flex items-center gap-1 text-xs text-[--ink]/60 hover:text-[--ink]"
+              className="flex items-center gap-1 text-xs text-[--text-muted] hover:text-[--text-primary]"
             >
               Ver detalhes <ArrowRight className="h-3 w-3" />
             </Link>
@@ -331,28 +344,33 @@ export default async function MesPage({
         </Card>
       </div>
 
-      <Card className="shadow-sm">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Maiores despesas</CardTitle>
+          <CardTitle className="text-card-title">Maiores despesas</CardTitle>
         </CardHeader>
         <CardContent>
           {top5.length === 0 ? (
-            <p className="text-sm text-[--ink]/70">Nenhuma despesa neste mês.</p>
+            <p className="text-sm text-[--text-muted]">Nenhuma despesa neste mês.</p>
           ) : (
             <div className="flex flex-col">
               {top5.map((row) => (
                 <div
                   key={row.id}
-                  className="flex items-center gap-3 border-b border-[--rule]/60 py-2.5 text-sm last:border-0"
+                  className="flex min-h-[50px] items-center gap-3 border-b border-[--border-soft] px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
                 >
-                  <span className="w-40 truncate">{row.description}</span>
+                  <span className="text-table-body w-40 truncate text-[--text-primary]">
+                    {row.description}
+                  </span>
                   <CategoryBadge
                     name={row.category_name ?? ""}
                     kind="expense"
                     color={colorMap.get(row.category_name ?? "")}
                   />
-                  <span className="w-28 text-[--ink]/60">{row.account_name}</span>
-                  <span className="ml-auto font-semibold tabular-nums" style={{ color: "var(--out)" }}>
+                  <span className="text-table-body w-28">{row.account_name}</span>
+                  <span
+                    className="ml-auto text-right font-semibold tabular-nums"
+                    style={{ color: "var(--table-amount-out)" }}
+                  >
                     -{formatCents(row.amount_cents)}
                   </span>
                 </div>

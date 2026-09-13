@@ -77,8 +77,8 @@ export default async function TransacoesPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-bold">Transações</h1>
-      <Card className="shadow-sm">
+      <h1 className="text-page-title">Transações</h1>
+      <Card>
         <CardContent className="flex flex-col gap-6 pt-6">
           <Suspense>
             <TransactionFilters

@@ -12,6 +12,8 @@ import {
   HeartHandshake,
 } from "lucide-react";
 
+const ICON_PROPS = { size: 18, strokeWidth: 1.8 };
+
 const NAV = [
   { href: "/mes", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
@@ -27,26 +29,26 @@ export function Sidebar({ householdName }: { householdName: string }) {
 
   return (
     <aside
-      className="flex h-screen w-60 shrink-0 flex-col justify-between border-r"
-      style={{ backgroundColor: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}
+      className="flex h-screen w-[230px] shrink-0 flex-col justify-between"
+      style={{ background: "var(--sidebar-bg-gradient)" }}
     >
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-2 px-5 pt-6">
+      <div className="flex flex-col gap-6 px-4 pt-[22px]">
+        <div className="flex items-center gap-2 px-1">
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: "var(--sidebar-active-bg)" }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+            style={{ background: "var(--sidebar-active-gradient)" }}
           >
             <HeartHandshake className="h-5 w-5 text-white" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-white">{householdName}</span>
-            <span className="text-xs" style={{ color: "var(--sidebar-fg-muted)" }}>
+            <span className="text-[18px] font-bold text-white">{householdName}</span>
+            <span className="text-[11px] font-normal" style={{ color: "var(--sidebar-fg-muted)" }}>
               Dashboard financeiro
             </span>
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3">
+        <nav className="flex flex-col gap-1">
           {NAV.map((item) => {
             const isActive = pathname?.startsWith(item.href);
             const Icon = item.icon;
@@ -54,13 +56,15 @@ export function Sidebar({ householdName }: { householdName: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                className={`flex min-h-[42px] items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
+                  isActive ? "text-white" : "text-[--sidebar-fg] hover:bg-white/[.06] hover:text-white"
+                }`}
                 style={{
-                  backgroundColor: isActive ? "var(--sidebar-active-bg)" : "transparent",
-                  color: isActive ? "#ffffff" : "var(--sidebar-fg)",
+                  background: isActive ? "var(--sidebar-active-gradient)" : "transparent",
+                  boxShadow: isActive ? "0 6px 14px rgba(69,76,224,.25)" : "none",
                 }}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon {...ICON_PROPS} className="shrink-0" />
                 {item.label}
               </Link>
             );
@@ -72,10 +76,10 @@ export function Sidebar({ householdName }: { householdName: string }) {
                 key={item.label}
                 aria-disabled="true"
                 title="Em breve"
-                className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium opacity-40"
+                className="flex min-h-[42px] cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium opacity-40"
                 style={{ color: "var(--sidebar-fg)" }}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon {...ICON_PROPS} className="shrink-0" />
                 {item.label}
               </span>
             );

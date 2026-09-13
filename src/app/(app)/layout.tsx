@@ -49,11 +49,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-[--paper] text-[--ink]">
       <Sidebar householdName={household?.name ?? "Sem household"} />
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-[--rule] bg-[--surface] px-6 py-3">
+        <header
+          className="flex h-[66px] shrink-0 items-center justify-between border-b px-7"
+          style={{ backgroundColor: "rgba(255,255,255,.92)", borderColor: "var(--border-primary)" }}
+        >
           <GlobalSearch />
           <div className="flex items-center gap-3">
             <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
-            <span className="text-sm text-[--ink]/70">{member?.display_name ?? user.email}</span>
+            <span className="text-[13px] text-[--text-secondary]">
+              {member?.display_name ?? user.email}
+            </span>
             <form action={logout}>
               <Button type="submit" variant="outline" size="sm">
                 Sair
@@ -61,7 +66,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto px-7 pt-6 pb-8">
+          <div className="mx-auto max-w-[1600px]">{children}</div>
+        </main>
       </div>
     </div>
   );

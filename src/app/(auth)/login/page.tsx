@@ -14,7 +14,7 @@ export default async function LoginPage({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[--paper] p-4">
-      <Card className="w-full max-w-sm shadow-sm">
+      <Card className="w-full max-w-sm">
         <CardHeader className="flex flex-col items-center gap-2 pb-2">
           <div
             className="flex h-11 w-11 items-center justify-center rounded-2xl"

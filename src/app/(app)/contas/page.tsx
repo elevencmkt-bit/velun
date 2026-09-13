@@ -44,27 +44,30 @@ export default async function ContasPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Contas</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-page-title">Contas</h1>
+          <p className="text-page-subtitle">Saldo por conta, derivado das transações cleared.</p>
+        </div>
         <AccountForm />
       </div>
 
       {!accounts || accounts.length === 0 ? (
-        <p className="text-sm text-[--ink]/70">
+        <p className="text-sm text-[--text-muted]">
           Nenhuma conta ainda. Crie a primeira para começar a lançar transações.
         </p>
       ) : (
         <>
-          <Card className="w-fit shadow-sm">
-            <CardContent className="flex items-center gap-3 pt-6">
+          <Card className="w-fit">
+            <CardContent className="flex min-h-[116px] items-center gap-4">
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
                 style={{ backgroundColor: "var(--badge-blue-bg)" }}
               >
-                <Wallet className="h-5 w-5" style={{ color: "var(--badge-blue-fg)" }} />
+                <Wallet className="h-6 w-6" style={{ color: "var(--badge-blue-fg)" }} />
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm text-[--ink]/60">Saldo total</span>
-                <span className="text-xl font-semibold tabular-nums">{formatCents(total)}</span>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-kpi-label">Saldo total</span>
+                <span className="text-kpi-value">{formatCents(total)}</span>
               </div>
             </CardContent>
           </Card>
@@ -76,15 +79,15 @@ export default async function ContasPage() {
               return (
                 <Card
                   key={account.id}
-                  className={`shadow-sm ${account.is_archived ? "opacity-50" : ""}`}
+                  className={account.is_archived ? "opacity-50" : ""}
                 >
-                  <CardContent className="flex flex-col gap-3 pt-6">
+                  <CardContent className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <div
-                        className="flex h-10 w-10 items-center justify-center rounded-xl"
+                        className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
                         style={{ backgroundColor: "var(--badge-purple-bg)" }}
                       >
-                        <Icon className="h-5 w-5" style={{ color: "var(--badge-purple-fg)" }} />
+                        <Icon className="h-6 w-6" style={{ color: "var(--badge-purple-fg)" }} />
                       </div>
                       {account.is_archived ? (
                         <Badge variant="secondary">Arquivada</Badge>
@@ -93,15 +96,15 @@ export default async function ContasPage() {
                       )}
                     </div>
                     <div>
-                      <div className="font-medium">{account.name}</div>
-                      <div className="text-xs text-[--ink]/50">
+                      <div className="text-card-title">{account.name}</div>
+                      <div className="text-xs text-[--text-muted]">
                         {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
                         {account.institution ? ` · ${account.institution}` : ""}
                       </div>
                     </div>
                     <span
-                      className="text-xl font-semibold tabular-nums"
-                      style={{ color: balance < 0 ? "var(--out)" : "var(--in)" }}
+                      className="text-kpi-value"
+                      style={{ color: balance < 0 ? "var(--expense)" : undefined }}
                     >
                       {formatCents(balance)}
                     </span>

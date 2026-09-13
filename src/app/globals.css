@@ -39,73 +39,136 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xs: 5px;
+  --radius-sm: 7px;
+  --radius-md: 9px;
+  --radius-lg: 11px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 22px;
+  --radius-4xl: 26px;
+  --radius-pill: 999px;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* UI Style Specs — Dashboard Financeiro (seção 30, tokens do usuário) */
 
-  /* Direção visual — Fase 6, inspirada no mockup do household (referência
-     visual, não a paleta minimalista original da seção 7 da spec). */
-  --ink: #16181d;
-  --paper: #f5f6fb;
-  --surface: #ffffff;
-  --rule: #e7e8f2;
-  --out: #ef4444;
-  --in: #16a34a;
-  --flag: #f59e0b;
+  /* Background */
+  --bg-app: #f6f8fc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f8fafc;
 
-  --sidebar-bg: #181a2e;
-  --sidebar-fg: #d7d8e6;
-  --sidebar-fg-muted: #9496b3;
-  --sidebar-active-bg: #4f46e5;
+  /* Text */
+  --text-primary: #101828;
+  --text-secondary: #475467;
+  --text-muted: #667085;
+  --text-light: #98a2b3;
+
+  /* Border */
+  --border-primary: #eaecf0;
+  --border-soft: #f2f4f7;
+
+  /* Brand */
+  --primary: #5158f6;
+  --primary-hover: #454bd8;
+  --primary-light: #eef0ff;
+  --primary-soft: #f5f6ff;
+
+  /* Finance */
+  --income: #12b76a;
+  --income-dark: #027a48;
+  --income-soft: #ecfdf3;
+  --income-icon: #a6f4c5;
+
+  --expense: #f04438;
+  --expense-dark: #b42318;
+  --expense-soft: #fef3f2;
+  --expense-icon: #fecdca;
+
+  --warning: #f79009;
+  --warning-dark: #b54708;
+  --warning-soft: #fffaeb;
+
+  --info: #2e90fa;
+  --info-soft: #eff8ff;
+
+  --purple: #7f56d9;
+  --purple-soft: #f4f3ff;
+
+  /* Shadows — quase imperceptíveis (seção 22) */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.03);
+  --shadow-sm: 0 2px 6px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 6px 18px rgba(16, 24, 40, 0.06);
+
+  /* Paleta de gráficos (seção 14) */
+  --chart-green: #32b77a;
+  --chart-red: #f05273;
+  --chart-blue: #3b6ff5;
+  --chart-purple: #9457eb;
+  --chart-orange: #f59e42;
+  --chart-yellow: #f9c74f;
+  --chart-cyan: #36a2eb;
+
+  /* --- Compat: nomes usados no restante do app antes desta spec --- */
+  --ink: var(--text-primary);
+  --paper: var(--bg-app);
+  --surface: var(--bg-surface);
+  --rule: var(--border-primary);
+  --out: var(--expense);
+  --in: var(--income);
+  --flag: var(--warning);
+
+  --sidebar-fg: rgba(255, 255, 255, 0.72);
+  --sidebar-fg-muted: rgba(255, 255, 255, 0.55);
+  --sidebar-active-bg: #4e54ed;
+  --sidebar-active-gradient: linear-gradient(135deg, #6268ff, #4e54ed);
   --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-bg-gradient: linear-gradient(180deg, #17223b 0%, #111a2f 100%);
 
-  --badge-green-bg: #dcfce7;
-  --badge-green-fg: #16a34a;
-  --badge-red-bg: #fee2e2;
-  --badge-red-fg: #ef4444;
-  --badge-blue-bg: #dbeafe;
-  --badge-blue-fg: #3b82f6;
-  --badge-purple-bg: #ede9fe;
-  --badge-purple-fg: #8b5cf6;
+  --badge-green-bg: var(--income-soft);
+  --badge-green-fg: var(--income-dark);
+  --badge-red-bg: var(--expense-soft);
+  --badge-red-fg: var(--expense-dark);
+  --badge-blue-bg: #e0eaff;
+  --badge-blue-fg: #4e5ba6;
+  --badge-purple-bg: var(--purple-soft);
+  --badge-purple-fg: var(--purple);
+
+  /* Valores de tabela (seção 16) — tom ligeiramente diferente do --in/--out geral */
+  --table-amount-in: #039855;
+  --table-amount-out: #e62e4d;
+
+  /* shadcn primitives lidas por Button/Input/Select/Dialog/Card */
+  --background: var(--bg-app);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--primary-light);
+  --accent-foreground: var(--primary-hover);
+  --destructive: var(--expense);
+  --border: var(--border-primary);
+  --input: #d0d5dd;
+  --ring: var(--primary);
+  --chart-1: var(--chart-blue);
+  --chart-2: var(--chart-green);
+  --chart-3: var(--chart-purple);
+  --chart-4: var(--chart-orange);
+  --chart-5: var(--chart-red);
+  --radius: 9px;
+  --sidebar: #17223b;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-ring: var(--primary);
 }
 
 .dark {
@@ -148,8 +211,65 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings:
+      "tnum" 1,
+      "cv02" 1,
+      "cv03" 1,
+      "cv04" 1;
+    font-variant-numeric: tabular-nums;
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Escala tipográfica (seção 2) — traduzida em classes reaproveitáveis */
+@layer components {
+  .text-page-title {
+    font-size: 32px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+  }
+  .text-page-subtitle {
+    font-size: 14px;
+    line-height: 1.5;
+    font-weight: 400;
+    color: var(--text-secondary);
+  }
+  .text-card-title {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .text-kpi-label {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .text-kpi-value {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .text-table-body {
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 400;
+    color: var(--text-secondary);
+  }
+  .text-table-header {
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
   }
 }

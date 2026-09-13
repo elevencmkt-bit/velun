@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatCents } from "@/lib/money";
-import { MUTED_SLICE_COLOR } from "@/lib/category-colors";
+import { INCOME_COLOR, MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 import { bulkUpdateCategory, updateTransactionCategory } from "@/lib/actions/transactions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ export function TransactionsTable({
 }: {
   rows: TransactionRow[];
   categories: CategoryOption[];
-  categoryColors: Record<string, string>;
+  categoryColors: Record<string, CategoryColorPair>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -117,7 +117,7 @@ export function TransactionsTable({
         const allSelected = dayIds.every((id) => selected.has(id));
         return (
           <div key={date} className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 border-b border-[--rule] pb-1 text-sm font-medium capitalize text-[--ink]/70">
+            <div className="text-table-header flex items-center gap-2 border-b border-[--border-primary] pb-1.5 capitalize">
               <Checkbox
                 checked={allSelected}
                 onCheckedChange={(checked) => toggleAll(dayIds, checked === true)}
@@ -127,11 +127,13 @@ export function TransactionsTable({
             {dayRows.map((row) => (
               <div
                 key={row.id}
-                className="flex items-center gap-3 border-b border-[--rule]/60 py-2 text-sm"
+                className="flex min-h-[50px] items-center gap-3 border-b border-[--border-soft] px-1 transition-colors hover:bg-[#F9FAFB]"
               >
                 <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
-                <span className="w-40 truncate">{row.description}</span>
-                <span className="w-28 text-[--ink]/60">{row.account_name}</span>
+                <span className="text-table-body w-40 truncate text-[--text-primary]">
+                  {row.description}
+                </span>
+                <span className="text-table-body w-28">{row.account_name}</span>
                 <span className="w-40">
                   <Select
                     value={row.category_id ?? NO_CATEGORY}
@@ -144,16 +146,15 @@ export function TransactionsTable({
                     }}
                   >
                     <SelectTrigger
-                      className="h-8 w-full border-transparent text-sm font-medium"
-                      style={{
-                        backgroundColor: row.category_name
-                          ? `color-mix(in srgb, ${
-                              row.direction === "in"
-                                ? "var(--badge-green-fg)"
-                                : (categoryColors[row.category_name] ?? MUTED_SLICE_COLOR)
-                            } 16%, white)`
-                          : undefined,
-                      }}
+                      className="h-8 w-full border-transparent text-[13px] font-medium"
+                      style={(() => {
+                        if (!row.category_name) return undefined;
+                        const pair =
+                          row.direction === "in"
+                            ? INCOME_COLOR
+                            : (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR);
+                        return { backgroundColor: pair.bg, color: pair.fg };
+                      })()}
                     >
                       <SelectValue placeholder="Sem categoria" />
                     </SelectTrigger>
@@ -167,16 +168,26 @@ export function TransactionsTable({
                     </SelectContent>
                   </Select>
                 </span>
-                <span className="w-24 text-[--ink]/60">{row.creator_name ?? "—"}</span>
-                <span className="w-20 text-[--ink]/60">
+                <span className="text-table-body w-24">{row.creator_name ?? "—"}</span>
+                <span className="text-table-body w-20">
                   {row.import_id ? "Importado" : "Manual"}
                 </span>
                 {row.status === "pending" ? (
-                  <span className="text-xs text-[--flag]">pendente</span>
+                  <span
+                    className="rounded-[6px] px-2 py-0.5 text-[11px] font-medium"
+                    style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
+                  >
+                    pendente
+                  </span>
                 ) : null}
                 <span
-                  className="ml-auto font-semibold tabular-nums"
-                  style={{ color: row.direction === "out" ? "var(--out)" : "var(--in)" }}
+                  className="ml-auto text-right font-semibold tabular-nums"
+                  style={{
+                    color:
+                      row.direction === "out"
+                        ? "var(--table-amount-out)"
+                        : "var(--table-amount-in)",
+                  }}
                 >
                   {row.direction === "out" ? "-" : "+"}
                   {formatCents(row.amount_cents)}
