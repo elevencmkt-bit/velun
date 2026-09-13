@@ -113,6 +113,20 @@ export function TransactionFilters({
         </SelectContent>
       </Select>
 
+      <Select
+        defaultValue={searchParams.get("direction") ?? ALL}
+        onValueChange={(v) => setParam("direction", v)}
+      >
+        <SelectTrigger className="w-36">
+          <SelectValue placeholder="Entradas x saídas" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Entradas e saídas</SelectItem>
+          <SelectItem value="in">Só entradas</SelectItem>
+          <SelectItem value="out">Só saídas</SelectItem>
+        </SelectContent>
+      </Select>
+
       <Input
         type="date"
         defaultValue={searchParams.get("from") ?? ""}

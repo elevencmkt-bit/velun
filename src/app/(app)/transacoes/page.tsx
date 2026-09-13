@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getExpenseCategoryColorMap } from "@/lib/category-colors";
 import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
+import { formatCents } from "@/lib/money";
 import { MonthSelector } from "@/components/month-selector";
 import { Card, CardContent } from "@/components/ui/card";
 import { TransactionFilters } from "./filters";
@@ -71,6 +72,9 @@ export default async function TransacoesPage({
   if (params.member) query = query.eq("created_by", params.member);
   if (params.origin === "manual") query = query.is("import_id", null);
   if (params.origin === "imported") query = query.not("import_id", "is", null);
+  if (params.direction === "in" || params.direction === "out") {
+    query = query.eq("direction", params.direction);
+  }
   if (params.q) query = query.ilike("description", `%${params.q}%`);
 
   if (hasCustomRange) {
@@ -104,6 +108,27 @@ export default async function TransacoesPage({
     creator_name: single<{ display_name: string }>(row.creator)?.display_name ?? null,
   }));
 
+  const totalIn = rows.filter((r) => r.direction === "in").reduce((sum, r) => sum + r.amount_cents, 0);
+  const totalOut = rows.filter((r) => r.direction === "out").reduce((sum, r) => sum + r.amount_cents, 0);
+
+  let totalLabel: string;
+  let totalDisplay: string;
+  let totalColor: string;
+  if (params.direction === "in") {
+    totalLabel = "Total de entradas";
+    totalDisplay = `+${formatCents(totalIn)}`;
+    totalColor = "var(--income)";
+  } else if (params.direction === "out") {
+    totalLabel = "Total de saídas";
+    totalDisplay = `-${formatCents(totalOut)}`;
+    totalColor = "var(--expense)";
+  } else {
+    const net = totalIn - totalOut;
+    totalLabel = "Saldo do período";
+    totalDisplay = `${net >= 0 ? "+" : "-"}${formatCents(Math.abs(net))}`;
+    totalColor = net >= 0 ? "var(--income)" : "var(--expense)";
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -123,6 +148,17 @@ export default async function TransacoesPage({
               members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
             />
           </Suspense>
+          <div className="flex items-center justify-between border-b border-(--border-soft) pb-3">
+            <span className="text-metadata">
+              {rows.length} {rows.length === 1 ? "transação" : "transações"}
+            </span>
+            <span className="flex items-baseline gap-2">
+              <span className="text-metadata">{totalLabel}</span>
+              <span className="font-semibold tabular-nums" style={{ color: totalColor }}>
+                {totalDisplay}
+              </span>
+            </span>
+          </div>
           <TransactionsTable
             rows={rows}
             accounts={accounts ?? []}
