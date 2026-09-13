@@ -8,6 +8,7 @@ export type TransactionRow = {
   status: "pending" | "cleared";
   import_id: string | null;
   transfer_group_id: string | null;
+  recurrence_id: string | null;
   account_id: string;
   category_id: string | null;
   account_name: string;

@@ -4,65 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { parseToCents } from "@/lib/money";
-import { computeFingerprint } from "@/lib/fingerprint";
-import { generateOccurrenceDates, type RecurrenceFrequency } from "@/lib/recurrence";
-
-const OCCURRENCES_TO_MATERIALIZE = 12;
-
-type Template = {
-  account_id: string;
-  category_id: string | null;
-  direction: "in" | "out";
-  amount_cents: number;
-  description: string;
-  notes: string | null;
-};
-
-async function materializeOccurrences(params: {
-  recurrenceId: string;
-  householdId: string;
-  memberId: string;
-  template: Template;
-  frequency: RecurrenceFrequency;
-  startsOn: string;
-  dayOfMonth: number | null;
-  endsOn: string | null;
-}) {
-  const supabase = await createClient();
-
-  const dates = generateOccurrenceDates({
-    frequency: params.frequency,
-    startsOn: params.startsOn,
-    dayOfMonth: params.dayOfMonth,
-    endsOn: params.endsOn,
-    count: OCCURRENCES_TO_MATERIALIZE,
-  });
-
-  if (dates.length === 0) return;
-
-  const rows = dates.map((date) => ({
-    household_id: params.householdId,
-    account_id: params.template.account_id,
-    category_id: params.template.category_id,
-    date,
-    amount_cents: params.template.amount_cents,
-    direction: params.template.direction,
-    description: params.template.description,
-    notes: params.template.notes,
-    status: "pending" as const,
-    recurrence_id: params.recurrenceId,
-    fingerprint: computeFingerprint({
-      accountId: params.template.account_id,
-      date,
-      amountCents: params.template.amount_cents,
-      description: params.template.description,
-    }),
-    created_by: params.memberId,
-  }));
-
-  const { error } = await supabase.from("transactions").insert(rows);
-  if (error) throw new Error(error.message);
-}
+import type { RecurrenceFrequency } from "@/lib/recurrence";
+import { materializeOccurrences } from "@/lib/materialize-occurrences";
 
 export async function createRecurrence(formData: FormData) {
   const { memberId, householdId } = await getCurrentMember();
@@ -95,18 +38,20 @@ export async function createRecurrence(formData: FormData) {
     throw new Error("Dia do mês inválido.");
   }
 
+  const template = {
+    account_id: accountId,
+    category_id: categoryId,
+    direction,
+    amount_cents: amountCents,
+    description,
+    notes: null,
+  } as const;
+
   const { data: recurrence, error } = await supabase
     .from("recurrences")
     .insert({
       household_id: householdId,
-      template: {
-        account_id: accountId,
-        category_id: categoryId,
-        direction,
-        amount_cents: amountCents,
-        description,
-        notes: null,
-      },
+      template,
       frequency,
       day_of_month: dayOfMonth,
       starts_on: startsOn,
@@ -122,14 +67,7 @@ export async function createRecurrence(formData: FormData) {
     recurrenceId: recurrence.id,
     householdId,
     memberId,
-    template: {
-      account_id: accountId,
-      category_id: categoryId,
-      direction,
-      amount_cents: amountCents,
-      description,
-      notes: null,
-    },
+    template,
     frequency,
     startsOn,
     dayOfMonth,

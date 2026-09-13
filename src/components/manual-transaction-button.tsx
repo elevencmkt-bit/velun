@@ -45,6 +45,8 @@ export function ManualTransactionButton({
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [makeRecurring, setMakeRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -83,6 +85,8 @@ export function ManualTransactionButton({
         }
         formRef.current?.reset();
         setSelectedCategoryId("");
+        setMakeRecurring(false);
+        setRecurrenceFrequency("monthly");
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -286,6 +290,44 @@ export function ManualTransactionButton({
               <Checkbox name="is_pending" />
               Ainda não caiu (pendente)
             </label>
+          ) : null}
+
+          {mode !== "transfer" ? (
+            <div className="flex flex-col gap-3 rounded-md border border-(--border-soft) p-3">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  name="make_recurring"
+                  checked={makeRecurring}
+                  onCheckedChange={(checked) => setMakeRecurring(checked === true)}
+                />
+                Repetir esse lançamento
+              </label>
+              {makeRecurring ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="recurrence_frequency">Frequência</Label>
+                    <Select
+                      name="recurrence_frequency"
+                      value={recurrenceFrequency}
+                      onValueChange={setRecurrenceFrequency}
+                    >
+                      <SelectTrigger id="recurrence_frequency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="yearly">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="recurrence_ends_on">Repetir até (opcional)</Label>
+                    <Input id="recurrence_ends_on" name="recurrence_ends_on" type="date" />
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}

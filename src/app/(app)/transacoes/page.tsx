@@ -37,7 +37,7 @@ export default async function TransacoesPage({
     .from("transactions")
     .select(
       `id, date, description, notes, amount_cents, direction, status, import_id,
-       transfer_group_id, account_id, category_id,
+       transfer_group_id, recurrence_id, account_id, category_id,
        account:accounts(name),
        category:categories(name),
        creator:members!created_by(display_name)`,
@@ -71,6 +71,7 @@ export default async function TransacoesPage({
     status: row.status,
     import_id: row.import_id,
     transfer_group_id: row.transfer_group_id,
+    recurrence_id: row.recurrence_id,
     account_id: row.account_id,
     category_id: row.category_id,
     account_name: single<{ name: string }>(row.account)?.name ?? "—",

@@ -5,6 +5,23 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { parseToCents } from "@/lib/money";
 import { computeFingerprint } from "@/lib/fingerprint";
+import { createRecurrenceFromAnchor } from "@/lib/materialize-occurrences";
+import type { RecurrenceFrequency } from "@/lib/recurrence";
+
+// Se o box de lançamento/edição marcou "repetir esse lançamento",
+// devolve a frequência escolhida; senão null (fluxo sem recorrência).
+function parseRecurrenceInput(
+  formData: FormData,
+): { frequency: RecurrenceFrequency; endsOn: string | null } | null {
+  if (formData.get("make_recurring") !== "on") return null;
+
+  const frequency = String(formData.get("recurrence_frequency") ?? "") as RecurrenceFrequency;
+  if (!["monthly", "weekly", "yearly"].includes(frequency)) {
+    throw new Error("Frequência de recorrência inválida.");
+  }
+
+  return { frequency, endsOn: String(formData.get("recurrence_ends_on") ?? "") || null };
+}
 
 export async function createTransaction(formData: FormData) {
   const { memberId, householdId } = await getCurrentMember();
@@ -39,30 +56,59 @@ export async function createTransaction(formData: FormData) {
   if (!account) throw new Error("Conta não encontrada neste household.");
 
   const fingerprint = computeFingerprint({ accountId, date, amountCents, description });
+  const recurrenceInput = parseRecurrenceInput(formData);
 
-  const { error } = await supabase.from("transactions").insert({
-    household_id: householdId,
-    account_id: accountId,
-    category_id: categoryId,
-    date,
-    amount_cents: amountCents,
-    direction,
-    description,
-    notes,
-    status: isPending ? "pending" : "cleared",
-    fingerprint,
-    created_by: memberId,
-  });
+  const { data: inserted, error } = await supabase
+    .from("transactions")
+    .insert({
+      household_id: householdId,
+      account_id: accountId,
+      category_id: categoryId,
+      date,
+      amount_cents: amountCents,
+      direction,
+      description,
+      notes,
+      status: isPending ? "pending" : "cleared",
+      fingerprint,
+      created_by: memberId,
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  if (recurrenceInput) {
+    const recurrenceId = await createRecurrenceFromAnchor({
+      householdId,
+      memberId,
+      template: {
+        account_id: accountId,
+        category_id: categoryId,
+        direction,
+        amount_cents: amountCents,
+        description,
+        notes,
+      },
+      frequency: recurrenceInput.frequency,
+      anchorDate: date,
+      endsOn: recurrenceInput.endsOn,
+    });
+    const { error: linkError } = await supabase
+      .from("transactions")
+      .update({ recurrence_id: recurrenceId })
+      .eq("id", inserted.id);
+    if (linkError) throw new Error(linkError.message);
+  }
 
   revalidatePath("/transacoes");
   revalidatePath("/contas");
   revalidatePath("/mes");
+  revalidatePath("/a-pagar");
 }
 
 export async function updateTransaction(transactionId: string, formData: FormData) {
-  const { householdId } = await getCurrentMember();
+  const { memberId, householdId } = await getCurrentMember();
   const supabase = await createClient();
 
   const accountId = String(formData.get("account_id") ?? "");
@@ -91,7 +137,14 @@ export async function updateTransaction(transactionId: string, formData: FormDat
     .maybeSingle();
   if (!account) throw new Error("Conta não encontrada neste household.");
 
+  const { data: current } = await supabase
+    .from("transactions")
+    .select("recurrence_id")
+    .eq("id", transactionId)
+    .maybeSingle();
+
   const fingerprint = computeFingerprint({ accountId, date, amountCents, description });
+  const recurrenceInput = parseRecurrenceInput(formData);
 
   const { error } = await supabase
     .from("transactions")
@@ -110,6 +163,29 @@ export async function updateTransaction(transactionId: string, formData: FormDat
     .is("transfer_group_id", null);
 
   if (error) throw new Error(error.message);
+
+  if (recurrenceInput && !current?.recurrence_id) {
+    const recurrenceId = await createRecurrenceFromAnchor({
+      householdId,
+      memberId,
+      template: {
+        account_id: accountId,
+        category_id: categoryId,
+        direction: direction as "in" | "out",
+        amount_cents: amountCents,
+        description,
+        notes,
+      },
+      frequency: recurrenceInput.frequency,
+      anchorDate: date,
+      endsOn: recurrenceInput.endsOn,
+    });
+    const { error: linkError } = await supabase
+      .from("transactions")
+      .update({ recurrence_id: recurrenceId })
+      .eq("id", transactionId);
+    if (linkError) throw new Error(linkError.message);
+  }
 
   revalidatePath("/transacoes");
   revalidatePath("/contas");

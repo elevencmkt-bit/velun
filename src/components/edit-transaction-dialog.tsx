@@ -38,6 +38,7 @@ export type EditableTransaction = {
   description: string;
   notes: string | null;
   status: "pending" | "cleared";
+  recurrence_id: string | null;
 };
 
 export function EditTransactionDialog({
@@ -55,6 +56,8 @@ export function EditTransactionDialog({
   const [categories, setCategories] = useState(initialCategories);
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [makeRecurring, setMakeRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -229,6 +232,50 @@ export function EditTransactionDialog({
             <Checkbox name="is_pending" defaultChecked={transaction.status === "pending"} />
             Ainda não caiu (pendente)
           </label>
+
+          <div className="flex flex-col gap-3 rounded-md border border-(--border-soft) p-3">
+            {transaction.recurrence_id ? (
+              <p className="text-sm text-(--text-muted)">
+                Esse lançamento já faz parte de uma recorrência.
+              </p>
+            ) : (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    name="make_recurring"
+                    checked={makeRecurring}
+                    onCheckedChange={(checked) => setMakeRecurring(checked === true)}
+                  />
+                  Repetir esse lançamento
+                </label>
+                {makeRecurring ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="recurrence_frequency">Frequência</Label>
+                      <Select
+                        name="recurrence_frequency"
+                        value={recurrenceFrequency}
+                        onValueChange={setRecurrenceFrequency}
+                      >
+                        <SelectTrigger id="recurrence_frequency">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="weekly">Semanal</SelectItem>
+                          <SelectItem value="monthly">Mensal</SelectItem>
+                          <SelectItem value="yearly">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="recurrence_ends_on">Repetir até (opcional)</Label>
+                      <Input id="recurrence_ends_on" name="recurrence_ends_on" type="date" />
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
 
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}
 

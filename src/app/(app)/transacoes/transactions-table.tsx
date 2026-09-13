@@ -209,6 +209,7 @@ export function TransactionsTable({
                         description: row.description,
                         notes: row.notes,
                         status: row.status,
+                        recurrence_id: row.recurrence_id,
                       }}
                       accounts={accounts}
                       categories={categories}
