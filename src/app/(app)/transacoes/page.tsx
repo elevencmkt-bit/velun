@@ -2,10 +2,25 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getExpenseCategoryColorMap } from "@/lib/category-colors";
+import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
+import { MonthSelector } from "@/components/month-selector";
 import { Card, CardContent } from "@/components/ui/card";
 import { TransactionFilters } from "./filters";
 import { TransactionsTable } from "./transactions-table";
 import type { TransactionRow } from "./types";
+
+// Constrói a URL de navegação de mês preservando os outros filtros ativos
+// (conta, categoria, quem lançou, origem, busca) e removendo o intervalo
+// manual de datas, já que trocar de mês deve substituir esse filtro.
+function monthHref(params: Record<string, string | undefined>, month: string) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "from" || key === "to" || key === "month") continue;
+    if (value) search.set(key, value);
+  }
+  search.set("month", month);
+  return `/transacoes?${search.toString()}`;
+}
 
 export default async function TransacoesPage({
   searchParams,
@@ -15,6 +30,11 @@ export default async function TransacoesPage({
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
   const params = await searchParams;
+  const hasCustomRange = Boolean(params.from || params.to);
+  const { year, monthIndex } = parseMonthParam(params.month);
+  const { start, end } = monthRange(year, monthIndex);
+  const prev = shiftMonth(year, monthIndex, -1);
+  const next = shiftMonth(year, monthIndex, 1);
 
   const [{ data: accounts }, { data: categories }, { data: members }, colorMap] =
     await Promise.all([
@@ -51,9 +71,14 @@ export default async function TransacoesPage({
   if (params.member) query = query.eq("created_by", params.member);
   if (params.origin === "manual") query = query.is("import_id", null);
   if (params.origin === "imported") query = query.not("import_id", "is", null);
-  if (params.from) query = query.gte("date", params.from);
-  if (params.to) query = query.lte("date", params.to);
   if (params.q) query = query.ilike("description", `%${params.q}%`);
+
+  if (hasCustomRange) {
+    if (params.from) query = query.gte("date", params.from);
+    if (params.to) query = query.lte("date", params.to);
+  } else {
+    query = query.gte("date", start).lte("date", end);
+  }
 
   const { data: rawRows, error } = await query;
   if (error) throw new Error(error.message);
@@ -81,7 +106,14 @@ export default async function TransacoesPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-page-title">Transações</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-page-title">Transações</h1>
+        <MonthSelector
+          label={monthLabel(year, monthIndex)}
+          prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
+          nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
+        />
+      </div>
       <Card>
         <CardContent className="flex flex-col gap-6 pt-6">
           <Suspense>
