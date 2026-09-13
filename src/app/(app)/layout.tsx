@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/(auth)/login/actions";
 import { Button } from "@/components/ui/button";
+import { ManualTransactionButton } from "@/components/manual-transaction-button";
 
 const NAV = [
   { href: "/importar", label: "Importar" },
@@ -36,6 +37,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
   const household = Array.isArray(householdName) ? householdName[0] : householdName;
 
+  const [{ data: accounts }, { data: categories }] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id, name")
+      .eq("household_id", member?.household_id ?? "")
+      .eq("is_archived", false)
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("categories")
+      .select("id, name, kind")
+      .eq("household_id", member?.household_id ?? "")
+      .eq("is_archived", false)
+      .order("name"),
+  ]);
+
   return (
     <div className="min-h-screen bg-[--paper] text-[--ink]">
       <header className="flex items-center justify-between border-b border-[--rule] px-6 py-3">
@@ -54,6 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </nav>
         </div>
         <div className="flex items-center gap-3">
+          <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
           <span className="text-sm text-[--ink]/70">{member?.display_name ?? user.email}</span>
           <form action={logout}>
             <Button type="submit" variant="outline" size="sm">
