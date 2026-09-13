@@ -1,4 +1,4 @@
-import { BarChart3, FolderKanban, Plus, Users } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, Folder, Plus, UserRoundCheck, UsersRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getCategoryColorMap } from "@/lib/category-colors";
@@ -11,26 +11,35 @@ import { InviteManager } from "./invite-manager";
 import { CurrencySelect } from "./currency-select";
 
 const BENEFITS = [
-  { icon: BarChart3, label: "Acompanhar saldo e gastos", bg: "var(--badge-green-bg)", fg: "var(--badge-green-fg)" },
-  { icon: FolderKanban, label: "Compartilhar categorias e contas", bg: "var(--badge-blue-bg)", fg: "var(--badge-blue-fg)" },
-  { icon: Users, label: "Tomar decisões em conjunto", bg: "var(--badge-purple-bg)", fg: "var(--badge-purple-fg)" },
+  { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
+  { icon: Folder, label: "Compartilhar categorias e contas", bg: "#F0EDFF", fg: "#7056EB" },
+  { icon: UserRoundCheck, label: "Tomar decisões em conjunto", bg: "#FFF0F3", fg: "#F04469" },
 ];
 
 function MemberAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
-  return avatarUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={avatarUrl}
-      alt={name}
-      className="h-11 w-11 shrink-0 rounded-full border-2 border-(--bg-surface) object-cover"
-    />
-  ) : (
-    <div
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-(--bg-surface) text-sm font-semibold text-white"
-      style={{ background: "var(--sidebar-active-gradient)" }}
-    >
-      {initial}
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl}
+          alt={name}
+          className="h-[42px] w-[42px] shrink-0 rounded-full border-2 border-(--bg-surface) object-cover"
+          style={{ boxShadow: "0 0 0 1px var(--border-soft), 0 3px 8px rgba(16,24,40,.08)" }}
+        />
+      ) : (
+        <div
+          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-2 border-(--bg-surface) text-sm font-semibold text-white"
+          style={{
+            background: "var(--sidebar-active-gradient)",
+            boxShadow: "0 0 0 1px var(--border-soft), 0 3px 8px rgba(16,24,40,.08)",
+          }}
+        >
+          {initial}
+        </div>
+      )}
+      <span className="max-w-[64px] truncate text-[11px] font-semibold text-(--text-primary)">{name}</span>
     </div>
   );
 }
@@ -106,69 +115,107 @@ export default async function ConfiguracoesPage() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardContent className="flex flex-col gap-6">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="flex flex-col gap-3">
+      <section
+        className="relative overflow-hidden rounded-2xl border"
+        style={{
+          borderColor: "#CCD3FF",
+          background:
+            "radial-gradient(circle at 38% 15%, rgba(91,108,255,0.10), transparent 34%), linear-gradient(135deg, #FFFFFF 0%, #F9FAFF 58%, #F4F6FF 100%)",
+          boxShadow: "0 8px 24px rgba(20,28,60,.04)",
+        }}
+      >
+        <div className="grid grid-cols-1 gap-7 p-7 pb-5 md:[grid-template-columns:minmax(0,1fr)_1px_minmax(460px,1.12fr)]">
+          {/* COLUNA ESQUERDA */}
+          <div className="min-w-0">
+            <div className="flex items-start gap-4">
               <div
-                className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                style={{ backgroundColor: "var(--primary-light)" }}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
+                style={{ background: "linear-gradient(135deg, #E9EDFF 0%, #DDE4FF 100%)" }}
               >
-                <Users className="h-5 w-5" style={{ color: "var(--primary)" }} />
+                <UsersRound className="h-5 w-5" style={{ color: "var(--primary)" }} />
               </div>
-              <div className="flex flex-col gap-1">
-                <h2 className="text-card-title">Orçamento compartilhado</h2>
-                <p className="text-sm text-(--text-secondary)">
+              <div>
+                <h3 className="mb-1.5 text-[18px] leading-tight font-bold tracking-tight text-(--text-primary)">
+                  Orçamento compartilhado
+                </h3>
+                <p className="max-w-[460px] text-sm leading-relaxed text-(--text-secondary)">
                   Convide pessoas para acompanhar suas finanças, compartilhar categorias e contas, e
                   tomar decisões em conjunto.
                 </p>
               </div>
-
-              <div className="mt-2 flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  {members.map((m) => (
-                    <MemberAvatar key={m.id} name={m.display_name} avatarUrl={m.avatar_url} />
-                  ))}
-                  <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-dashed"
-                    style={{ borderColor: "var(--border-primary)", color: "var(--text-light)" }}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </div>
-                </div>
-                <span
-                  className="inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-                  style={{ backgroundColor: "var(--income-soft)", color: "var(--income-dark)" }}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--income)" }} />
-                  {members.length} {members.length === 1 ? "membro ativo" : "membros ativos"}
-                </span>
-              </div>
-
-              <div className="mt-2 flex items-center justify-between gap-3 border-t pt-4" style={{ borderColor: "var(--border-soft)" }}>
-                <span className="text-sm font-medium text-(--text-primary)">Moeda do orçamento</span>
-                <CurrencySelect currency={currency} />
-              </div>
             </div>
 
-            <InviteManager pendingInvite={pendingInvite} />
+            <div className="mt-6 flex flex-wrap items-start gap-3">
+              {members.map((m) => (
+                <MemberAvatar key={m.id} name={m.display_name} avatarUrl={m.avatar_url} />
+              ))}
+              <button
+                type="button"
+                aria-label="Adicionar membro"
+                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border border-dashed transition-colors"
+                style={{ borderColor: "#B9C2DF", color: "var(--primary)", backgroundColor: "rgba(255,255,255,.65)" }}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+              <span
+                className="ml-1 inline-flex h-[42px] w-fit items-center gap-1.5 rounded-full px-2.5 text-xs font-medium"
+                style={{ backgroundColor: "var(--income-soft)", color: "#297A50" }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--income)" }} />
+                {members.length} {members.length === 1 ? "membro ativo" : "membros ativos"}
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 border-t pt-5 sm:grid-cols-3" style={{ borderColor: "var(--border-soft)" }}>
-            {BENEFITS.map((benefit) => (
-              <div key={benefit.label} className="flex items-center gap-2.5">
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: benefit.bg }}
-                >
-                  <benefit.icon className="h-4 w-4" style={{ color: benefit.fg }} />
-                </div>
-                <span className="text-sm text-(--text-secondary)">{benefit.label}</span>
-              </div>
-            ))}
+          {/* DIVISOR */}
+          <div
+            className="hidden md:block"
+            style={{
+              background: "linear-gradient(to bottom, transparent, #E0E5F2 12%, #E0E5F2 88%, transparent)",
+            }}
+          />
+
+          {/* COLUNA DIREITA */}
+          <InviteManager pendingInvite={pendingInvite} />
+        </div>
+
+        {/* MOEDA */}
+        <div
+          className="flex flex-col items-start gap-2 border-t px-7 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+          style={{ borderColor: "rgba(230,234,242,.9)" }}
+        >
+          <div>
+            <strong className="block text-xs font-semibold text-(--text-primary)">Moeda do orçamento</strong>
+            <span className="mt-0.5 block text-[11px] text-(--text-light)">
+              Usada nos lançamentos e relatórios deste orçamento.
+            </span>
           </div>
-        </CardContent>
-      </Card>
+          <CurrencySelect currency={currency} />
+        </div>
+
+        {/* BENEFÍCIOS */}
+        <div
+          className="grid grid-cols-1 border-t sm:grid-cols-3"
+          style={{ borderColor: "rgba(230,234,242,.85)", backgroundColor: "rgba(255,255,255,.35)" }}
+        >
+          {BENEFITS.map((benefit, i) => (
+            <div
+              key={benefit.label}
+              className={`flex min-h-[58px] items-center justify-center gap-2.5 border-[rgba(230,234,242,.8)] px-5 py-2.5 sm:justify-start ${
+                i > 0 ? "border-t sm:border-t-0 sm:border-l" : ""
+              }`}
+            >
+              <div
+                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]"
+                style={{ backgroundColor: benefit.bg, color: benefit.fg }}
+              >
+                <benefit.icon className="h-3.5 w-3.5" />
+              </div>
+              <span className="text-[11px] leading-tight text-(--text-secondary)">{benefit.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <Card>
         <CardContent className="flex flex-col gap-4">
