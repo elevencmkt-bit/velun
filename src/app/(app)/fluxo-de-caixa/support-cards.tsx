@@ -21,7 +21,10 @@ export function UpcomingEventsCard({
   const visible = events.slice(0, 6);
 
   return (
-    <article className="flex min-h-[230px] flex-col rounded-2xl border p-5 shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--border-primary)" }}>
+    <article
+      className="flex min-h-[230px] flex-col rounded-2xl border p-5"
+      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div
@@ -54,12 +57,12 @@ export function UpcomingEventsCard({
             return (
               <div
                 key={event.id}
-                className="grid min-h-[43px] grid-cols-[34px_1fr_auto] items-center gap-2.5"
+                className="grid min-h-[43px] grid-cols-[42px_1fr_auto] items-center gap-2.5"
                 style={{ borderTop: i === 0 ? "none" : "1px solid var(--border-soft)" }}
               >
                 <div
-                  className="flex h-[34px] w-[34px] flex-col items-center justify-center rounded-[9px] text-center leading-[1.05]"
-                  style={{ background: "var(--bg-subtle)", color: "var(--text-secondary)" }}
+                  className="flex min-w-[42px] flex-col items-center justify-center rounded-xl border px-1.5 py-2 text-center leading-[1.05]"
+                  style={{ background: "#F7F8FC", borderColor: "#E6EAF2", color: "var(--text-secondary)" }}
                 >
                   <span className="text-[10px] font-bold">{day}</span>
                   <span className="text-[8px] font-semibold uppercase">{month}</span>
@@ -105,7 +108,7 @@ function ImpactRow({
         <strong className="block text-[11.5px] font-semibold text-(--text-primary)">{label}</strong>
         <span className="text-[9.5px] text-(--text-light)">{sublabel}</span>
       </div>
-      <div className="h-[9px] overflow-hidden rounded-full" style={{ background: "var(--border-soft)" }}>
+      <div className="h-[10px] overflow-hidden rounded-full" style={{ background: "#EEF1F6" }}>
         <div className="h-full rounded-full" style={{ width: `${percent}%`, background: gradient }} />
       </div>
       <span className="text-right text-[11px] font-semibold tabular-nums text-(--text-secondary)">
@@ -131,7 +134,10 @@ export function ImpactsCard({
   const maxImpact = Math.max(totalIncome, totalExpense, Math.abs(netResult), 1);
 
   return (
-    <article className="flex min-h-[230px] flex-col rounded-2xl border p-5 shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--border-primary)" }}>
+    <article
+      className="flex min-h-[230px] flex-col rounded-2xl border p-5"
+      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+    >
       <div className="mb-1 flex items-center gap-2.5">
         <div
           className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
@@ -151,7 +157,7 @@ export function ImpactsCard({
         amount={totalIncome}
         percent={Math.round((totalIncome / maxImpact) * 100)}
         currency={currency}
-        gradient="linear-gradient(90deg,#20B785,#15A775)"
+        gradient="linear-gradient(90deg,#20C67A,#18B26B)"
       />
       <ImpactRow
         label="Saídas previstas"
@@ -159,7 +165,7 @@ export function ImpactsCard({
         amount={totalExpense}
         percent={Math.round((totalExpense / maxImpact) * 100)}
         currency={currency}
-        gradient="linear-gradient(90deg,#FF667D,#F0445E)"
+        gradient="linear-gradient(90deg,#FF6B81,#F04469)"
       />
       <ImpactRow
         label="Resultado do período"
@@ -167,12 +173,12 @@ export function ImpactsCard({
         amount={netResult}
         percent={Math.round((Math.abs(netResult) / maxImpact) * 100)}
         currency={currency}
-        gradient="linear-gradient(90deg,#7A68FF,#536DFF)"
+        gradient="linear-gradient(90deg,#7C5CFA,#5B6CFF)"
       />
 
       <div
-        className="mt-2 rounded-[10px] px-3 py-2.5 text-[10.5px] leading-[1.4]"
-        style={{ background: "var(--primary-soft)", color: "var(--text-secondary)" }}
+        className="mt-2 rounded-xl border px-4 py-3.5 text-[10.5px] leading-[1.4]"
+        style={{ background: "#F7F8FF", borderColor: "#ECEFFD", color: "var(--text-secondary)" }}
       >
         Neste período: entradas de {formatCents(totalIncome, currency)} e saídas de{" "}
         {formatCents(totalExpense, currency)}, resultado de {formatCents(netResult, currency)}.
@@ -183,7 +189,10 @@ export function ImpactsCard({
 
 export function InsightCard({ insight }: { insight: CashFlowInsight }) {
   return (
-    <article className="flex min-h-[230px] flex-col rounded-2xl border p-5 shadow-[var(--shadow-sm)]" style={{ borderColor: "var(--border-primary)" }}>
+    <article
+      className="flex min-h-[230px] flex-col rounded-2xl border p-5"
+      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+    >
       <div className="mb-3 flex items-center gap-2.5">
         <div
           className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
@@ -198,12 +207,12 @@ export function InsightCard({ insight }: { insight: CashFlowInsight }) {
       </div>
 
       <div
-        className="flex gap-3 rounded-xl p-3.5"
-        style={{ background: "linear-gradient(135deg,#F1F0FF,#F6F7FF)" }}
+        className="flex gap-3 rounded-[14px] border p-3.5"
+        style={{ background: "linear-gradient(135deg, #F4F2FF 0%, #F8F7FF 100%)", borderColor: "#EBE7FF" }}
       >
         <div
-          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px]"
-          style={{ background: "rgba(255,255,255,.78)", color: "var(--primary)" }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: "#ECE9FF", color: "#6B5BFF" }}
         >
           <Sparkles className="h-4 w-4" />
         </div>
@@ -213,14 +222,18 @@ export function InsightCard({ insight }: { insight: CashFlowInsight }) {
       </div>
 
       {insight.bullets.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-3 flex flex-col gap-3">
           {insight.bullets.map((bullet, i) => (
-            <div key={i} className="flex items-start gap-2">
+            <div key={i} className="flex items-start gap-2.5">
               <div
-                className="flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full text-white"
-                style={{ background: bullet.tone === "warning" ? "var(--warning)" : "var(--income)" }}
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full"
+                style={
+                  bullet.tone === "warning"
+                    ? { background: "#FFF4E5", color: "#F59E0B" }
+                    : { background: "#EAFBF2", color: "#16A34A" }
+                }
               >
-                {bullet.tone === "warning" ? <TriangleAlert className="h-2.5 w-2.5" /> : <Check className="h-2.5 w-2.5" />}
+                {bullet.tone === "warning" ? <TriangleAlert className="h-3 w-3" /> : <Check className="h-3 w-3" />}
               </div>
               <p className="text-[10.5px] leading-[1.35] text-(--text-secondary)">{bullet.text}</p>
             </div>

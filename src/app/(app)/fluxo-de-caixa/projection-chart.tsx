@@ -166,11 +166,11 @@ export function ProjectionChart({
           <Tooltip content={<ChartTooltip currency={currency} />} />
           <ReferenceLine
             x={points[0]?.label}
-            stroke="var(--primary)"
-            strokeDasharray="4 3"
-            label={{ value: "Hoje", position: "insideTopLeft", fill: "var(--primary)", fontSize: 11, fontWeight: 600 }}
+            stroke="#5B6CFF"
+            strokeDasharray="6 6"
+            label={{ value: "Hoje", position: "insideTopLeft", fill: "#5B6CFF", fontSize: 11, fontWeight: 600 }}
           />
-          <ReferenceLine y={0} stroke="#98A2B3" strokeDasharray="3 3" />
+          <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="5 5" strokeOpacity={0.8} />
           <Line
             type="stepAfter"
             dataKey="balance_cents"

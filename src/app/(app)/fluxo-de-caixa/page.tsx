@@ -59,12 +59,19 @@ export default async function FluxoDeCaixaPage({
   horizonDate.setDate(today.getDate() + horizonDays);
   const rangeLabel = `${dateFormatter.format(today)} – ${dateFormatter.format(horizonDate)}`;
 
+  const KPI_TONES = {
+    blue: { bg: "#EEF0FF", fg: "#5B6CFF" },
+    green: { bg: "#EAFBF2", fg: "#22C55E" },
+    red: { bg: "#FFF1F3", fg: "#F04469" },
+    purple: { bg: "#F3EEFF", fg: "#7C5CFA" },
+  };
+
   const kpis = [
     {
       key: "current",
       icon: WalletCards,
-      iconBg: "var(--badge-blue-bg)",
-      iconFg: "var(--badge-blue-fg)",
+      iconBg: KPI_TONES.blue.bg,
+      iconFg: KPI_TONES.blue.fg,
       label: "Saldo atual",
       value: formatCents(currentTotal, currency),
       valueColor: undefined as string | undefined,
@@ -73,8 +80,8 @@ export default async function FluxoDeCaixaPage({
     {
       key: "end",
       icon: TrendingUp,
-      iconBg: finalPoint.balance_cents < 0 ? "var(--badge-red-bg)" : "var(--badge-green-bg)",
-      iconFg: finalPoint.balance_cents < 0 ? "var(--badge-red-fg)" : "var(--badge-green-fg)",
+      iconBg: finalPoint.balance_cents < 0 ? KPI_TONES.red.bg : KPI_TONES.green.bg,
+      iconFg: finalPoint.balance_cents < 0 ? KPI_TONES.red.fg : KPI_TONES.green.fg,
       label: "Saldo ao final do período",
       value: formatCents(finalPoint.balance_cents, currency),
       valueColor: finalPoint.balance_cents < 0 ? "var(--expense)" : undefined,
@@ -83,8 +90,8 @@ export default async function FluxoDeCaixaPage({
     {
       key: "low",
       icon: TrendingDown,
-      iconBg: "var(--badge-red-bg)",
-      iconFg: "var(--badge-red-fg)",
+      iconBg: KPI_TONES.red.bg,
+      iconFg: KPI_TONES.red.fg,
       label: "Menor saldo projetado",
       value: formatCents(lowestPoint.balance_cents, currency),
       valueColor: lowestPoint.balance_cents < 0 ? "var(--expense)" : undefined,
@@ -93,8 +100,8 @@ export default async function FluxoDeCaixaPage({
     {
       key: "negative-days",
       icon: CalendarDays,
-      iconBg: "var(--badge-purple-bg)",
-      iconFg: "var(--badge-purple-fg)",
+      iconBg: KPI_TONES.purple.bg,
+      iconFg: KPI_TONES.purple.fg,
       label: "Dias no negativo",
       value: `${negativeDays} ${negativeDays === 1 ? "dia" : "dias"}`,
       valueColor: negativeDays > 0 ? "var(--expense)" : undefined,
@@ -154,8 +161,12 @@ export default async function FluxoDeCaixaPage({
         {kpis.map((kpi) => (
           <div
             key={kpi.key}
-            className="flex min-h-[116px] items-center gap-4 rounded-2xl border p-5 shadow-[var(--shadow-sm)]"
-            style={{ borderColor: "var(--border-primary)" }}
+            className="flex min-h-[116px] items-center gap-4 rounded-2xl border p-5"
+            style={{
+              background: "#FFFFFF",
+              borderColor: "#E8ECF4",
+              boxShadow: "0 6px 20px rgba(20,28,60,.04)",
+            }}
           >
             <div
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
@@ -178,8 +189,12 @@ export default async function FluxoDeCaixaPage({
       </div>
 
       <div
-        className="rounded-2xl border p-6 pb-4 shadow-[var(--shadow-sm)]"
-        style={{ borderColor: "var(--border-primary)" }}
+        className="rounded-[18px] border p-6"
+        style={{
+          background: "#FFFFFF",
+          borderColor: "#E8ECF4",
+          boxShadow: "0 8px 24px rgba(20,28,60,.04)",
+        }}
       >
         <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row">
           <div>
@@ -207,11 +222,16 @@ export default async function FluxoDeCaixaPage({
             </span>
           </div>
         </div>
-        <ProjectionChart
-          points={points}
-          currency={currency}
-          highlightedEventIds={[...highlightedEventIds]}
-        />
+        <div
+          className="rounded-[14px] px-2 pt-3 pb-1"
+          style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #FCFCFE 100%)" }}
+        >
+          <ProjectionChart
+            points={points}
+            currency={currency}
+            highlightedEventIds={[...highlightedEventIds]}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2 xl:grid-cols-3">
