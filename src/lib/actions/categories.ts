@@ -3,8 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { findPaletteColorByFg } from "@/lib/category-colors";
 
-const PALETTE = { income: "#2F6B4F", expense: "#B2402F" } as const;
+// "" (não NULL, a coluna é NOT NULL) marca "sem cor manual" — a cor
+// real é derivada automaticamente em category-colors.ts. Categorias
+// antigas guardam um hex fixo de antes dessa tela existir; como não
+// bate com nenhuma entrada da paleta, também caem no fallback.
+const NO_MANUAL_COLOR = "";
+
+function revalidateCategoryPaths() {
+  revalidatePath("/transacoes");
+  revalidatePath("/contas");
+  revalidatePath("/mes");
+  revalidatePath("/a-pagar");
+  revalidatePath("/relatorios");
+  revalidatePath("/configuracoes");
+}
 
 export async function createCategory(formData: FormData) {
   const { householdId } = await getCurrentMember();
@@ -18,14 +32,71 @@ export async function createCategory(formData: FormData) {
 
   const { data, error } = await supabase
     .from("categories")
-    .insert({ household_id: householdId, name, kind, color: PALETTE[kind] })
+    .insert({ household_id: householdId, name, kind, color: NO_MANUAL_COLOR })
     .select("id")
     .single();
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/transacoes");
-  revalidatePath("/contas");
+  revalidateCategoryPaths();
 
   return data.id as string;
+}
+
+export async function updateCategoryName(categoryId: string, name: string) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Nome da categoria é obrigatório.");
+
+  const { error } = await supabase
+    .from("categories")
+    .update({ name: trimmed })
+    .eq("id", categoryId)
+    .eq("household_id", householdId);
+
+  if (error) throw new Error(error.message);
+
+  revalidateCategoryPaths();
+}
+
+// `color` deve ser um dos `fg` da CATEGORY_PALETTE, ou null para voltar
+// pro fallback automático — só categorias de despesa podem ter cor
+// manual (receita usa sempre o verde fixo de INCOME_COLOR).
+export async function updateCategoryColor(categoryId: string, color: string | null) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  if (color !== null && !findPaletteColorByFg(color)) {
+    throw new Error("Cor inválida.");
+  }
+
+  const { error } = await supabase
+    .from("categories")
+    .update({ color: color ?? NO_MANUAL_COLOR })
+    .eq("id", categoryId)
+    .eq("household_id", householdId)
+    .eq("kind", "expense");
+
+  if (error) throw new Error(error.message);
+
+  revalidateCategoryPaths();
+}
+
+export async function deleteCategory(categoryId: string) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  // transactions.category_id é ON DELETE SET NULL — lançamentos que
+  // usavam essa categoria passam a "Sem categoria", nada quebra.
+  const { error } = await supabase
+    .from("categories")
+    .delete()
+    .eq("id", categoryId)
+    .eq("household_id", householdId);
+
+  if (error) throw new Error(error.message);
+
+  revalidateCategoryPaths();
 }

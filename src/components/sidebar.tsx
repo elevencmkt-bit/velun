@@ -11,6 +11,7 @@ import {
   Wallet,
   PieChart,
   HeartHandshake,
+  Settings,
 } from "lucide-react";
 
 const ICON_PROPS = { size: 20, strokeWidth: 1.8 };
@@ -22,6 +23,7 @@ const NAV = [
   { href: "/fluxo-de-caixa", label: "Fluxo de caixa", icon: TrendingUp },
   { href: "/relatorios", label: "Relatórios", icon: PieChart },
   { href: "/contas", label: "Contas", icon: Wallet },
+  { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 const DISABLED_NAV = [{ label: "Importar", icon: Upload }];

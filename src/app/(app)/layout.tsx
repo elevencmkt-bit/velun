@@ -17,11 +17,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  const { data: member } = await supabase
+  const withAvatar = await supabase
     .from("members")
-    .select("display_name, household_id, households(name)")
+    .select("display_name, avatar_url, household_id, households(name)")
     .eq("id", user.id)
     .maybeSingle();
+
+  // avatar_url pode ainda não existir se a migração 0003 não rodou —
+  // refaz sem a coluna em vez de derrubar o layout inteiro nesse caso.
+  let member: {
+    display_name: string;
+    avatar_url: string | null;
+    household_id: string;
+    households: unknown;
+  } | null = withAvatar.data;
+
+  if (withAvatar.error) {
+    const { data: withoutAvatar } = await supabase
+      .from("members")
+      .select("display_name, household_id, households(name)")
+      .eq("id", user.id)
+      .maybeSingle();
+    member = withoutAvatar ? { ...withoutAvatar, avatar_url: null } : null;
+  }
 
   // Sem tipos gerados do Supabase ainda, o builder infere `households`
   // como array — na prática é o objeto único do lado "many-to-one".
@@ -61,6 +79,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <UserMenu
               displayName={member?.display_name ?? user.email ?? "Você"}
               subtitle={household?.name ?? "Conta compartilhada"}
+              avatarUrl={member?.avatar_url ?? null}
               onLogout={logout}
             />
           </div>

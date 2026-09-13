@@ -13,10 +13,12 @@ import {
 export function UserMenu({
   displayName,
   subtitle,
+  avatarUrl,
   onLogout,
 }: {
   displayName: string;
   subtitle: string;
+  avatarUrl?: string | null;
   onLogout: () => void;
 }) {
   const initial = displayName.trim().charAt(0).toUpperCase() || "?";
@@ -25,12 +27,21 @@ export function UserMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2.5 rounded-lg px-1.5 py-1 outline-none transition-colors hover:bg-[--border-soft]">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-            style={{ background: "var(--sidebar-active-gradient)" }}
-          >
-            {initial}
-          </div>
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+              style={{ background: "var(--sidebar-active-gradient)" }}
+            >
+              {initial}
+            </div>
+          )}
           <div className="hidden flex-col items-start leading-tight sm:flex">
             <span className="text-[13px] font-medium text-(--text-primary)">{displayName}</span>
             <span className="text-metadata">{subtitle}</span>
