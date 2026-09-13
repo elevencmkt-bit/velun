@@ -2,7 +2,7 @@
 
 Ver a especificação completa no Google Drive: `ECM_HUB/000_Eleven_CM/DASHBOARD/spec-dashboard-financeiro.md`.
 
-Status: **Fase 0 — Fundação** (schema + auth scaffolding prontos, faltando conectar a um projeto Supabase real).
+Status: **Fase 1 — Núcleo concluída** (contas, lançamento manual, transações com filtros/edição/bulk). Projeto Supabase já conectado e rodando.
 
 ## Stack
 
@@ -53,10 +53,13 @@ src/app/(auth)/login      tela de login
 src/app/(app)/            telas autenticadas (importar, mês, transações, a pagar, fluxo de caixa, contas)
 src/lib/supabase/         clientes Supabase (browser, server, middleware)
 src/lib/money.ts          conversão centavos <-> texto exibido (única fronteira com float)
+src/lib/fingerprint.ts    fingerprint de transação (dedup import + lançamento manual)
+src/lib/balances.ts       saldo por conta, derivado das transações cleared
+src/lib/actions/          server actions (contas, categorias, transações)
 supabase/migrations/      schema SQL com RLS por household_id
 supabase/seed/            dados de exemplo
 ```
 
 ## Próximo passo
 
-Fase 1 (núcleo): contas, categorias, lançamento manual, lista de transações — ver seção 8 da spec.
+Fase 2 (importação CSV): upload, mapeamento de colunas via modelo, staging, dedup, grade de revisão, regras de categorização — ver seção 8 da spec. Precisa da `ANTHROPIC_API_KEY` no `.env.local`.
