@@ -1,21 +1,21 @@
-import { INCOME_COLOR, MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
+import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 
 // Pills de categoria (UI Style Specs, seção 17): fundo suave, texto
-// saturado, sem parecer botão — nada de dot ou borda.
+// saturado, sem parecer botão — nada de dot ou borda. A cor já vem
+// resolvida do mapa de cores do household (manual ou automática, tanto
+// pra despesa quanto receita), então o componente só desenha.
 export function CategoryBadge({
   name,
-  kind,
   color,
 }: {
   name: string;
-  kind: "income" | "expense" | null;
   color?: CategoryColorPair;
 }) {
   if (!name) {
     return <span className="text-xs text-(--text-light)">Sem categoria</span>;
   }
 
-  const pair = kind === "income" ? INCOME_COLOR : (color ?? MUTED_CATEGORY_COLOR);
+  const pair = color ?? MUTED_CATEGORY_COLOR;
 
   return (
     <span

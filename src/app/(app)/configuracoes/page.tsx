@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { getExpenseCategoryColorMap } from "@/lib/category-colors";
+import { getCategoryColorMap } from "@/lib/category-colors";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProfileForm } from "./profile-form";
 import { CategoryRow } from "./category-row";
@@ -18,7 +18,7 @@ export default async function ConfiguracoesPage() {
       .select("id, name, kind, color")
       .eq("household_id", householdId)
       .order("name"),
-    getExpenseCategoryColorMap(supabase, householdId),
+    getCategoryColorMap(supabase, householdId),
   ]);
 
   // avatar_url pode ainda não existir se a migração 0003 não rodou —
@@ -79,7 +79,11 @@ export default async function ConfiguracoesPage() {
                 <p className="text-sm text-(--text-muted)">Nenhuma categoria de receita ainda.</p>
               ) : (
                 incomeCategories.map((category) => (
-                  <CategoryRow key={category.id} category={category} />
+                  <CategoryRow
+                    key={category.id}
+                    category={category}
+                    effectiveColor={colorMap.get(category.name)?.fg ?? null}
+                  />
                 ))
               )}
             </div>

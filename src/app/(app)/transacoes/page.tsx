@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { getExpenseCategoryColorMap } from "@/lib/category-colors";
+import { getCategoryColorMap } from "@/lib/category-colors";
 import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
 import { formatCents } from "@/lib/money";
 import { MonthSelector } from "@/components/month-selector";
@@ -51,7 +51,7 @@ export default async function TransacoesPage({
         .eq("is_archived", false)
         .order("name"),
       supabase.from("members").select("id, display_name").eq("household_id", householdId),
-      getExpenseCategoryColorMap(supabase, householdId),
+      getCategoryColorMap(supabase, householdId),
     ]);
 
   let query = supabase

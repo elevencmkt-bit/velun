@@ -55,9 +55,7 @@ export function CategoryRow({
     startTransition(async () => {
       try {
         await updateCategoryName(category.id, name);
-        if (category.kind === "expense") {
-          await updateCategoryColor(category.id, color);
-        }
+        await updateCategoryColor(category.id, color);
         setEditOpen(false);
         router.refresh();
       } catch (err) {
@@ -77,7 +75,7 @@ export function CategoryRow({
     <div className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 last:border-0">
       <div
         className="h-6 w-6 shrink-0 rounded-full"
-        style={{ backgroundColor: category.kind === "income" ? "var(--income)" : (effectiveColor ?? "var(--text-light)") }}
+        style={{ backgroundColor: effectiveColor ?? "var(--text-light)" }}
       />
       <span className="text-table-body text-(--text-primary)">{category.name}</span>
 
@@ -109,12 +107,10 @@ export function CategoryRow({
                   autoFocus
                 />
               </div>
-              {category.kind === "expense" ? (
-                <div className="flex flex-col gap-2">
-                  <Label>Cor</Label>
-                  <ColorSwatchGrid value={color} onChange={setColor} />
-                </div>
-              ) : null}
+              <div className="flex flex-col gap-2">
+                <Label>Cor</Label>
+                <ColorSwatchGrid value={color} onChange={setColor} />
+              </div>
               {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
               <Button type="submit" disabled={isPending}>
                 {isPending ? "Salvando..." : "Salvar"}

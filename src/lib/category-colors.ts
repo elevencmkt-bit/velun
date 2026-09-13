@@ -42,24 +42,29 @@ export function findPaletteColorByFg(fg: string | null | undefined): CategoryCol
 }
 
 // Cor por categoria: se a categoria tem uma cor manual escolhida (seu
-// `color` bate com uma entrada da paleta), usa ela. Senão cai no
-// fallback automático — fixo pela posição alfabética entre as
-// categorias de despesa sem cor manual, para que a mesma categoria não
-// troque de cor de um mês para o outro nem quando outras ganham cor
-// manual.
+// `color` bate com uma entrada da paleta), usa ela — vale tanto pra
+// despesa quanto receita. Sem cor manual, cai no fallback automático:
+// receita usa o verde fixo de INCOME_COLOR (identidade visual de
+// "entrada"), despesa usa a posição alfabética entre as despesas sem
+// cor manual, pra não trocar de cor de um mês pro outro.
 export function buildCategoryColorMap(
-  categories: { name: string; color: string | null }[],
+  categories: { name: string; kind: "income" | "expense"; color: string | null }[],
 ): Map<string, CategoryColorPair> {
   const map = new Map<string, CategoryColorPair>();
-  const autoNames: string[] = [];
+  const autoExpenseNames: string[] = [];
 
   for (const category of categories) {
     const manual = findPaletteColorByFg(category.color);
-    if (manual) map.set(category.name, manual);
-    else autoNames.push(category.name);
+    if (manual) {
+      map.set(category.name, manual);
+    } else if (category.kind === "income") {
+      map.set(category.name, INCOME_COLOR);
+    } else {
+      autoExpenseNames.push(category.name);
+    }
   }
 
-  const sorted = [...new Set(autoNames)].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const sorted = [...new Set(autoExpenseNames)].sort((a, b) => a.localeCompare(b, "pt-BR"));
   sorted.forEach((name, i) => {
     map.set(name, CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]);
   });
@@ -67,18 +72,18 @@ export function buildCategoryColorMap(
   return map;
 }
 
-// Busca as categorias de despesa do household e monta o mapa de cores —
-// reaproveitado pela tela Mês (donut) e pelos badges de Transações/A vencer,
-// para que a mesma categoria tenha sempre a mesma cor em todo o app.
-export async function getExpenseCategoryColorMap(
+// Busca todas as categorias do household (despesa e receita) e monta o
+// mapa de cores — reaproveitado pela tela Mês (donut), Relatórios,
+// Transações, A vencer e Configurações, pra que a mesma categoria
+// tenha sempre a mesma cor em todo o app.
+export async function getCategoryColorMap(
   supabase: SupabaseClient,
   householdId: string,
 ): Promise<Map<string, CategoryColorPair>> {
   const { data } = await supabase
     .from("categories")
-    .select("name, color")
-    .eq("household_id", householdId)
-    .eq("kind", "expense");
+    .select("name, kind, color")
+    .eq("household_id", householdId);
 
   return buildCategoryColorMap(data ?? []);
 }

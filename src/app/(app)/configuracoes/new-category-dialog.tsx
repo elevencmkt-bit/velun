@@ -91,12 +91,10 @@ export function NewCategoryDialog() {
               autoFocus
             />
           </div>
-          {kind === "expense" ? (
-            <div className="flex flex-col gap-2">
-              <Label>Cor</Label>
-              <ColorSwatchGrid value={color} onChange={setColor} />
-            </div>
-          ) : null}
+          <div className="flex flex-col gap-2">
+            <Label>Cor</Label>
+            <ColorSwatchGrid value={color} onChange={setColor} />
+          </div>
           {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
           <Button type="submit" disabled={isPending}>
             {isPending ? "Criando..." : "Criar categoria"}

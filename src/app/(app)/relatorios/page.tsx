@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
-import { getExpenseCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
+import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
 import { excludeTransfers, groupByCategory, sumByDirection } from "@/lib/reports";
@@ -34,7 +34,7 @@ export default async function RelatoriosPage({
       end,
       view === "a-vencer" ? "pending" : "cleared",
     ),
-    getExpenseCategoryColorMap(supabase, householdId),
+    getCategoryColorMap(supabase, householdId),
   ]);
 
   const current = excludeTransfers(rows);
@@ -112,7 +112,7 @@ export default async function RelatoriosPage({
                     key={row.name}
                     className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 last:border-0"
                   >
-                    <CategoryBadge name={row.name} kind="income" />
+                    <CategoryBadge name={row.name} color={colorMap.get(row.name)} />
                     <span className="text-metadata ml-auto">
                       {totalIncome > 0 ? Math.round((row.amount_cents / totalIncome) * 100) : 0}%
                     </span>

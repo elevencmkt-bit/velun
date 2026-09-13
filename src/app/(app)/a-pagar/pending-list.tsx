@@ -70,7 +70,6 @@ export function PendingList({
           <span className="w-32">
             <CategoryBadge
               name={row.category_name ?? ""}
-              kind={row.direction === "in" ? "income" : "expense"}
               color={row.category_name ? categoryColors[row.category_name] : undefined}
             />
           </span>

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { getExpenseCategoryColorMap } from "@/lib/category-colors";
+import { getCategoryColorMap } from "@/lib/category-colors";
 import { formatCents } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecurrenceForm } from "./recurrence-form";
@@ -54,7 +54,7 @@ export default async function AVencerPage() {
       .eq("household_id", householdId)
       .eq("is_active", true)
       .order("created_at", { ascending: true }),
-    getExpenseCategoryColorMap(supabase, householdId),
+    getCategoryColorMap(supabase, householdId),
   ]);
 
   const single = <T,>(value: T | T[] | null): T | null =>

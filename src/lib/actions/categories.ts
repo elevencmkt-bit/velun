@@ -32,9 +32,7 @@ export async function createCategory(formData: FormData) {
   if (!name) throw new Error("Nome da categoria é obrigatório.");
   if (kind !== "income" && kind !== "expense") throw new Error("Tipo de categoria inválido.");
 
-  // Cor manual só faz sentido pra despesa — receita é sempre o verde
-  // fixo de INCOME_COLOR, então qualquer valor aqui é ignorado.
-  if (kind === "expense" && color && !findPaletteColorByFg(color)) {
+  if (color && !findPaletteColorByFg(color)) {
     throw new Error("Cor inválida.");
   }
 
@@ -44,7 +42,7 @@ export async function createCategory(formData: FormData) {
       household_id: householdId,
       name,
       kind,
-      color: kind === "expense" && color ? color : NO_MANUAL_COLOR,
+      color: color ?? NO_MANUAL_COLOR,
     })
     .select("id")
     .single();
@@ -75,8 +73,8 @@ export async function updateCategoryName(categoryId: string, name: string) {
 }
 
 // `color` deve ser um dos `fg` da CATEGORY_PALETTE, ou null para voltar
-// pro fallback automático — só categorias de despesa podem ter cor
-// manual (receita usa sempre o verde fixo de INCOME_COLOR).
+// pro fallback automático (verde fixo pra receita, alfabético pra
+// despesa) — vale pros dois tipos de categoria.
 export async function updateCategoryColor(categoryId: string, color: string | null) {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
@@ -89,8 +87,7 @@ export async function updateCategoryColor(categoryId: string, color: string | nu
     .from("categories")
     .update({ color: color ?? NO_MANUAL_COLOR })
     .eq("id", categoryId)
-    .eq("household_id", householdId)
-    .eq("kind", "expense");
+    .eq("household_id", householdId);
 
   if (error) throw new Error(error.message);
 

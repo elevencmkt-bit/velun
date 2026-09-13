@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatCents } from "@/lib/money";
-import { INCOME_COLOR, MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
+import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 import { bulkUpdateCategory, updateTransactionCategory } from "@/lib/actions/transactions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -153,10 +153,7 @@ export function TransactionsTable({
                       className="h-8 w-full border-transparent text-[13px] font-medium"
                       style={(() => {
                         if (!row.category_name) return undefined;
-                        const pair =
-                          row.direction === "in"
-                            ? INCOME_COLOR
-                            : (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR);
+                        const pair = categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR;
                         return { backgroundColor: pair.bg, color: pair.fg };
                       })()}
                     >

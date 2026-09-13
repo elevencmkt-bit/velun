@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, ArrowDownCircle, PiggyBa
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
-import { getExpenseCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
+import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { getCashFlowProjection } from "@/lib/cash-flow";
 import {
   monthRange,
@@ -164,7 +164,7 @@ export default async function MesPage({
     fetchMonthTransactions(supabase, householdId, start, end),
     fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
     fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
-    getExpenseCategoryColorMap(supabase, householdId),
+    getCategoryColorMap(supabase, householdId),
     getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS),
     fetchPendingPreview(supabase, householdId),
   ]);
@@ -332,7 +332,6 @@ export default async function MesPage({
                     </span>
                     <CategoryBadge
                       name={row.category_name ?? ""}
-                      kind={row.direction === "in" ? "income" : "expense"}
                       color={colorMap.get(row.category_name ?? "")}
                     />
                     <span
