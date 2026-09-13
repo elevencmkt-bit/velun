@@ -44,7 +44,7 @@ export function RecurrencesList({ rows }: { rows: RecurrenceRow[] }) {
             <span className="w-20" />
           )}
           <span
-            className="ml-auto font-medium tabular-nums"
+            className="ml-auto font-semibold tabular-nums"
             style={{ color: row.direction === "out" ? "var(--out)" : "var(--in)" }}
           >
             {row.direction === "out" ? "-" : "+"}

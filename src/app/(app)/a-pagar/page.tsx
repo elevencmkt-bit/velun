@@ -89,7 +89,7 @@ export default async function APagarPage() {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <h1 className="text-lg font-medium">A pagar</h1>
+        <h1 className="text-lg font-bold">A pagar</h1>
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm font-normal text-[--ink]/60">
@@ -104,7 +104,7 @@ export default async function APagarPage() {
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-medium">Recorrências</h2>
+          <h2 className="text-base font-semibold">Recorrências</h2>
           <RecurrenceForm accounts={accounts ?? []} categories={categories ?? []} />
         </div>
         <Card className="shadow-sm">

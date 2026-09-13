@@ -44,7 +44,7 @@ export default async function ContasPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-medium">Contas</h1>
+        <h1 className="text-lg font-bold">Contas</h1>
         <AccountForm />
       </div>
 

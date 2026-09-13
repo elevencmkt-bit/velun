@@ -77,7 +77,7 @@ export default async function TransacoesPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-medium">Transações</h1>
+      <h1 className="text-lg font-bold">Transações</h1>
       <Card className="shadow-sm">
         <CardContent className="flex flex-col gap-6 pt-6">
           <Suspense>

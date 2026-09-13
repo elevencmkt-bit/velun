@@ -175,7 +175,7 @@ export function TransactionsTable({
                   <span className="text-xs text-[--flag]">pendente</span>
                 ) : null}
                 <span
-                  className="ml-auto font-medium tabular-nums"
+                  className="ml-auto font-semibold tabular-nums"
                   style={{ color: row.direction === "out" ? "var(--out)" : "var(--in)" }}
                 >
                   {row.direction === "out" ? "-" : "+"}

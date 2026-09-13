@@ -53,7 +53,7 @@ export function Sidebar({ householdName }: { householdName: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
                 style={{
                   backgroundColor: isActive ? "var(--sidebar-active-bg)" : "transparent",
                   color: isActive ? "#ffffff" : "var(--sidebar-fg)",

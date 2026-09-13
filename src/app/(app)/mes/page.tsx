@@ -206,7 +206,7 @@ export default async function MesPage({
   if (householdIsEmpty) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="text-lg font-medium">Mês</h1>
+        <h1 className="text-lg font-bold">Mês</h1>
         <Card>
           <CardHeader>
             <CardTitle className="text-base font-normal text-[--ink]/70">
@@ -226,7 +226,7 @@ export default async function MesPage({
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-medium">Mês</h1>
+        <h1 className="text-lg font-bold">Mês</h1>
         <div className="flex items-center gap-3 text-sm">
           <Link
             href={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
@@ -277,7 +277,7 @@ export default async function MesPage({
       <div className="grid grid-cols-2 gap-6">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-medium">Despesas por categoria</CardTitle>
+            <CardTitle className="text-base font-semibold">Despesas por categoria</CardTitle>
           </CardHeader>
           <CardContent>
             <MonthDonut slices={slices} />
@@ -285,7 +285,7 @@ export default async function MesPage({
         </Card>
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-medium">Entradas vs saídas</CardTitle>
+            <CardTitle className="text-base font-semibold">Entradas vs saídas</CardTitle>
           </CardHeader>
           <CardContent>
             <TrendBarChart points={trendPoints} />
@@ -295,7 +295,7 @@ export default async function MesPage({
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base font-medium">Maiores despesas</CardTitle>
+          <CardTitle className="text-base font-semibold">Maiores despesas</CardTitle>
         </CardHeader>
         <CardContent>
           {top5.length === 0 ? (
@@ -314,7 +314,7 @@ export default async function MesPage({
                     color={colorMap.get(row.category_name ?? "")}
                   />
                   <span className="w-28 text-[--ink]/60">{row.account_name}</span>
-                  <span className="ml-auto font-medium tabular-nums" style={{ color: "var(--out)" }}>
+                  <span className="ml-auto font-semibold tabular-nums" style={{ color: "var(--out)" }}>
                     -{formatCents(row.amount_cents)}
                   </span>
                 </div>

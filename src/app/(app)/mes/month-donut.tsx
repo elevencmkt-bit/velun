@@ -56,7 +56,7 @@ export function MonthDonut({ slices }: { slices: DonutSlice[] }) {
             />
             <span className="flex-1 truncate">{slice.name}</span>
             <span className="text-[--ink]/60">{Math.round((slice.amount_cents / total) * 100)}%</span>
-            <span className="w-20 text-right font-medium tabular-nums">
+            <span className="w-20 text-right font-semibold tabular-nums">
               {formatCents(slice.amount_cents)}
             </span>
           </li>

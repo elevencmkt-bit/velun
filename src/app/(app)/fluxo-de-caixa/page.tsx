@@ -62,7 +62,7 @@ export default async function FluxoDeCaixaPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-lg font-medium">Fluxo de caixa</h1>
+      <h1 className="text-lg font-bold">Fluxo de caixa</h1>
       <p className="text-sm text-[--ink]/70">
         Saldo atual mais as contas pendentes, projetado para os próximos {HORIZON_DAYS} dias.
       </p>
