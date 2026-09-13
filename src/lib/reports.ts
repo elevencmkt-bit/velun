@@ -47,11 +47,22 @@ export function groupExpensesByCategory(rows: MonthTransaction[]): CategorySlice
   return [...kept, { name: OTHER_BUCKET, amount_cents: restTotal }];
 }
 
-export function topExpenses(rows: MonthTransaction[], limit: number): MonthTransaction[] {
-  return rows
-    .filter((r) => r.direction === "out")
-    .sort((a, b) => b.amount_cents - a.amount_cents)
-    .slice(0, limit);
+// Ranking simples por categoria (tela Relatórios) — sem o teto de 8
+// fatias do donut, porque aqui é lista, não gráfico.
+export function groupByCategory(
+  rows: MonthTransaction[],
+  direction: "in" | "out",
+): CategorySlice[] {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (row.direction !== direction) continue;
+    const key = row.category_name ?? "Sem categoria";
+    totals.set(key, (totals.get(key) ?? 0) + row.amount_cents);
+  }
+
+  return Array.from(totals.entries())
+    .map(([name, amount_cents]) => ({ name, amount_cents }))
+    .sort((a, b) => b.amount_cents - a.amount_cents);
 }
 
 export function percentChange(current: number, previous: number): number | null {

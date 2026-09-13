@@ -9,6 +9,7 @@ import {
   Upload,
   TrendingUp,
   Wallet,
+  PieChart,
   HeartHandshake,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ const NAV = [
   { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
   { href: "/a-pagar", label: "A pagar", icon: CalendarClock },
   { href: "/fluxo-de-caixa", label: "Fluxo de caixa", icon: TrendingUp },
+  { href: "/relatorios", label: "Relatórios", icon: PieChart },
   { href: "/contas", label: "Contas", icon: Wallet },
 ];
 

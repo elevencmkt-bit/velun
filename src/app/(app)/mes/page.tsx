@@ -6,92 +6,37 @@ import { formatCents } from "@/lib/money";
 import { getExpenseCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { getCashFlowProjection } from "@/lib/cash-flow";
 import {
+  monthRange,
+  shiftMonth,
+  monthParam,
+  monthLabel,
+  shortMonthLabel,
+  parseMonthParam,
+} from "@/lib/month";
+import { fetchMonthTransactions } from "@/lib/month-transactions";
+import {
   excludeTransfers,
   groupExpensesByCategory,
   percentChange,
   sumByDirection,
-  type MonthTransaction,
 } from "@/lib/reports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge } from "@/components/category-badge";
+import { MonthSelector } from "@/components/month-selector";
 import { MonthDonut } from "./month-donut";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
-import { MonthSelector } from "./month-selector";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
 const RECENT_TRANSACTIONS_LIMIT = 6;
 const PENDING_PREVIEW_LIMIT = 4;
 
-function monthRange(year: number, monthIndex: number) {
-  const start = new Date(year, monthIndex, 1);
-  const end = new Date(year, monthIndex + 1, 0);
-  const toISO = (d: Date) => d.toISOString().slice(0, 10);
-  return { start: toISO(start), end: toISO(end) };
-}
-
-function shiftMonth(year: number, monthIndex: number, delta: number) {
-  const d = new Date(year, monthIndex + delta, 1);
-  return { year: d.getFullYear(), monthIndex: d.getMonth() };
-}
-
-function monthParam(year: number, monthIndex: number) {
-  return `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-}
-
-function monthLabel(year: number, monthIndex: number) {
-  return new Date(year, monthIndex, 1)
-    .toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-    .replace(/^\w/, (c) => c.toUpperCase());
-}
-
-function shortMonthLabel(year: number, monthIndex: number) {
-  return new Date(year, monthIndex, 1)
-    .toLocaleDateString("pt-BR", { month: "short" })
-    .replace(".", "");
-}
-
 function shortDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
   });
-}
-
-async function fetchMonthTransactions(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  householdId: string,
-  start: string,
-  end: string,
-): Promise<MonthTransaction[]> {
-  const { data, error } = await supabase
-    .from("transactions")
-    .select(
-      `id, date, amount_cents, direction, description, transfer_group_id,
-       account:accounts(name),
-       category:categories(name)`,
-    )
-    .eq("household_id", householdId)
-    .eq("status", "cleared")
-    .gte("date", start)
-    .lte("date", end);
-
-  if (error) throw new Error(error.message);
-
-  const single = <T,>(value: T | T[] | null): T | null =>
-    Array.isArray(value) ? (value[0] ?? null) : value;
-
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    date: row.date,
-    amount_cents: row.amount_cents,
-    direction: row.direction,
-    description: row.description,
-    transfer_group_id: row.transfer_group_id,
-    account_name: single<{ name: string }>(row.account)?.name ?? "—",
-    category_name: single<{ name: string }>(row.category)?.name ?? null,
-  }));
 }
 
 type PendingPreviewRow = {
@@ -198,15 +143,7 @@ export default async function MesPage({
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
   const { month } = await searchParams;
-
-  const now = new Date();
-  let year = now.getFullYear();
-  let monthIndex = now.getMonth();
-  if (month && /^\d{4}-\d{2}$/.test(month)) {
-    const [y, m] = month.split("-").map(Number);
-    year = y;
-    monthIndex = m - 1;
-  }
+  const { year, monthIndex } = parseMonthParam(month);
 
   const { start, end } = monthRange(year, monthIndex);
   const prev = shiftMonth(year, monthIndex, -1);
