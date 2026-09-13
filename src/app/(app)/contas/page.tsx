@@ -31,7 +31,7 @@ export default async function ContasPage() {
   const [{ data: accounts }, balances] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, type, institution, is_archived")
+      .select("id, name, type, institution, is_archived, opening_balance_cents")
       .eq("household_id", householdId)
       .order("sort_order")
       .order("name"),
@@ -89,14 +89,26 @@ export default async function ContasPage() {
                       >
                         <Icon className="h-8 w-8" style={{ color: "var(--badge-purple-fg)" }} />
                       </div>
-                      {account.is_archived ? (
-                        <Badge variant="secondary">Arquivada</Badge>
-                      ) : (
-                        <AccountRowActions accountId={account.id} isArchived={false} />
-                      )}
+                      <div className="flex items-center gap-1">
+                        <AccountForm
+                          account={{
+                            id: account.id,
+                            name: account.name,
+                            type: account.type,
+                            institution: account.institution,
+                            opening_balance_cents: account.opening_balance_cents,
+                          }}
+                        />
+                        <AccountRowActions accountId={account.id} isArchived={account.is_archived} />
+                      </div>
                     </div>
                     <div>
-                      <div className="text-card-title">{account.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-card-title">{account.name}</span>
+                        {account.is_archived ? (
+                          <Badge variant="secondary">Arquivada</Badge>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-(--text-muted)">
                         {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
                         {account.institution ? ` · ${account.institution}` : ""}
@@ -108,9 +120,6 @@ export default async function ContasPage() {
                     >
                       {formatCents(balance)}
                     </span>
-                    {account.is_archived ? (
-                      <AccountRowActions accountId={account.id} isArchived />
-                    ) : null}
                   </CardContent>
                 </Card>
               );

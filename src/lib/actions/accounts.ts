@@ -34,6 +34,34 @@ export async function createAccount(formData: FormData) {
   revalidatePath("/contas");
 }
 
+export async function updateAccount(accountId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const name = String(formData.get("name") ?? "").trim();
+  const type = String(formData.get("type") ?? "");
+  const institution = String(formData.get("institution") ?? "").trim() || null;
+  const openingBalanceInput = String(formData.get("opening_balance") ?? "0");
+
+  if (!name) throw new Error("Nome da conta é obrigatório.");
+  if (!ACCOUNT_TYPES.includes(type as (typeof ACCOUNT_TYPES)[number])) {
+    throw new Error("Tipo de conta inválido.");
+  }
+
+  const { error } = await supabase
+    .from("accounts")
+    .update({
+      name,
+      type,
+      institution,
+      opening_balance_cents: parseToCents(openingBalanceInput || "0"),
+    })
+    .eq("id", accountId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/contas");
+}
+
 export async function archiveAccount(accountId: string) {
   const supabase = await createClient();
   const { error } = await supabase
