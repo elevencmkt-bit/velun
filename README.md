@@ -2,7 +2,7 @@
 
 Ver a especificação completa no Google Drive: `ECM_HUB/000_Eleven_CM/DASHBOARD/spec-dashboard-financeiro.md`.
 
-Status: **Fase 5 concluída** (Fases 2/3 de importação de extrato puladas por ora — só entrada manual). Contas, lançamento manual, transações com filtros/edição/bulk, recorrências, A pagar, transferências, tela Mês e fluxo de caixa projetado. Projeto Supabase já conectado e rodando.
+Status: **Fase 6 concluída** (Fases 2/3 de importação de extrato puladas por ora — só entrada manual). Contas, lançamento manual, transações com filtros/edição/bulk, recorrências, A pagar, transferências, tela Mês, fluxo de caixa projetado, e direção visual (sidebar, cards, badges de categoria) inspirada em referência trazida pelo usuário — substituiu a paleta minimalista original da seção 7 da spec. Projeto Supabase já conectado e rodando.
 
 ## Stack
 
@@ -62,4 +62,6 @@ supabase/seed/            dados de exemplo
 
 ## Próximo passo
 
-Fase 6 (polimento): direção visual aplicada de ponta a ponta, atalhos de teclado da grade de revisão (ainda não existe pois a importação foi pulada) e refinamento geral. Fases 2/3 (importação de extrato CSV/PDF) ficam para depois; quando forem retomadas, vão precisar da `ANTHROPIC_API_KEY` no `.env.local`. Ver seção 8 da spec.
+Todas as fases que não dependem de importação de extrato estão prontas. Uso contínuo do app com lançamento manual é o próximo passo natural — ou retomar as Fases 2/3 (importação CSV/PDF via Claude), que vão precisar da `ANTHROPIC_API_KEY` no `.env.local`. Ver seção 8 da spec.
+
+Nota sobre a direção visual: a paleta minimalista da seção 7 da spec foi substituída por uma referência trazida pelo usuário (mockup + template CodeIgniter de inspiração visual — o template em si não foi usado no código, é PHP/Bootstrap, stack incompatível). Sidebar, cards com ícone e badges de categoria vivem em `src/components/sidebar.tsx`, `src/components/category-badge.tsx` e nos tokens de cor em `src/app/globals.css`.
