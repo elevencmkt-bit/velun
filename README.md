@@ -2,7 +2,7 @@
 
 Ver a especificação completa no Google Drive: `ECM_HUB/000_Eleven_CM/DASHBOARD/spec-dashboard-financeiro.md`.
 
-Status: **Fase 4 concluída** (Fases 2/3 de importação de extrato puladas por ora — só entrada manual). Contas, lançamento manual, transações com filtros/edição/bulk, recorrências, A pagar e transferências entre contas. Projeto Supabase já conectado e rodando.
+Status: **Fase 5 concluída** (Fases 2/3 de importação de extrato puladas por ora — só entrada manual). Contas, lançamento manual, transações com filtros/edição/bulk, recorrências, A pagar, transferências, tela Mês e fluxo de caixa projetado. Projeto Supabase já conectado e rodando.
 
 ## Stack
 
@@ -62,4 +62,4 @@ supabase/seed/            dados de exemplo
 
 ## Próximo passo
 
-Fase 5 (leitura): tela Mês (entrou/saiu/sobrou, donut de despesas, maiores despesas, comparação com mês anterior) e fluxo de caixa projetado de 90 dias — ver seção 8 da spec. Fases 2/3 (importação de extrato CSV/PDF) ficam para depois; quando forem retomadas, vão precisar da `ANTHROPIC_API_KEY` no `.env.local`.
+Fase 6 (polimento): direção visual aplicada de ponta a ponta, atalhos de teclado da grade de revisão (ainda não existe pois a importação foi pulada) e refinamento geral. Fases 2/3 (importação de extrato CSV/PDF) ficam para depois; quando forem retomadas, vão precisar da `ANTHROPIC_API_KEY` no `.env.local`. Ver seção 8 da spec.
