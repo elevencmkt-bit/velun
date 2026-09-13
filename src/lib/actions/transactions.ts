@@ -97,3 +97,71 @@ export async function deleteTransaction(transactionId: string) {
   revalidatePath("/contas");
   revalidatePath("/mes");
 }
+
+export async function markTransactionPaid(transactionId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transactions")
+    .update({ status: "cleared" })
+    .eq("id", transactionId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/a-pagar");
+  revalidatePath("/transacoes");
+  revalidatePath("/contas");
+  revalidatePath("/mes");
+}
+
+export async function createTransfer(formData: FormData) {
+  const { memberId, householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const fromAccountId = String(formData.get("from_account_id") ?? "");
+  const toAccountId = String(formData.get("to_account_id") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const description = String(formData.get("description") ?? "").trim() || "Transferência";
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  const amountInput = String(formData.get("amount") ?? "");
+
+  if (!fromAccountId || !toAccountId) throw new Error("Selecione as duas contas.");
+  if (fromAccountId === toAccountId) {
+    throw new Error("Conta de origem e destino não podem ser a mesma.");
+  }
+  if (!date) throw new Error("Data é obrigatória.");
+
+  const amountCents = parseToCents(amountInput);
+  if (amountCents <= 0) throw new Error("Valor precisa ser maior que zero.");
+
+  const fromFingerprint = computeFingerprint({
+    accountId: fromAccountId,
+    date,
+    amountCents,
+    description,
+  });
+  const toFingerprint = computeFingerprint({
+    accountId: toAccountId,
+    date,
+    amountCents,
+    description,
+  });
+
+  const { error } = await supabase.rpc("create_transfer", {
+    p_household_id: householdId,
+    p_from_account_id: fromAccountId,
+    p_to_account_id: toAccountId,
+    p_date: date,
+    p_amount_cents: amountCents,
+    p_description: description,
+    p_notes: notes,
+    p_created_by: memberId,
+    p_from_fingerprint: fromFingerprint,
+    p_to_fingerprint: toFingerprint,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/transacoes");
+  revalidatePath("/contas");
+  revalidatePath("/mes");
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createTransaction } from "@/lib/actions/transactions";
+import { createTransaction, createTransfer } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; kind: "income" | "expense" };
+type Mode = "in" | "out" | "transfer";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -39,7 +40,7 @@ export function ManualTransactionButton({
   categories: Category[];
 }) {
   const [open, setOpen] = useState(false);
-  const [direction, setDirection] = useState<"in" | "out">("out");
+  const [mode, setMode] = useState<Mode>("out");
   const [categories, setCategories] = useState(initialCategories);
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -65,7 +66,7 @@ export function ManualTransactionButton({
   }, []);
 
   const categoriesForDirection = categories.filter(
-    (c) => c.kind === (direction === "in" ? "income" : "expense"),
+    (c) => c.kind === (mode === "in" ? "income" : "expense"),
   );
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -74,13 +75,18 @@ export function ManualTransactionButton({
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
       try {
-        await createTransaction(formData);
+        if (mode === "transfer") {
+          await createTransfer(formData);
+        } else {
+          formData.set("direction", mode);
+          await createTransaction(formData);
+        }
         formRef.current?.reset();
         setSelectedCategoryId("");
         setOpen(false);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao lançar transação.");
+        setError(err instanceof Error ? err.message : "Erro ao lançar.");
       }
     });
   }
@@ -92,12 +98,9 @@ export function ManualTransactionButton({
       try {
         const formData = new FormData();
         formData.set("name", name);
-        formData.set("kind", direction === "in" ? "income" : "expense");
+        formData.set("kind", mode === "in" ? "income" : "expense");
         const id = await createCategory(formData);
-        setCategories((prev) => [
-          ...prev,
-          { id, name, kind: direction === "in" ? "income" : "expense" },
-        ]);
+        setCategories((prev) => [...prev, { id, name, kind: mode === "in" ? "income" : "expense" }]);
         setSelectedCategoryId(id);
         setNewCategoryName("");
         setNewCategoryOpen(false);
@@ -126,9 +129,9 @@ export function ManualTransactionButton({
         </DialogHeader>
         <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4">
           <Tabs
-            value={direction}
+            value={mode}
             onValueChange={(v) => {
-              setDirection(v as "in" | "out");
+              setMode(v as Mode);
               setSelectedCategoryId("");
             }}
           >
@@ -139,9 +142,11 @@ export function ManualTransactionButton({
               <TabsTrigger value="in" className="flex-1">
                 Entrada
               </TabsTrigger>
+              <TabsTrigger value="transfer" className="flex-1">
+                Transferência
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          <input type="hidden" name="direction" value={direction} />
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
@@ -161,72 +166,114 @@ export function ManualTransactionButton({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="account_id">Conta</Label>
-            <Select name="account_id" required>
-              <SelectTrigger id="account_id">
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="category_id">Categoria</Label>
-            <Select
-              name="category_id"
-              value={selectedCategoryId}
-              onValueChange={setSelectedCategoryId}
-            >
-              <SelectTrigger id="category_id">
-                <SelectValue placeholder="Sem categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoriesForDirection.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {newCategoryOpen ? (
-              <div className="flex gap-2">
-                <Input
-                  autoFocus
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Nome da nova categoria"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      onCreateCategory();
-                    }
-                  }}
-                />
-                <Button type="button" size="sm" onClick={onCreateCategory} disabled={isPending}>
-                  Criar
-                </Button>
+          {mode === "transfer" ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="from_account_id">De</Label>
+                <Select name="from_account_id" required>
+                  <SelectTrigger id="from_account_id">
+                    <SelectValue placeholder="Conta de origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <button
-                type="button"
-                className="w-fit text-left text-sm text-[--ink]/60 underline-offset-2 hover:underline"
-                onClick={() => setNewCategoryOpen(true)}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="to_account_id">Para</Label>
+                <Select name="to_account_id" required>
+                  <SelectTrigger id="to_account_id">
+                    <SelectValue placeholder="Conta de destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="account_id">Conta</Label>
+              <Select name="account_id" required>
+                <SelectTrigger id="account_id">
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {mode !== "transfer" ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="category_id">Categoria</Label>
+              <Select
+                name="category_id"
+                value={selectedCategoryId}
+                onValueChange={setSelectedCategoryId}
               >
-                + nova categoria
-              </button>
-            )}
-          </div>
+                <SelectTrigger id="category_id">
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesForDirection.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newCategoryOpen ? (
+                <div className="flex gap-2">
+                  <Input
+                    autoFocus
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Nome da nova categoria"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCreateCategory();
+                      }
+                    }}
+                  />
+                  <Button type="button" size="sm" onClick={onCreateCategory} disabled={isPending}>
+                    Criar
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="w-fit text-left text-sm text-[--ink]/60 underline-offset-2 hover:underline"
+                  onClick={() => setNewCategoryOpen(true)}
+                >
+                  + nova categoria
+                </button>
+              )}
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="description">Descrição</Label>
-            <Input id="description" name="description" required />
+            <Input
+              id="description"
+              name="description"
+              required={mode !== "transfer"}
+              placeholder={mode === "transfer" ? "Transferência" : undefined}
+            />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -234,10 +281,12 @@ export function ManualTransactionButton({
             <Input id="notes" name="notes" />
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox name="is_pending" />
-            Ainda não caiu (pendente)
-          </label>
+          {mode !== "transfer" ? (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox name="is_pending" />
+              Ainda não caiu (pendente)
+            </label>
+          ) : null}
 
           {error ? <p className="text-sm text-[--out]">{error}</p> : null}
 
