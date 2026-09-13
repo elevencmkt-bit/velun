@@ -1,13 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MonthTransaction } from "@/lib/reports";
 
-// Transações cleared de um household num intervalo de datas, com conta
-// e categoria já resolvidas — usado pelo Dashboard e por Relatórios.
+// Transações de um household num intervalo de datas, com conta e
+// categoria já resolvidas — usado pelo Dashboard e por Relatórios.
+// `status` default "cleared" (realizado); passe "pending" para projeção
+// do que ainda vai vencer/entrar em um mês (futuro ou corrente).
 export async function fetchMonthTransactions(
   supabase: SupabaseClient,
   householdId: string,
   start: string,
   end: string,
+  status: "cleared" | "pending" = "cleared",
 ): Promise<MonthTransaction[]> {
   const { data, error } = await supabase
     .from("transactions")
@@ -17,7 +20,7 @@ export async function fetchMonthTransactions(
        category:categories(name)`,
     )
     .eq("household_id", householdId)
-    .eq("status", "cleared")
+    .eq("status", status)
     .gte("date", start)
     .lte("date", end);
 
