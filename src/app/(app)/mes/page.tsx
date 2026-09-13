@@ -158,6 +158,7 @@ function StatCard({
   icon: Icon,
   badgeBg,
   badgeFg,
+  valueColor,
   delta,
 }: {
   label: string;
@@ -165,6 +166,7 @@ function StatCard({
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   badgeBg: string;
   badgeFg: string;
+  valueColor: string;
   delta: React.ReactNode;
 }) {
   return (
@@ -178,7 +180,9 @@ function StatCard({
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-kpi-label">{label}</span>
-          <span className="text-kpi-value">{value}</span>
+          <span className="text-kpi-value" style={{ color: valueColor }}>
+            {value}
+          </span>
           {delta}
         </div>
       </CardContent>
@@ -300,6 +304,7 @@ export default async function MesPage({
           icon={ArrowUpCircle}
           badgeBg="var(--badge-green-bg)"
           badgeFg="var(--badge-green-fg)"
+          valueColor="var(--income)"
           delta={<PercentBadge current={entrou} previous={entrouPrev} favorable="up" />}
         />
         <StatCard
@@ -308,6 +313,7 @@ export default async function MesPage({
           icon={ArrowDownCircle}
           badgeBg="var(--badge-red-bg)"
           badgeFg="var(--badge-red-fg)"
+          valueColor="var(--expense)"
           delta={<PercentBadge current={saiu} previous={saiuPrev} favorable="down" />}
         />
         <StatCard
@@ -316,6 +322,7 @@ export default async function MesPage({
           icon={PiggyBank}
           badgeBg="var(--badge-blue-bg)"
           badgeFg="var(--badge-blue-fg)"
+          valueColor={sobrou < 0 ? "var(--expense)" : "var(--income)"}
           delta={<PercentBadge current={sobrou} previous={sobrouPrev} favorable="up" />}
         />
       </div>
