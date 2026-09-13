@@ -19,34 +19,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const withAvatar = await supabase
     .from("members")
-    .select("display_name, avatar_url, household_id, households(name)")
+    .select("display_name, avatar_url, household_id")
     .eq("id", user.id)
     .maybeSingle();
 
   // avatar_url pode ainda não existir se a migração 0003 não rodou —
   // refaz sem a coluna em vez de derrubar o layout inteiro nesse caso.
-  let member: {
-    display_name: string;
-    avatar_url: string | null;
-    household_id: string;
-    households: unknown;
-  } | null = withAvatar.data;
+  let member: { display_name: string; avatar_url: string | null; household_id: string } | null =
+    withAvatar.data;
 
   if (withAvatar.error) {
     const { data: withoutAvatar } = await supabase
       .from("members")
-      .select("display_name, household_id, households(name)")
+      .select("display_name, household_id")
       .eq("id", user.id)
       .maybeSingle();
     member = withoutAvatar ? { ...withoutAvatar, avatar_url: null } : null;
   }
-
-  // Sem tipos gerados do Supabase ainda, o builder infere `households`
-  // como array — na prática é o objeto único do lado "many-to-one".
-  const householdName = (
-    member?.households as unknown as { name: string } | { name: string }[] | null
-  );
-  const household = Array.isArray(householdName) ? householdName[0] : householdName;
 
   const [{ data: accounts }, { data: categories }] = await Promise.all([
     supabase
@@ -65,9 +54,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div className="flex min-h-screen bg-(--paper) text-(--ink)">
-      <Sidebar householdName={household?.name ?? "Sem household"} />
-      <div className="flex flex-1 flex-col">
+    <div className="flex h-screen overflow-hidden bg-(--paper) text-(--ink)">
+      <Sidebar />
+      <div className="flex min-h-0 flex-1 flex-col">
         <header
           className="flex h-[72px] shrink-0 items-center justify-between border-b px-7"
           style={{ backgroundColor: "rgba(255,255,255,.92)", borderColor: "var(--border-primary)" }}
@@ -78,13 +67,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <NotificationBell />
             <UserMenu
               displayName={member?.display_name ?? user.email ?? "Você"}
-              subtitle={household?.name ?? "Conta compartilhada"}
+              subtitle="Dashboard Financeiro"
               avatarUrl={member?.avatar_url ?? null}
               onLogout={logout}
             />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto px-7 pt-6 pb-8">
+        <main className="min-h-0 flex-1 overflow-y-auto px-7 pt-6 pb-8">
           <div className="mx-auto max-w-[1600px]">{children}</div>
         </main>
       </div>

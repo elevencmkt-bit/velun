@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,7 +11,6 @@ import {
   TrendingUp,
   Wallet,
   PieChart,
-  HeartHandshake,
   Settings,
 } from "lucide-react";
 
@@ -28,29 +28,26 @@ const NAV = [
 
 const DISABLED_NAV = [{ label: "Importar", icon: Upload }];
 
-export function Sidebar({ householdName }: { householdName: string }) {
+export function Sidebar() {
   const pathname = usePathname();
 
   return (
     <aside
-      className="flex h-screen w-[232px] shrink-0 flex-col justify-between"
+      className="flex h-full w-[232px] shrink-0 flex-col justify-between"
       style={{ background: "var(--sidebar-bg-gradient)" }}
     >
       <div className="flex flex-col gap-8 px-5 pt-6">
         <div className="flex items-center gap-3 px-1">
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
-            style={{
-              background: "var(--sidebar-active-gradient)",
-              boxShadow: "var(--sidebar-active-shadow)",
-            }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px]"
+            style={{ boxShadow: "var(--sidebar-active-shadow)" }}
           >
-            <HeartHandshake className="h-6 w-6 text-white" />
+            <Image src="/velun-icon.png" alt="Velun" width={48} height={48} className="h-full w-full" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-[19px] font-bold text-white">{householdName}</span>
+            <span className="text-[19px] font-bold text-white">Velun</span>
             <span className="text-[12px] font-normal" style={{ color: "var(--sidebar-fg-muted)" }}>
-              Dashboard financeiro
+              Dashboard Financeiro
             </span>
           </div>
         </div>

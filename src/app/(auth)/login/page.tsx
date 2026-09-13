@@ -1,4 +1,4 @@
-import { HeartHandshake } from "lucide-react";
+import Image from "next/image";
 import { login } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,10 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center bg-(--paper) p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="flex flex-col items-center gap-2 pb-2">
-          <div
-            className="flex h-11 w-11 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "var(--sidebar-active-bg)" }}
-          >
-            <HeartHandshake className="h-6 w-6 text-white" />
+          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl">
+            <Image src="/velun-icon.png" alt="Velun" width={44} height={44} className="h-full w-full" />
           </div>
+          <span className="text-lg font-bold text-(--text-primary)">Velun</span>
           <CardTitle>Entrar</CardTitle>
         </CardHeader>
         <CardContent>
