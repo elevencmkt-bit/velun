@@ -26,7 +26,13 @@ export async function getCurrentMember() {
     .eq("id", user.id)
     .single();
 
-  if (error || !member) {
+  // PGRST116 = .single() não achou nenhuma linha — aí sim não há
+  // membership. Qualquer outro erro (rede, timeout) é passageiro e não
+  // deve virar essa mensagem enganosa; melhor deixar recarregar.
+  if (error && error.code !== "PGRST116") {
+    throw new Error(`Falha ao carregar membership, tente novamente: ${error.message}`);
+  }
+  if (!member) {
     throw new Error("Usuário autenticado sem membership em nenhum household.");
   }
 
