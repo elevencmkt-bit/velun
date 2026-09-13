@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; confirm?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, confirm } = await searchParams;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-(--paper) p-4">
@@ -23,6 +23,11 @@ export default async function LoginPage({
           <CardTitle>Entrar</CardTitle>
         </CardHeader>
         <CardContent>
+          {confirm ? (
+            <p className="mb-4 text-sm text-(--text-secondary)">
+              Conta criada! Confirme seu email antes de entrar (verifique sua caixa de entrada).
+            </p>
+          ) : null}
           <form action={login} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>

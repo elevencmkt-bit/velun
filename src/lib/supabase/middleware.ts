@@ -30,7 +30,11 @@ export async function updateSession(request: NextRequest) {
     error,
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  // /convite é a página pública de aceite de convite — quem não tem
+  // conta ainda precisa conseguir abri-la sem ser jogado pro /login.
+  const isAuthRoute =
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/convite");
 
   // Erro de rede/timeout ao consultar o Supabase (ex.: Gateway Timeout) não
   // significa que a sessão expirou — só que não deu pra confirmar agora.
