@@ -12,7 +12,7 @@ export function CategoryBadge({
   color?: CategoryColorPair;
 }) {
   if (!name) {
-    return <span className="text-xs text-[--text-light]">Sem categoria</span>;
+    return <span className="text-xs text-(--text-light)">Sem categoria</span>;
   }
 
   const pair = kind === "income" ? INCOME_COLOR : (color ?? MUTED_CATEGORY_COLOR);

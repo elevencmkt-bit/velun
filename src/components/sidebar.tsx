@@ -57,7 +57,7 @@ export function Sidebar({ householdName }: { householdName: string }) {
                 key={item.href}
                 href={item.href}
                 className={`flex min-h-[42px] items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${
-                  isActive ? "text-white" : "text-[--sidebar-fg] hover:bg-white/[.06] hover:text-white"
+                  isActive ? "text-white" : "text-(--sidebar-fg) hover:bg-white/[.06] hover:text-white"
                 }`}
                 style={{
                   background: isActive ? "var(--sidebar-active-gradient)" : "transparent",

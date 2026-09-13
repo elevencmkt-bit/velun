@@ -46,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div className="flex min-h-screen bg-[--paper] text-[--ink]">
+    <div className="flex min-h-screen bg-(--paper) text-(--ink)">
       <Sidebar householdName={household?.name ?? "Sem household"} />
       <div className="flex flex-1 flex-col">
         <header
@@ -56,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <GlobalSearch />
           <div className="flex items-center gap-3">
             <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
-            <span className="text-[13px] text-[--text-secondary]">
+            <span className="text-[13px] text-(--text-secondary)">
               {member?.display_name ?? user.email}
             </span>
             <form action={logout}>

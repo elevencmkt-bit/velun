@@ -119,7 +119,7 @@ export function TransactionFilters({
         onChange={(e) => setParam("from", e.target.value)}
         className="w-36"
       />
-      <span className="text-sm text-[--ink]/50">até</span>
+      <span className="text-sm text-(--ink)/50">até</span>
       <Input
         type="date"
         defaultValue={searchParams.get("to") ?? ""}

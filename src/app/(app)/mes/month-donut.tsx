@@ -15,7 +15,7 @@ export function MonthDonut({
   const total = slices.reduce((sum, s) => sum + s.amount_cents, 0);
 
   if (slices.length === 0 || total === 0) {
-    return <p className="text-sm text-[--text-muted]">Nenhuma despesa cleared neste mês.</p>;
+    return <p className="text-sm text-(--text-muted)">Nenhuma despesa cleared neste mês.</p>;
   }
 
   const size = compact ? "h-36 w-36" : "h-56 w-56";
@@ -52,12 +52,12 @@ export function MonthDonut({
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className="font-bold tabular-nums text-[--text-primary]"
+            className="font-bold tabular-nums text-(--text-primary)"
             style={{ fontSize: compact ? 13 : 16 }}
           >
             {formatCents(total)}
           </span>
-          <span className="text-[11px] text-[--text-muted]">Total</span>
+          <span className="text-[11px] text-(--text-muted)">Total</span>
         </div>
       </div>
       <ul className="flex w-full flex-1 flex-col gap-1.5">
@@ -67,13 +67,13 @@ export function MonthDonut({
               className="h-2.5 w-2.5 shrink-0 rounded-full"
               style={{ backgroundColor: slice.color }}
             />
-            <span className="flex-1 truncate text-[--text-secondary]">{slice.name}</span>
+            <span className="flex-1 truncate text-(--text-secondary)">{slice.name}</span>
             {compact ? null : (
-              <span className="text-[--text-muted]">
+              <span className="text-(--text-muted)">
                 {Math.round((slice.amount_cents / total) * 100)}%
               </span>
             )}
-            <span className="w-20 text-right font-semibold tabular-nums text-[--text-primary]">
+            <span className="w-20 text-right font-semibold tabular-nums text-(--text-primary)">
               {formatCents(slice.amount_cents)}
             </span>
           </li>

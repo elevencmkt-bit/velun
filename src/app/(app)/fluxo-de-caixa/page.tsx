@@ -88,7 +88,7 @@ export default async function FluxoDeCaixaPage() {
               >
                 {formatCents(lowestPoint.balance_cents)}
               </span>
-              <span className="text-xs text-[--text-muted]">em {lowestPoint.label}</span>
+              <span className="text-xs text-(--text-muted)">em {lowestPoint.label}</span>
             </div>
           </CardContent>
         </Card>

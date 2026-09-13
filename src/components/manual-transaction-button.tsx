@@ -257,7 +257,7 @@ export function ManualTransactionButton({
               ) : (
                 <button
                   type="button"
-                  className="w-fit text-left text-sm text-[--ink]/60 underline-offset-2 hover:underline"
+                  className="w-fit text-left text-sm text-(--ink)/60 underline-offset-2 hover:underline"
                   onClick={() => setNewCategoryOpen(true)}
                 >
                   + nova categoria
@@ -288,7 +288,7 @@ export function ManualTransactionButton({
             </label>
           ) : null}
 
-          {error ? <p className="text-sm text-[--out]">{error}</p> : null}
+          {error ? <p className="text-sm text-(--out)">{error}</p> : null}
 
           <Button type="submit" disabled={isPending}>
             {isPending ? "Lançando..." : "Lançar"}

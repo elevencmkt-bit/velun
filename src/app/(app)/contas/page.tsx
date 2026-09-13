@@ -52,7 +52,7 @@ export default async function ContasPage() {
       </div>
 
       {!accounts || accounts.length === 0 ? (
-        <p className="text-sm text-[--text-muted]">
+        <p className="text-sm text-(--text-muted)">
           Nenhuma conta ainda. Crie a primeira para começar a lançar transações.
         </p>
       ) : (
@@ -97,7 +97,7 @@ export default async function ContasPage() {
                     </div>
                     <div>
                       <div className="text-card-title">{account.name}</div>
-                      <div className="text-xs text-[--text-muted]">
+                      <div className="text-xs text-(--text-muted)">
                         {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
                         {account.institution ? ` · ${account.institution}` : ""}
                       </div>

@@ -96,7 +96,7 @@ export function AccountForm() {
               placeholder="0.00"
             />
           </div>
-          {error ? <p className="text-sm text-[--out]">{error}</p> : null}
+          {error ? <p className="text-sm text-(--out)">{error}</p> : null}
           <Button type="submit" disabled={isPending}>
             {isPending ? "Criando..." : "Criar conta"}
           </Button>

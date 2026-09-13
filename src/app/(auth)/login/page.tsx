@@ -13,7 +13,7 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[--paper] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-(--paper) p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="flex flex-col items-center gap-2 pb-2">
           <div
@@ -40,7 +40,7 @@ export default async function LoginPage({
                 autoComplete="current-password"
               />
             </div>
-            {error ? <p className="text-sm text-[--out]">{error}</p> : null}
+            {error ? <p className="text-sm text-(--out)">{error}</p> : null}
             <Button type="submit">Entrar</Button>
           </form>
         </CardContent>

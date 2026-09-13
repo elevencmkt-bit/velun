@@ -78,13 +78,13 @@ export function TransactionsTable({
   }
 
   if (rows.length === 0) {
-    return <p className="text-sm text-[--ink]/70">Nenhuma transação encontrada.</p>;
+    return <p className="text-sm text-(--ink)/70">Nenhuma transação encontrada.</p>;
   }
 
   return (
     <div className="flex flex-col gap-4">
       {selected.size > 0 ? (
-        <div className="flex items-center gap-3 rounded-md border border-[--rule] bg-[--surface] px-3 py-2">
+        <div className="flex items-center gap-3 rounded-md border border-(--rule) bg-(--surface) px-3 py-2">
           <span className="text-sm">{selected.size} selecionada(s)</span>
           <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
             <SelectTrigger className="w-48">
@@ -117,7 +117,7 @@ export function TransactionsTable({
         const allSelected = dayIds.every((id) => selected.has(id));
         return (
           <div key={date} className="flex flex-col gap-1">
-            <div className="text-table-header flex items-center gap-2 border-b border-[--border-primary] pb-1.5 capitalize">
+            <div className="text-table-header flex items-center gap-2 border-b border-(--border-primary) pb-1.5 capitalize">
               <Checkbox
                 checked={allSelected}
                 onCheckedChange={(checked) => toggleAll(dayIds, checked === true)}
@@ -127,10 +127,10 @@ export function TransactionsTable({
             {dayRows.map((row) => (
               <div
                 key={row.id}
-                className="flex min-h-[50px] items-center gap-3 border-b border-[--border-soft] px-1 transition-colors hover:bg-[#F9FAFB]"
+                className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors hover:bg-[#F9FAFB]"
               >
                 <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
-                <span className="text-table-body w-40 truncate text-[--text-primary]">
+                <span className="text-table-body w-40 truncate text-(--text-primary)">
                   {row.description}
                 </span>
                 <span className="text-table-body w-28">{row.account_name}</span>

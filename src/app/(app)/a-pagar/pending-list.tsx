@@ -38,7 +38,7 @@ export function PendingList({
 
   if (rows.length === 0) {
     return (
-      <p className="text-sm text-[--text-muted]">Nenhuma conta pendente nos próximos 30 dias.</p>
+      <p className="text-sm text-(--text-muted)">Nenhuma conta pendente nos próximos 30 dias.</p>
     );
   }
 
@@ -47,7 +47,7 @@ export function PendingList({
       {rows.map((row) => (
         <div
           key={row.id}
-          className="flex min-h-[50px] items-center gap-3 border-b border-[--border-soft] px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+          className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
         >
           <span className="text-table-body w-16">{formatDate(row.date)}</span>
           {row.is_overdue ? (
@@ -58,7 +58,7 @@ export function PendingList({
               Atrasada
             </span>
           ) : null}
-          <span className="text-table-body w-48 truncate text-[--text-primary]">
+          <span className="text-table-body w-48 truncate text-(--text-primary)">
             {row.description}
           </span>
           <span className="text-table-body w-28">{row.account_name}</span>

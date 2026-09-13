@@ -100,7 +100,7 @@ function PercentBadge({
 }) {
   const change = percentChange(current, previous);
   if (change === null) {
-    return <span className="text-xs text-[--text-light]">sem dado anterior</span>;
+    return <span className="text-xs text-(--text-light)">sem dado anterior</span>;
   }
   const direction = change >= 0 ? "up" : "down";
   const isFavorable = direction === favorable;
@@ -234,7 +234,7 @@ export default async function MesPage({
           <CardHeader>
             <CardTitle className="text-card-title">Household vazio</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-[--text-secondary]">
+          <CardContent className="text-sm text-(--text-secondary)">
             Nenhuma conta ainda. Cadastre uma conta em{" "}
             <span className="font-medium">Contas</span> ou lance algo em{" "}
             <span className="font-medium">Transações</span> para começar.
@@ -254,16 +254,16 @@ export default async function MesPage({
         <div className="flex items-center gap-3 text-sm">
           <Link
             href={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
-            className="text-[--text-muted] hover:text-[--text-primary]"
+            className="text-(--text-muted) hover:text-(--text-primary)"
           >
             ← anterior
           </Link>
-          <span className="font-medium capitalize text-[--text-primary]">
+          <span className="font-medium capitalize text-(--text-primary)">
             {monthLabel(year, monthIndex)}
           </span>
           <Link
             href={`/mes?month=${monthParam(next.year, next.monthIndex)}`}
-            className="text-[--text-muted] hover:text-[--text-primary]"
+            className="text-(--text-muted) hover:text-(--text-primary)"
           >
             próximo →
           </Link>
@@ -322,13 +322,13 @@ export default async function MesPage({
             <div className="flex items-center justify-between text-sm">
               <div className="flex flex-col">
                 <span className="text-kpi-label">Saldo atual</span>
-                <span className="font-semibold tabular-nums text-[--text-primary]">
+                <span className="font-semibold tabular-nums text-(--text-primary)">
                   {formatCents(cashFlow.currentTotal)}
                 </span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-kpi-label">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
-                <span className="font-semibold tabular-nums text-[--text-primary]">
+                <span className="font-semibold tabular-nums text-(--text-primary)">
                   {formatCents(cashFlow.finalPoint.balance_cents)}
                 </span>
               </div>
@@ -336,7 +336,7 @@ export default async function MesPage({
             <CashFlowChart points={cashFlow.points} compact />
             <Link
               href="/fluxo-de-caixa"
-              className="flex items-center gap-1 text-xs text-[--text-muted] hover:text-[--text-primary]"
+              className="flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
             >
               Ver detalhes <ArrowRight className="h-3 w-3" />
             </Link>
@@ -350,15 +350,15 @@ export default async function MesPage({
         </CardHeader>
         <CardContent>
           {top5.length === 0 ? (
-            <p className="text-sm text-[--text-muted]">Nenhuma despesa neste mês.</p>
+            <p className="text-sm text-(--text-muted)">Nenhuma despesa neste mês.</p>
           ) : (
             <div className="flex flex-col">
               {top5.map((row) => (
                 <div
                   key={row.id}
-                  className="flex min-h-[50px] items-center gap-3 border-b border-[--border-soft] px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+                  className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
                 >
-                  <span className="text-table-body w-40 truncate text-[--text-primary]">
+                  <span className="text-table-body w-40 truncate text-(--text-primary)">
                     {row.description}
                   </span>
                   <CategoryBadge
