@@ -54,12 +54,12 @@
   /* UI Style Specs — Dashboard Financeiro (seção 30, tokens do usuário) */
 
   /* Background */
-  --bg-app: #f6f8fc;
+  --bg-app: #f5f6f8;
   --bg-surface: #ffffff;
-  --bg-subtle: #f8fafc;
+  --bg-subtle: #f8f9fb;
 
   /* Text */
-  --text-primary: #101828;
+  --text-primary: #111318;
   --text-secondary: #475467;
   --text-muted: #667085;
   --text-light: #98a2b3;
@@ -68,22 +68,23 @@
   --border-primary: #eaecf0;
   --border-soft: #f2f4f7;
 
-  /* Brand */
-  --primary: #5158f6;
-  --primary-hover: #454bd8;
-  --primary-light: #eef0ff;
+  /* Brand — paleta Velun */
+  --primary: #536dfe;
+  --primary-hover: #4257cb;
+  --primary-light: #eef1ff;
   --primary-soft: #f5f6ff;
+  --electric-blue: #6c83ff;
 
-  /* Finance */
-  --income: #12b76a;
-  --income-dark: #027a48;
-  --income-soft: #ecfdf3;
-  --income-icon: #a6f4c5;
+  /* Finance — Positive/Negative da paleta Velun */
+  --income: #27c499;
+  --income-dark: #1a8a6d;
+  --income-soft: #e6fbf5;
+  --income-icon: #a8eedc;
 
-  --expense: #f04438;
-  --expense-dark: #b42318;
-  --expense-soft: #fef3f2;
-  --expense-icon: #fecdca;
+  --expense: #ff647c;
+  --expense-dark: #c22b44;
+  --expense-soft: #ffeef1;
+  --expense-icon: #ffc2cc;
 
   --warning: #f79009;
   --warning-dark: #b54708;
@@ -101,9 +102,9 @@
   --shadow-md: 0 6px 18px rgba(16, 24, 40, 0.06);
 
   /* Paleta de gráficos (seção 14) */
-  --chart-green: #32b77a;
-  --chart-red: #f05273;
-  --chart-blue: #3b6ff5;
+  --chart-green: #27c499;
+  --chart-red: #ff647c;
+  --chart-blue: #536dfe;
   --chart-purple: #9457eb;
   --chart-orange: #f59e42;
   --chart-yellow: #f9c74f;
@@ -120,25 +121,25 @@
 
   --sidebar-fg: rgba(255, 255, 255, 0.72);
   --sidebar-fg-muted: rgba(255, 255, 255, 0.55);
-  --sidebar-active-bg: #4f46e5;
-  --sidebar-active-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  --sidebar-active-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
+  --sidebar-active-bg: #536dfe;
+  --sidebar-active-gradient: linear-gradient(135deg, #536dfe 0%, #6c83ff 100%);
+  --sidebar-active-shadow: 0 6px 16px rgba(83, 109, 254, 0.28);
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-bg-gradient: linear-gradient(180deg, #17223b 0%, #111a2f 100%);
+  --sidebar-bg-gradient: linear-gradient(180deg, #1b1e24 0%, #111318 100%);
 
   /* Ícones de KPI (refinamento visual) — mais saturados, protagonistas */
-  --badge-green-bg: #ddf8ea;
-  --badge-green-fg: #079455;
-  --badge-red-bg: #fee7e7;
-  --badge-red-fg: #e53935;
-  --badge-blue-bg: #e2eafe;
-  --badge-blue-fg: #5167e8;
+  --badge-green-bg: #dff9f0;
+  --badge-green-fg: #1a8a6d;
+  --badge-red-bg: #ffe3e8;
+  --badge-red-fg: #c22b44;
+  --badge-blue-bg: #e7ebff;
+  --badge-blue-fg: #4257cb;
   --badge-purple-bg: var(--purple-soft);
   --badge-purple-fg: var(--purple);
 
   /* Valores de tabela (seção 16) — tom ligeiramente diferente do --in/--out geral */
-  --table-amount-in: #039855;
-  --table-amount-out: #e62e4d;
+  --table-amount-in: #1a8a6d;
+  --table-amount-out: #c22b44;
 
   /* shadcn primitives lidas por Button/Input/Select/Dialog/Card */
   --background: var(--bg-app);
