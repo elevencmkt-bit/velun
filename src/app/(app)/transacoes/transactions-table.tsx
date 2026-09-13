@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatCents } from "@/lib/money";
+import { MUTED_SLICE_COLOR } from "@/lib/category-colors";
 import { bulkUpdateCategory, updateTransactionCategory } from "@/lib/actions/transactions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -25,9 +26,11 @@ function formatDayHeading(date: string) {
 export function TransactionsTable({
   rows,
   categories,
+  categoryColors,
 }: {
   rows: TransactionRow[];
   categories: CategoryOption[];
+  categoryColors: Record<string, string>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -140,7 +143,18 @@ export function TransactionsTable({
                       });
                     }}
                   >
-                    <SelectTrigger className="h-8 w-full text-sm">
+                    <SelectTrigger
+                      className="h-8 w-full border-transparent text-sm font-medium"
+                      style={{
+                        backgroundColor: row.category_name
+                          ? `color-mix(in srgb, ${
+                              row.direction === "in"
+                                ? "var(--badge-green-fg)"
+                                : (categoryColors[row.category_name] ?? MUTED_SLICE_COLOR)
+                            } 16%, white)`
+                          : undefined,
+                      }}
+                    >
                       <SelectValue placeholder="Sem categoria" />
                     </SelectTrigger>
                     <SelectContent>

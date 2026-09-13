@@ -14,7 +14,7 @@ export function MonthDonut({ slices }: { slices: DonutSlice[] }) {
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <div className="h-56 w-56 shrink-0">
+      <div className="relative h-56 w-56 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -42,6 +42,10 @@ export function MonthDonut({ slices }: { slices: DonutSlice[] }) {
             />
           </PieChart>
         </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-lg font-semibold tabular-nums">{formatCents(total)}</span>
+          <span className="text-xs text-[--ink]/50">Total</span>
+        </div>
       </div>
       <ul className="flex flex-1 flex-col gap-1.5">
         {slices.map((slice) => (

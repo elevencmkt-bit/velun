@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { getExpenseCategoryColorMap } from "@/lib/category-colors";
+import { Card, CardContent } from "@/components/ui/card";
 import { TransactionFilters } from "./filters";
 import { TransactionsTable } from "./transactions-table";
 import type { TransactionRow } from "./types";
@@ -14,20 +16,22 @@ export default async function TransacoesPage({
   const supabase = await createClient();
   const params = await searchParams;
 
-  const [{ data: accounts }, { data: categories }, { data: members }] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id, name")
-      .eq("household_id", householdId)
-      .order("name"),
-    supabase
-      .from("categories")
-      .select("id, name, kind")
-      .eq("household_id", householdId)
-      .eq("is_archived", false)
-      .order("name"),
-    supabase.from("members").select("id, display_name").eq("household_id", householdId),
-  ]);
+  const [{ data: accounts }, { data: categories }, { data: members }, colorMap] =
+    await Promise.all([
+      supabase
+        .from("accounts")
+        .select("id, name")
+        .eq("household_id", householdId)
+        .order("name"),
+      supabase
+        .from("categories")
+        .select("id, name, kind")
+        .eq("household_id", householdId)
+        .eq("is_archived", false)
+        .order("name"),
+      supabase.from("members").select("id, display_name").eq("household_id", householdId),
+      getExpenseCategoryColorMap(supabase, householdId),
+    ]);
 
   let query = supabase
     .from("transactions")
@@ -74,14 +78,22 @@ export default async function TransacoesPage({
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-lg font-medium">Transações</h1>
-      <Suspense>
-        <TransactionFilters
-          accounts={accounts ?? []}
-          categories={categories ?? []}
-          members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
-        />
-      </Suspense>
-      <TransactionsTable rows={rows} categories={categories ?? []} />
+      <Card className="shadow-sm">
+        <CardContent className="flex flex-col gap-6 pt-6">
+          <Suspense>
+            <TransactionFilters
+              accounts={accounts ?? []}
+              categories={categories ?? []}
+              members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
+            />
+          </Suspense>
+          <TransactionsTable
+            rows={rows}
+            categories={categories ?? []}
+            categoryColors={Object.fromEntries(colorMap)}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,18 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/(auth)/login/actions";
 import { Button } from "@/components/ui/button";
 import { ManualTransactionButton } from "@/components/manual-transaction-button";
-
-const NAV = [
-  { href: "/importar", label: "Importar" },
-  { href: "/mes", label: "Mês" },
-  { href: "/transacoes", label: "Transações" },
-  { href: "/a-pagar", label: "A pagar" },
-  { href: "/fluxo-de-caixa", label: "Fluxo de caixa" },
-  { href: "/contas", label: "Contas" },
-];
+import { Sidebar } from "@/components/sidebar";
+import { GlobalSearch } from "@/components/global-search";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -54,33 +46,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div className="min-h-screen bg-[--paper] text-[--ink]">
-      <header className="flex items-center justify-between border-b border-[--rule] px-6 py-3">
-        <div className="flex items-center gap-6">
-          <span className="text-sm font-medium">{household?.name ?? "Sem household"}</span>
-          <nav className="flex gap-4">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm text-[--ink]/70 hover:text-[--ink]"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
-          <span className="text-sm text-[--ink]/70">{member?.display_name ?? user.email}</span>
-          <form action={logout}>
-            <Button type="submit" variant="outline" size="sm">
-              Sair
-            </Button>
-          </form>
-        </div>
-      </header>
-      <main className="p-6">{children}</main>
+    <div className="flex min-h-screen bg-[--paper] text-[--ink]">
+      <Sidebar householdName={household?.name ?? "Sem household"} />
+      <div className="flex flex-1 flex-col">
+        <header className="flex items-center justify-between border-b border-[--rule] bg-[--surface] px-6 py-3">
+          <GlobalSearch />
+          <div className="flex items-center gap-3">
+            <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
+            <span className="text-sm text-[--ink]/70">{member?.display_name ?? user.email}</span>
+            <form action={logout}>
+              <Button type="submit" variant="outline" size="sm">
+                Sair
+              </Button>
+            </form>
+          </div>
+        </header>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      </div>
     </div>
   );
 }

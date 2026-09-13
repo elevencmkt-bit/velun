@@ -6,6 +6,7 @@ import { formatCents } from "@/lib/money";
 import { markTransactionPaid } from "@/lib/actions/transactions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CategoryBadge } from "@/components/category-badge";
 
 export type PendingRow = {
   id: string;
@@ -25,7 +26,13 @@ function formatDate(date: string) {
   });
 }
 
-export function PendingList({ rows }: { rows: PendingRow[] }) {
+export function PendingList({
+  rows,
+  categoryColors,
+}: {
+  rows: PendingRow[];
+  categoryColors: Record<string, string>;
+}) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -48,7 +55,13 @@ export function PendingList({ rows }: { rows: PendingRow[] }) {
           ) : null}
           <span className="w-48 truncate">{row.description}</span>
           <span className="w-28 text-[--ink]/60">{row.account_name}</span>
-          <span className="w-32 text-[--ink]/60">{row.category_name ?? "—"}</span>
+          <span className="w-32">
+            <CategoryBadge
+              name={row.category_name ?? ""}
+              kind={row.direction === "in" ? "income" : "expense"}
+              color={row.category_name ? categoryColors[row.category_name] : undefined}
+            />
+          </span>
           <span
             className="ml-auto font-medium tabular-nums"
             style={{ color: row.direction === "out" ? "var(--out)" : "var(--in)" }}

@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { ArrowDownCircle, ArrowUpCircle, PiggyBank } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
-import { buildCategoryColorMap, MUTED_SLICE_COLOR } from "@/lib/category-colors";
+import { getExpenseCategoryColorMap, MUTED_SLICE_COLOR } from "@/lib/category-colors";
 import {
   excludeTransfers,
   groupExpensesByCategory,
@@ -12,7 +13,11 @@ import {
   type MonthTransaction,
 } from "@/lib/reports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CategoryBadge } from "@/components/category-badge";
 import { MonthDonut } from "./month-donut";
+import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
+
+const TREND_MONTHS = 6;
 
 function monthRange(year: number, monthIndex: number) {
   const start = new Date(year, monthIndex, 1);
@@ -34,6 +39,12 @@ function monthLabel(year: number, monthIndex: number) {
   return new Date(year, monthIndex, 1)
     .toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
     .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function shortMonthLabel(year: number, monthIndex: number) {
+  return new Date(year, monthIndex, 1)
+    .toLocaleDateString("pt-BR", { month: "short" })
+    .replace(".", "");
 }
 
 async function fetchMonthTransactions(
@@ -83,6 +94,44 @@ function DeltaLabel({ current, previous }: { current: number; previous: number }
   );
 }
 
+function StatCard({
+  label,
+  value,
+  valueColor,
+  icon: Icon,
+  badgeBg,
+  badgeFg,
+  delta,
+}: {
+  label: string;
+  value: string;
+  valueColor: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  badgeBg: string;
+  badgeFg: string;
+  delta: React.ReactNode;
+}) {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="flex flex-col gap-3 pt-6">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            style={{ backgroundColor: badgeBg }}
+          >
+            <Icon className="h-5 w-5" style={{ color: badgeFg }} />
+          </div>
+          <span className="text-sm text-[--ink]/60">{label}</span>
+        </div>
+        <span className="text-2xl font-semibold tabular-nums" style={{ color: valueColor }}>
+          {value}
+        </span>
+        {delta}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default async function MesPage({
   searchParams,
 }: {
@@ -106,6 +155,9 @@ export default async function MesPage({
   const prevRange = monthRange(prev.year, prev.monthIndex);
   const next = shiftMonth(year, monthIndex, 1);
 
+  const trendStart = shiftMonth(year, monthIndex, -(TREND_MONTHS - 1));
+  const trendRangeStart = monthRange(trendStart.year, trendStart.monthIndex).start;
+
   const { data: accounts } = await supabase
     .from("accounts")
     .select("id")
@@ -113,18 +165,16 @@ export default async function MesPage({
     .limit(1);
   const householdIsEmpty = !accounts || accounts.length === 0;
 
-  const [currentRows, prevRows, { data: expenseCategories }] = await Promise.all([
+  const [currentRows, prevRows, trendRows, colorMap] = await Promise.all([
     fetchMonthTransactions(supabase, householdId, start, end),
     fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
-    supabase
-      .from("categories")
-      .select("name")
-      .eq("household_id", householdId)
-      .eq("kind", "expense"),
+    fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
+    getExpenseCategoryColorMap(supabase, householdId),
   ]);
 
   const current = excludeTransfers(currentRows);
   const previous = excludeTransfers(prevRows);
+  const trend = excludeTransfers(trendRows);
 
   const entrou = sumByDirection(current, "in");
   const saiu = sumByDirection(current, "out");
@@ -134,13 +184,24 @@ export default async function MesPage({
   const saiuPrev = sumByDirection(previous, "out");
   const sobrouPrev = entrouPrev - saiuPrev;
 
-  const colorMap = buildCategoryColorMap((expenseCategories ?? []).map((c) => c.name));
   const slices = groupExpensesByCategory(current).map((slice) => ({
     ...slice,
     color: colorMap.get(slice.name) ?? MUTED_SLICE_COLOR,
   }));
 
   const top5 = topExpenses(current, 5);
+
+  const trendPoints: TrendPoint[] = [];
+  for (let i = TREND_MONTHS - 1; i >= 0; i--) {
+    const m = shiftMonth(year, monthIndex, -i);
+    const range = monthRange(m.year, m.monthIndex);
+    const monthRows = trend.filter((r) => r.date >= range.start && r.date <= range.end);
+    trendPoints.push({
+      label: shortMonthLabel(m.year, m.monthIndex),
+      entrou_cents: sumByDirection(monthRows, "in"),
+      saiu_cents: sumByDirection(monthRows, "out"),
+    });
+  }
 
   if (householdIsEmpty) {
     return (
@@ -184,74 +245,84 @@ export default async function MesPage({
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <Card>
+        <StatCard
+          label="Entrou"
+          value={formatCents(entrou)}
+          valueColor="var(--in)"
+          icon={ArrowUpCircle}
+          badgeBg="var(--badge-green-bg)"
+          badgeFg="var(--badge-green-fg)"
+          delta={<DeltaLabel current={entrou} previous={entrouPrev} />}
+        />
+        <StatCard
+          label="Saiu"
+          value={formatCents(saiu)}
+          valueColor="var(--out)"
+          icon={ArrowDownCircle}
+          badgeBg="var(--badge-red-bg)"
+          badgeFg="var(--badge-red-fg)"
+          delta={<DeltaLabel current={saiu} previous={saiuPrev} />}
+        />
+        <StatCard
+          label="Sobrou"
+          value={formatCents(sobrou)}
+          valueColor={sobrou < 0 ? "var(--out)" : "var(--in)"}
+          icon={PiggyBank}
+          badgeBg="var(--badge-blue-bg)"
+          badgeFg="var(--badge-blue-fg)"
+          delta={<DeltaLabel current={sobrou} previous={sobrouPrev} />}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm font-normal text-[--ink]/60">Entrou</CardTitle>
+            <CardTitle className="text-base font-medium">Despesas por categoria</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            <span className="text-2xl font-semibold tabular-nums" style={{ color: "var(--in)" }}>
-              {formatCents(entrou)}
-            </span>
-            <DeltaLabel current={entrou} previous={entrouPrev} />
+          <CardContent>
+            <MonthDonut slices={slices} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle className="text-sm font-normal text-[--ink]/60">Saiu</CardTitle>
+            <CardTitle className="text-base font-medium">Entradas vs saídas</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            <span className="text-2xl font-semibold tabular-nums" style={{ color: "var(--out)" }}>
-              {formatCents(saiu)}
-            </span>
-            <DeltaLabel current={saiu} previous={saiuPrev} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-normal text-[--ink]/60">Sobrou</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1">
-            <span
-              className="text-2xl font-semibold tabular-nums"
-              style={{ color: sobrou < 0 ? "var(--out)" : "var(--in)" }}
-            >
-              {formatCents(sobrou)}
-            </span>
-            <DeltaLabel current={sobrou} previous={sobrouPrev} />
+          <CardContent>
+            <TrendBarChart points={trendPoints} />
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-base font-medium">Despesas por categoria</h2>
-        <MonthDonut slices={slices} />
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h2 className="text-base font-medium">Maiores despesas</h2>
-        {top5.length === 0 ? (
-          <p className="text-sm text-[--ink]/70">Nenhuma despesa neste mês.</p>
-        ) : (
-          <div className="flex flex-col">
-            {top5.map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center gap-3 border-b border-[--rule]/60 py-2 text-sm"
-              >
-                <span className="w-40 truncate">{row.description}</span>
-                <span className="w-32 text-[--ink]/60">{row.category_name ?? "—"}</span>
-                <span className="w-28 text-[--ink]/60">{row.account_name}</span>
-                <span
-                  className="ml-auto font-medium tabular-nums"
-                  style={{ color: "var(--out)" }}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Maiores despesas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {top5.length === 0 ? (
+            <p className="text-sm text-[--ink]/70">Nenhuma despesa neste mês.</p>
+          ) : (
+            <div className="flex flex-col">
+              {top5.map((row) => (
+                <div
+                  key={row.id}
+                  className="flex items-center gap-3 border-b border-[--rule]/60 py-2.5 text-sm last:border-0"
                 >
-                  -{formatCents(row.amount_cents)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                  <span className="w-40 truncate">{row.description}</span>
+                  <CategoryBadge
+                    name={row.category_name ?? ""}
+                    kind="expense"
+                    color={colorMap.get(row.category_name ?? "")}
+                  />
+                  <span className="w-28 text-[--ink]/60">{row.account_name}</span>
+                  <span className="ml-auto font-medium tabular-nums" style={{ color: "var(--out)" }}>
+                    -{formatCents(row.amount_cents)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

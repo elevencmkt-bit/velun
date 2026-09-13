@@ -82,14 +82,30 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Direção visual (spec seção 7) — ponto de partida, refinado na Fase 6. */
+  /* Direção visual — Fase 6, inspirada no mockup do household (referência
+     visual, não a paleta minimalista original da seção 7 da spec). */
   --ink: #16181d;
-  --paper: #fbfaf7;
+  --paper: #f5f6fb;
   --surface: #ffffff;
-  --rule: #e6e3dc;
-  --out: #b2402f;
-  --in: #2f6b4f;
-  --flag: #c08a2e;
+  --rule: #e7e8f2;
+  --out: #ef4444;
+  --in: #16a34a;
+  --flag: #f59e0b;
+
+  --sidebar-bg: #181a2e;
+  --sidebar-fg: #d7d8e6;
+  --sidebar-fg-muted: #9496b3;
+  --sidebar-active-bg: #4f46e5;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --badge-green-bg: #dcfce7;
+  --badge-green-fg: #16a34a;
+  --badge-red-bg: #fee2e2;
+  --badge-red-fg: #ef4444;
+  --badge-blue-bg: #dbeafe;
+  --badge-blue-fg: #3b82f6;
+  --badge-purple-bg: #ede9fe;
+  --badge-purple-fg: #8b5cf6;
 }
 
 .dark {

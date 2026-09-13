@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { getExpenseCategoryColorMap } from "@/lib/category-colors";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecurrenceForm } from "./recurrence-form";
 import { PendingList, type PendingRow } from "./pending-list";
 import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
@@ -20,33 +22,39 @@ export default async function APagarPage() {
   const today = todayISO();
   const horizon = addDaysISO(30);
 
-  const [{ data: accounts }, { data: categories }, { data: pendingRaw }, { data: recurrencesRaw }] =
-    await Promise.all([
-      supabase.from("accounts").select("id, name").eq("household_id", householdId).order("name"),
-      supabase
-        .from("categories")
-        .select("id, name, kind")
-        .eq("household_id", householdId)
-        .eq("is_archived", false)
-        .order("name"),
-      supabase
-        .from("transactions")
-        .select(
-          `id, date, description, amount_cents, direction,
-           account:accounts(name),
-           category:categories(name)`,
-        )
-        .eq("household_id", householdId)
-        .eq("status", "pending")
-        .lte("date", horizon)
-        .order("date", { ascending: true }),
-      supabase
-        .from("recurrences")
-        .select("id, template, frequency, day_of_month")
-        .eq("household_id", householdId)
-        .eq("is_active", true)
-        .order("created_at", { ascending: true }),
-    ]);
+  const [
+    { data: accounts },
+    { data: categories },
+    { data: pendingRaw },
+    { data: recurrencesRaw },
+    colorMap,
+  ] = await Promise.all([
+    supabase.from("accounts").select("id, name").eq("household_id", householdId).order("name"),
+    supabase
+      .from("categories")
+      .select("id, name, kind")
+      .eq("household_id", householdId)
+      .eq("is_archived", false)
+      .order("name"),
+    supabase
+      .from("transactions")
+      .select(
+        `id, date, description, amount_cents, direction,
+         account:accounts(name),
+         category:categories(name)`,
+      )
+      .eq("household_id", householdId)
+      .eq("status", "pending")
+      .lte("date", horizon)
+      .order("date", { ascending: true }),
+    supabase
+      .from("recurrences")
+      .select("id, template, frequency, day_of_month")
+      .eq("household_id", householdId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true }),
+    getExpenseCategoryColorMap(supabase, householdId),
+  ]);
 
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
@@ -79,11 +87,19 @@ export default async function APagarPage() {
   });
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <h1 className="text-lg font-medium">A pagar</h1>
-        <p className="text-sm text-[--ink]/70">Próximos 30 dias, atrasadas em destaque.</p>
-        <PendingList rows={pendingRows} />
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-sm font-normal text-[--ink]/60">
+              Próximos 30 dias, atrasadas em destaque
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PendingList rows={pendingRows} categoryColors={Object.fromEntries(colorMap)} />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -91,7 +107,11 @@ export default async function APagarPage() {
           <h2 className="text-base font-medium">Recorrências</h2>
           <RecurrenceForm accounts={accounts ?? []} categories={categories ?? []} />
         </div>
-        <RecurrencesList rows={recurrenceRows} />
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <RecurrencesList rows={recurrenceRows} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
+import { TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getAccountBalances } from "@/lib/balances";
 import { formatCents } from "@/lib/money";
+import { Card, CardContent } from "@/components/ui/card";
 import { CashFlowChart, type CashFlowPoint } from "./cash-flow-chart";
 
 const HORIZON_DAYS = 90;
@@ -65,33 +67,80 @@ export default async function FluxoDeCaixaPage() {
         Saldo atual mais as contas pendentes, projetado para os próximos {HORIZON_DAYS} dias.
       </p>
 
-      <div className="flex gap-8 text-sm">
-        <div>
-          <div className="text-[--ink]/60">Saldo atual</div>
-          <div className="text-lg font-medium tabular-nums">{formatCents(currentTotal)}</div>
-        </div>
-        <div>
-          <div className="text-[--ink]/60">Projetado em {HORIZON_DAYS} dias</div>
-          <div
-            className="text-lg font-medium tabular-nums"
-            style={{ color: finalPoint.balance_cents < 0 ? "var(--out)" : "var(--in)" }}
-          >
-            {formatCents(finalPoint.balance_cents)}
-          </div>
-        </div>
-        <div>
-          <div className="text-[--ink]/60">Ponto mais baixo</div>
-          <div
-            className="text-lg font-medium tabular-nums"
-            style={{ color: lowestPoint.balance_cents < 0 ? "var(--out)" : "var(--ink)" }}
-          >
-            {formatCents(lowestPoint.balance_cents)}{" "}
-            <span className="text-xs text-[--ink]/50">em {lowestPoint.label}</span>
-          </div>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="shadow-sm">
+          <CardContent className="flex items-center gap-3 pt-6">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{ backgroundColor: "var(--badge-blue-bg)" }}
+            >
+              <Wallet className="h-5 w-5" style={{ color: "var(--badge-blue-fg)" }} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm text-[--ink]/60">Saldo atual</span>
+              <span className="text-xl font-semibold tabular-nums">
+                {formatCents(currentTotal)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="flex items-center gap-3 pt-6">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{
+                backgroundColor:
+                  finalPoint.balance_cents < 0 ? "var(--badge-red-bg)" : "var(--badge-green-bg)",
+              }}
+            >
+              <TrendingUp
+                className="h-5 w-5"
+                style={{
+                  color:
+                    finalPoint.balance_cents < 0
+                      ? "var(--badge-red-fg)"
+                      : "var(--badge-green-fg)",
+                }}
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm text-[--ink]/60">Projetado em {HORIZON_DAYS} dias</span>
+              <span
+                className="text-xl font-semibold tabular-nums"
+                style={{ color: finalPoint.balance_cents < 0 ? "var(--out)" : "var(--in)" }}
+              >
+                {formatCents(finalPoint.balance_cents)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="flex items-center gap-3 pt-6">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{ backgroundColor: "var(--badge-purple-bg)" }}
+            >
+              <TrendingDown className="h-5 w-5" style={{ color: "var(--badge-purple-fg)" }} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm text-[--ink]/60">Ponto mais baixo</span>
+              <span
+                className="text-xl font-semibold tabular-nums"
+                style={{ color: lowestPoint.balance_cents < 0 ? "var(--out)" : "var(--ink)" }}
+              >
+                {formatCents(lowestPoint.balance_cents)}
+              </span>
+              <span className="text-xs text-[--ink]/50">em {lowestPoint.label}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <CashFlowChart points={points} />
+      <Card className="shadow-sm">
+        <CardContent className="pt-6">
+          <CashFlowChart points={points} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

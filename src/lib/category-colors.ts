@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 // Paleta categórica validada (dataviz skill / references/palette.md) —
 // 8 matizes, ordem fixa, CVD-safe. Usada só nos gráficos de composição
 // (donut do Mês); os --in/--out da direção visual continuam sendo a
@@ -25,4 +27,20 @@ export function buildCategoryColorMap(expenseCategoryNames: string[]): Map<strin
     if (i < CATEGORICAL_PALETTE.length) map.set(name, CATEGORICAL_PALETTE[i]);
   });
   return map;
+}
+
+// Busca as categorias de despesa do household e monta o mapa de cores —
+// reaproveitado pela tela Mês (donut) e pelos badges de Transações/A pagar,
+// para que a mesma categoria tenha sempre a mesma cor em todo o app.
+export async function getExpenseCategoryColorMap(
+  supabase: SupabaseClient,
+  householdId: string,
+): Promise<Map<string, string>> {
+  const { data } = await supabase
+    .from("categories")
+    .select("name")
+    .eq("household_id", householdId)
+    .eq("kind", "expense");
+
+  return buildCategoryColorMap((data ?? []).map((c) => c.name));
 }
