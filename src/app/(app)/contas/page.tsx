@@ -58,12 +58,12 @@ export default async function ContasPage() {
       ) : (
         <>
           <Card className="w-fit">
-            <CardContent className="flex min-h-[116px] items-center gap-4">
+            <CardContent className="flex min-h-[128px] items-center gap-5">
               <div
-                className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
                 style={{ backgroundColor: "var(--badge-blue-bg)" }}
               >
-                <Wallet className="h-6 w-6" style={{ color: "var(--badge-blue-fg)" }} />
+                <Wallet className="h-8 w-8" style={{ color: "var(--badge-blue-fg)" }} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-kpi-label">Saldo total</span>
@@ -72,7 +72,7 @@ export default async function ContasPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-5">
             {accounts.map((account) => {
               const balance = balances.get(account.id) ?? 0;
               const Icon = ACCOUNT_TYPE_ICONS[account.type] ?? Wallet;
@@ -84,10 +84,10 @@ export default async function ContasPage() {
                   <CardContent className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <div
-                        className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
                         style={{ backgroundColor: "var(--badge-purple-bg)" }}
                       >
-                        <Icon className="h-6 w-6" style={{ color: "var(--badge-purple-fg)" }} />
+                        <Icon className="h-8 w-8" style={{ color: "var(--badge-purple-fg)" }} />
                       </div>
                       {account.is_archived ? (
                         <Badge variant="secondary">Arquivada</Badge>

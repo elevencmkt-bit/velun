@@ -27,14 +27,14 @@ export default async function FluxoDeCaixaPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-5">
         <Card>
-          <CardContent className="flex min-h-[116px] items-center gap-4">
+          <CardContent className="flex min-h-[128px] items-center gap-5">
             <div
-              className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
               style={{ backgroundColor: "var(--badge-blue-bg)" }}
             >
-              <Wallet className="h-6 w-6" style={{ color: "var(--badge-blue-fg)" }} />
+              <Wallet className="h-8 w-8" style={{ color: "var(--badge-blue-fg)" }} />
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-kpi-label">Saldo atual</span>
@@ -43,16 +43,16 @@ export default async function FluxoDeCaixaPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="flex min-h-[116px] items-center gap-4">
+          <CardContent className="flex min-h-[128px] items-center gap-5">
             <div
-              className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
               style={{
                 backgroundColor:
                   finalPoint.balance_cents < 0 ? "var(--badge-red-bg)" : "var(--badge-green-bg)",
               }}
             >
               <TrendingUp
-                className="h-6 w-6"
+                className="h-8 w-8"
                 style={{
                   color:
                     finalPoint.balance_cents < 0
@@ -73,12 +73,12 @@ export default async function FluxoDeCaixaPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="flex min-h-[116px] items-center gap-4">
+          <CardContent className="flex min-h-[128px] items-center gap-5">
             <div
-              className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
               style={{ backgroundColor: "var(--badge-purple-bg)" }}
             >
-              <TrendingDown className="h-6 w-6" style={{ color: "var(--badge-purple-fg)" }} />
+              <TrendingDown className="h-8 w-8" style={{ color: "var(--badge-purple-fg)" }} />
             </div>
             <div className="flex flex-col gap-1.5">
               <span className="text-kpi-label">Ponto mais baixo</span>

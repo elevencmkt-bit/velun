@@ -120,17 +120,19 @@
 
   --sidebar-fg: rgba(255, 255, 255, 0.72);
   --sidebar-fg-muted: rgba(255, 255, 255, 0.55);
-  --sidebar-active-bg: #4e54ed;
-  --sidebar-active-gradient: linear-gradient(135deg, #6268ff, #4e54ed);
+  --sidebar-active-bg: #4f46e5;
+  --sidebar-active-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  --sidebar-active-shadow: 0 6px 16px rgba(79, 70, 229, 0.28);
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-bg-gradient: linear-gradient(180deg, #17223b 0%, #111a2f 100%);
 
-  --badge-green-bg: var(--income-soft);
-  --badge-green-fg: var(--income-dark);
-  --badge-red-bg: var(--expense-soft);
-  --badge-red-fg: var(--expense-dark);
-  --badge-blue-bg: #e0eaff;
-  --badge-blue-fg: #4e5ba6;
+  /* Ícones de KPI (refinamento visual) — mais saturados, protagonistas */
+  --badge-green-bg: #ddf8ea;
+  --badge-green-fg: #079455;
+  --badge-red-bg: #fee7e7;
+  --badge-red-fg: #e53935;
+  --badge-blue-bg: #e2eafe;
+  --badge-blue-fg: #5167e8;
   --badge-purple-bg: var(--purple-soft);
   --badge-purple-fg: var(--purple);
 
@@ -226,7 +228,7 @@
 /* Escala tipográfica (seção 2) — traduzida em classes reaproveitáveis */
 @layer components {
   .text-page-title {
-    font-size: 32px;
+    font-size: 30px;
     line-height: 1.2;
     font-weight: 700;
     letter-spacing: -0.03em;
@@ -239,8 +241,8 @@
     color: var(--text-secondary);
   }
   .text-card-title {
-    font-size: 16px;
-    line-height: 24px;
+    font-size: 17px;
+    line-height: 25px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--text-primary);
@@ -252,8 +254,8 @@
     color: var(--text-muted);
   }
   .text-kpi-value {
-    font-size: 24px;
-    line-height: 30px;
+    font-size: 26px;
+    line-height: 32px;
     font-weight: 700;
     letter-spacing: -0.025em;
     color: var(--text-primary);
@@ -271,5 +273,11 @@
     font-weight: 500;
     color: var(--text-muted);
     text-transform: uppercase;
+  }
+  .text-metadata {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    color: var(--text-light);
   }
 }

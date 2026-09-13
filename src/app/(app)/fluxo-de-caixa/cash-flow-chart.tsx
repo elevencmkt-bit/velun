@@ -13,6 +13,12 @@ import {
 import { formatCents } from "@/lib/money";
 import type { CashFlowPoint } from "@/lib/cash-flow";
 
+function EndDot(props: { cx?: number; cy?: number; index?: number; totalPoints: number }) {
+  const { cx, cy, index, totalPoints } = props;
+  if (cx === undefined || cy === undefined || index !== totalPoints - 1) return null;
+  return <circle cx={cx} cy={cy} r={4} fill="var(--chart-blue)" stroke="white" strokeWidth={2} />;
+}
+
 export function CashFlowChart({
   points,
   compact = false,
@@ -21,22 +27,20 @@ export function CashFlowChart({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? "h-32 w-full" : "h-80 w-full"}>
+    <div className={compact ? "h-44 w-full" : "h-80 w-full"}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={points}
-          margin={compact ? { top: 4, right: 4, bottom: 0, left: 4 } : { top: 8, right: 16, bottom: 0, left: 8 }}
+          margin={compact ? { top: 8, right: 12, bottom: 0, left: 4 } : { top: 8, right: 16, bottom: 0, left: 8 }}
         >
-          <CartesianGrid vertical={false} stroke="var(--border-primary)" />
-          {compact ? null : (
-            <XAxis
-              dataKey="label"
-              interval={6}
-              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
-              axisLine={{ stroke: "var(--border-primary)" }}
-              tickLine={false}
-            />
-          )}
+          <CartesianGrid vertical={false} stroke="var(--border-soft)" />
+          <XAxis
+            dataKey="label"
+            interval={compact ? points.length - 2 : 6}
+            tick={{ fontSize: compact ? 11 : 11, fill: "var(--text-muted)" }}
+            axisLine={{ stroke: "var(--border-primary)" }}
+            tickLine={false}
+          />
           {compact ? null : (
             <YAxis
               tickFormatter={(v: number) => formatCents(v)}
@@ -52,8 +56,10 @@ export function CashFlowChart({
             contentStyle={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border-primary)",
-              borderRadius: 6,
+              borderRadius: 8,
+              boxShadow: "0 4px 14px rgba(16,24,40,.08)",
               fontSize: 13,
+              padding: "8px 12px",
             }}
           />
           {compact ? null : (
@@ -65,8 +71,8 @@ export function CashFlowChart({
             dataKey="balance_cents"
             stroke="var(--chart-blue)"
             strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 3 }}
+            dot={compact ? <EndDot totalPoints={points.length} /> : false}
+            activeDot={{ r: 4 }}
           />
         </LineChart>
       </ResponsiveContainer>

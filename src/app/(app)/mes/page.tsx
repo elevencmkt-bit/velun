@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDownCircle, ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, PiggyBank } from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, ArrowDownCircle, PiggyBank } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
@@ -10,7 +10,6 @@ import {
   groupExpensesByCategory,
   percentChange,
   sumByDirection,
-  topExpenses,
   type MonthTransaction,
 } from "@/lib/reports";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +17,12 @@ import { CategoryBadge } from "@/components/category-badge";
 import { MonthDonut } from "./month-donut";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
+import { MonthSelector } from "./month-selector";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
-
 const TREND_MONTHS = 6;
+const RECENT_TRANSACTIONS_LIMIT = 6;
+const PENDING_PREVIEW_LIMIT = 4;
 
 function monthRange(year: number, monthIndex: number) {
   const start = new Date(year, monthIndex, 1);
@@ -49,6 +50,13 @@ function shortMonthLabel(year: number, monthIndex: number) {
   return new Date(year, monthIndex, 1)
     .toLocaleDateString("pt-BR", { month: "short" })
     .replace(".", "");
+}
+
+function shortDate(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 async function fetchMonthTransactions(
@@ -86,9 +94,33 @@ async function fetchMonthTransactions(
   }));
 }
 
-// Badge de tendência (seção 13). A cor segue se a mudança é favorável
-// para esta métrica, não o sinal cru — Saiu caindo é bom (verde),
-// Entrou/Sobrou caindo é ruim (vermelho).
+type PendingPreviewRow = {
+  id: string;
+  date: string;
+  description: string;
+  amount_cents: number;
+  direction: "in" | "out";
+};
+
+async function fetchPendingPreview(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+): Promise<PendingPreviewRow[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id, date, description, amount_cents, direction")
+    .eq("household_id", householdId)
+    .eq("status", "pending")
+    .order("date", { ascending: true })
+    .limit(PENDING_PREVIEW_LIMIT);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+// Badge de tendência. A cor segue se a mudança é favorável para esta
+// métrica, não o sinal cru — Saiu caindo é bom (verde), Entrou/Sobrou
+// caindo é ruim (vermelho).
 function PercentBadge({
   current,
   previous,
@@ -137,12 +169,12 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex min-h-[116px] items-center gap-4">
+      <CardContent className="flex min-h-[128px] items-center gap-5">
         <div
-          className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[10px]"
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
           style={{ backgroundColor: badgeBg }}
         >
-          <Icon className="h-6 w-6" style={{ color: badgeFg }} />
+          <Icon className="h-8 w-8" style={{ color: badgeFg }} />
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-kpi-label">{label}</span>
@@ -187,12 +219,13 @@ export default async function MesPage({
     .limit(1);
   const householdIsEmpty = !accounts || accounts.length === 0;
 
-  const [currentRows, prevRows, trendRows, colorMap, cashFlow] = await Promise.all([
+  const [currentRows, prevRows, trendRows, colorMap, cashFlow, pendingPreview] = await Promise.all([
     fetchMonthTransactions(supabase, householdId, start, end),
     fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
     fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
     getExpenseCategoryColorMap(supabase, householdId),
     getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS),
+    fetchPendingPreview(supabase, householdId),
   ]);
 
   const current = excludeTransfers(currentRows);
@@ -212,7 +245,9 @@ export default async function MesPage({
     color: (colorMap.get(slice.name) ?? MUTED_CATEGORY_COLOR).fg,
   }));
 
-  const top5 = topExpenses(current, 5);
+  const recentTransactions = [...current]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, RECENT_TRANSACTIONS_LIMIT);
 
   const trendPoints: TrendPoint[] = [];
   for (let i = TREND_MONTHS - 1; i >= 0; i--) {
@@ -251,26 +286,14 @@ export default async function MesPage({
           <h1 className="text-page-title">Dashboard</h1>
           <p className="text-page-subtitle">Resumo financeiro de {monthLabel(year, monthIndex)}.</p>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <Link
-            href={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
-            className="text-(--text-muted) hover:text-(--text-primary)"
-          >
-            ← anterior
-          </Link>
-          <span className="font-medium capitalize text-(--text-primary)">
-            {monthLabel(year, monthIndex)}
-          </span>
-          <Link
-            href={`/mes?month=${monthParam(next.year, next.monthIndex)}`}
-            className="text-(--text-muted) hover:text-(--text-primary)"
-          >
-            próximo →
-          </Link>
-        </div>
+        <MonthSelector
+          label={monthLabel(year, monthIndex)}
+          prevHref={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
+          nextHref={`/mes?month=${monthParam(next.year, next.monthIndex)}`}
+        />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-5">
         <StatCard
           label="Entrou"
           value={formatCents(entrou)}
@@ -297,7 +320,7 @@ export default async function MesPage({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-5">
         <Card>
           <CardHeader>
             <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
@@ -344,41 +367,98 @@ export default async function MesPage({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-card-title">Maiores despesas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {top5.length === 0 ? (
-            <p className="text-sm text-(--text-muted)">Nenhuma despesa neste mês.</p>
-          ) : (
-            <div className="flex flex-col">
-              {top5.map((row) => (
-                <div
-                  key={row.id}
-                  className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
-                >
-                  <span className="text-table-body w-40 truncate text-(--text-primary)">
-                    {row.description}
-                  </span>
-                  <CategoryBadge
-                    name={row.category_name ?? ""}
-                    kind="expense"
-                    color={colorMap.get(row.category_name ?? "")}
-                  />
-                  <span className="text-table-body w-28">{row.account_name}</span>
-                  <span
-                    className="ml-auto text-right font-semibold tabular-nums"
-                    style={{ color: "var(--table-amount-out)" }}
+      <div className="grid grid-cols-[1.4fr_1fr] gap-5">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-card-title">Transações recentes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentTransactions.length === 0 ? (
+              <p className="text-sm text-(--text-muted)">Nenhuma transação neste mês.</p>
+            ) : (
+              <div className="flex flex-col">
+                {recentTransactions.map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
                   >
-                    -{formatCents(row.amount_cents)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    <span className="text-metadata w-14 shrink-0">{shortDate(row.date)}</span>
+                    <span className="text-table-body w-40 flex-1 truncate text-(--text-primary)">
+                      {row.description}
+                    </span>
+                    <CategoryBadge
+                      name={row.category_name ?? ""}
+                      kind={row.direction === "in" ? "income" : "expense"}
+                      color={colorMap.get(row.category_name ?? "")}
+                    />
+                    <span
+                      className="ml-auto text-right font-semibold tabular-nums"
+                      style={{
+                        color:
+                          row.direction === "out"
+                            ? "var(--table-amount-out)"
+                            : "var(--table-amount-in)",
+                      }}
+                    >
+                      {row.direction === "out" ? "-" : "+"}
+                      {formatCents(row.amount_cents)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link
+              href="/transacoes"
+              className="mt-3 flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
+            >
+              Ver todas <ArrowRight className="h-3 w-3" />
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-card-title">Contas a pagar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pendingPreview.length === 0 ? (
+              <p className="text-sm text-(--text-muted)">Nenhuma pendência.</p>
+            ) : (
+              <div className="flex flex-col">
+                {pendingPreview.map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+                  >
+                    <span className="text-table-body flex-1 truncate text-(--text-primary)">
+                      {row.description}
+                    </span>
+                    <span className="text-metadata shrink-0">{shortDate(row.date)}</span>
+                    <span
+                      className="ml-auto shrink-0 text-right font-semibold tabular-nums"
+                      style={{
+                        color:
+                          row.direction === "out"
+                            ? "var(--table-amount-out)"
+                            : "var(--table-amount-in)",
+                      }}
+                    >
+                      {row.direction === "out" ? "-" : "+"}
+                      {formatCents(row.amount_cents)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link
+              href="/a-pagar"
+              className="mt-3 flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
+            >
+              Ver todas <ArrowRight className="h-3 w-3" />
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

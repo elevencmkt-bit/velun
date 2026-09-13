@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/(auth)/login/actions";
-import { Button } from "@/components/ui/button";
 import { ManualTransactionButton } from "@/components/manual-transaction-button";
 import { Sidebar } from "@/components/sidebar";
 import { GlobalSearch } from "@/components/global-search";
+import { NotificationBell } from "@/components/notification-bell";
+import { UserMenu } from "@/components/user-menu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -50,20 +51,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar householdName={household?.name ?? "Sem household"} />
       <div className="flex flex-1 flex-col">
         <header
-          className="flex h-[66px] shrink-0 items-center justify-between border-b px-7"
+          className="flex h-[72px] shrink-0 items-center justify-between border-b px-7"
           style={{ backgroundColor: "rgba(255,255,255,.92)", borderColor: "var(--border-primary)" }}
         >
           <GlobalSearch />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
-            <span className="text-[13px] text-(--text-secondary)">
-              {member?.display_name ?? user.email}
-            </span>
-            <form action={logout}>
-              <Button type="submit" variant="outline" size="sm">
-                Sair
-              </Button>
-            </form>
+            <NotificationBell />
+            <UserMenu
+              displayName={member?.display_name ?? user.email ?? "Você"}
+              subtitle={household?.name ?? "Conta compartilhada"}
+              onLogout={logout}
+            />
           </div>
         </header>
         <main className="flex-1 overflow-y-auto px-7 pt-6 pb-8">
