@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowDownCircle, ArrowUpCircle, PiggyBank } from "lucide-react";
+import { ArrowDownCircle, ArrowRight, ArrowUpCircle, PiggyBank } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
 import { getExpenseCategoryColorMap, MUTED_SLICE_COLOR } from "@/lib/category-colors";
+import { getCashFlowProjection } from "@/lib/cash-flow";
 import {
   excludeTransfers,
   groupExpensesByCategory,
@@ -16,6 +17,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge } from "@/components/category-badge";
 import { MonthDonut } from "./month-donut";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
+import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
+
+const CASH_FLOW_PREVIEW_DAYS = 30;
 
 const TREND_MONTHS = 6;
 
@@ -165,11 +169,12 @@ export default async function MesPage({
     .limit(1);
   const householdIsEmpty = !accounts || accounts.length === 0;
 
-  const [currentRows, prevRows, trendRows, colorMap] = await Promise.all([
+  const [currentRows, prevRows, trendRows, colorMap, cashFlow] = await Promise.all([
     fetchMonthTransactions(supabase, householdId, start, end),
     fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
     fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
     getExpenseCategoryColorMap(supabase, householdId),
+    getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS),
   ]);
 
   const current = excludeTransfers(currentRows);
@@ -206,7 +211,7 @@ export default async function MesPage({
   if (householdIsEmpty) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="text-lg font-bold">Mês</h1>
+        <h1 className="text-lg font-bold">Dashboard</h1>
         <Card>
           <CardHeader>
             <CardTitle className="text-base font-normal text-[--ink]/70">
@@ -226,7 +231,7 @@ export default async function MesPage({
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">Mês</h1>
+        <h1 className="text-lg font-bold">Dashboard</h1>
         <div className="flex items-center gap-3 text-sm">
           <Link
             href={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
@@ -274,13 +279,13 @@ export default async function MesPage({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-3 gap-6">
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Despesas por categoria</CardTitle>
           </CardHeader>
           <CardContent>
-            <MonthDonut slices={slices} />
+            <MonthDonut slices={slices} compact />
           </CardContent>
         </Card>
         <Card className="shadow-sm">
@@ -288,7 +293,40 @@ export default async function MesPage({
             <CardTitle className="text-base font-semibold">Entradas vs saídas</CardTitle>
           </CardHeader>
           <CardContent>
-            <TrendBarChart points={trendPoints} />
+            <TrendBarChart points={trendPoints} compact />
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Fluxo de caixa</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col">
+                <span className="text-xs text-[--ink]/50">Saldo atual</span>
+                <span className="font-semibold tabular-nums">
+                  {formatCents(cashFlow.currentTotal)}
+                </span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-xs text-[--ink]/50">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
+                <span
+                  className="font-semibold tabular-nums"
+                  style={{
+                    color: cashFlow.finalPoint.balance_cents < 0 ? "var(--out)" : "var(--in)",
+                  }}
+                >
+                  {formatCents(cashFlow.finalPoint.balance_cents)}
+                </span>
+              </div>
+            </div>
+            <CashFlowChart points={cashFlow.points} compact />
+            <Link
+              href="/fluxo-de-caixa"
+              className="flex items-center gap-1 text-xs text-[--ink]/60 hover:text-[--ink]"
+            >
+              Ver detalhes <ArrowRight className="h-3 w-3" />
+            </Link>
           </CardContent>
         </Card>
       </div>

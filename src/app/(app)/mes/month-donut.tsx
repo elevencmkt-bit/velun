@@ -5,16 +5,24 @@ import { formatCents } from "@/lib/money";
 
 export type DonutSlice = { name: string; amount_cents: number; color: string };
 
-export function MonthDonut({ slices }: { slices: DonutSlice[] }) {
+export function MonthDonut({
+  slices,
+  compact = false,
+}: {
+  slices: DonutSlice[];
+  compact?: boolean;
+}) {
   const total = slices.reduce((sum, s) => sum + s.amount_cents, 0);
 
   if (slices.length === 0 || total === 0) {
     return <p className="text-sm text-[--ink]/70">Nenhuma despesa cleared neste mês.</p>;
   }
 
+  const size = compact ? "h-36 w-36" : "h-56 w-56";
+
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <div className="relative h-56 w-56 shrink-0">
+    <div className={compact ? "flex flex-col items-center gap-4" : "flex flex-col gap-4 sm:flex-row sm:items-center"}>
+      <div className={`relative ${size} shrink-0`}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -43,11 +51,13 @@ export function MonthDonut({ slices }: { slices: DonutSlice[] }) {
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-semibold tabular-nums">{formatCents(total)}</span>
+          <span className={`font-semibold tabular-nums ${compact ? "text-sm" : "text-lg"}`}>
+            {formatCents(total)}
+          </span>
           <span className="text-xs text-[--ink]/50">Total</span>
         </div>
       </div>
-      <ul className="flex flex-1 flex-col gap-1.5">
+      <ul className="flex w-full flex-1 flex-col gap-1.5">
         {slices.map((slice) => (
           <li key={slice.name} className="flex items-center gap-2 text-sm">
             <span
@@ -55,7 +65,11 @@ export function MonthDonut({ slices }: { slices: DonutSlice[] }) {
               style={{ backgroundColor: slice.color }}
             />
             <span className="flex-1 truncate">{slice.name}</span>
-            <span className="text-[--ink]/60">{Math.round((slice.amount_cents / total) * 100)}%</span>
+            {compact ? null : (
+              <span className="text-[--ink]/60">
+                {Math.round((slice.amount_cents / total) * 100)}%
+              </span>
+            )}
             <span className="w-20 text-right font-semibold tabular-nums">
               {formatCents(slice.amount_cents)}
             </span>

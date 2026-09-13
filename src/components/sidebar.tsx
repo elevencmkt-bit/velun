@@ -13,13 +13,14 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { href: "/importar", label: "Importar", icon: Upload },
-  { href: "/mes", label: "Mês", icon: LayoutDashboard },
+  { href: "/mes", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
   { href: "/a-pagar", label: "A pagar", icon: CalendarClock },
   { href: "/fluxo-de-caixa", label: "Fluxo de caixa", icon: TrendingUp },
   { href: "/contas", label: "Contas", icon: Wallet },
 ];
+
+const DISABLED_NAV = [{ label: "Importar", icon: Upload }];
 
 export function Sidebar({ householdName }: { householdName: string }) {
   const pathname = usePathname();
@@ -62,6 +63,21 @@ export function Sidebar({ householdName }: { householdName: string }) {
                 <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
+            );
+          })}
+          {DISABLED_NAV.map((item) => {
+            const Icon = item.icon;
+            return (
+              <span
+                key={item.label}
+                aria-disabled="true"
+                title="Em breve"
+                className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium opacity-40"
+                style={{ color: "var(--sidebar-fg)" }}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </span>
             );
           })}
         </nav>
