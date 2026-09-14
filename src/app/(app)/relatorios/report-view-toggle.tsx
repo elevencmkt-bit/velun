@@ -18,9 +18,19 @@ export function ReportViewToggle({ view }: { view: ReportView }) {
 
   return (
     <Tabs value={view} onValueChange={onChange}>
-      <TabsList>
-        <TabsTrigger value="realizado">Realizado</TabsTrigger>
-        <TabsTrigger value="a-vencer">A vencer</TabsTrigger>
+      <TabsList className="h-10 rounded-full border border-(--border-primary) bg-(--bg-subtle) p-1">
+        <TabsTrigger
+          value="realizado"
+          className="rounded-full px-3.5 text-(--text-secondary) data-active:bg-primary data-active:text-primary-foreground data-active:shadow-[0_2px_5px_rgba(81,88,246,.20)]"
+        >
+          Realizado
+        </TabsTrigger>
+        <TabsTrigger
+          value="a-vencer"
+          className="rounded-full px-3.5 text-(--text-secondary) data-active:bg-primary data-active:text-primary-foreground data-active:shadow-[0_2px_5px_rgba(81,88,246,.20)]"
+        >
+          A vencer
+        </TabsTrigger>
       </TabsList>
     </Tabs>
   );
