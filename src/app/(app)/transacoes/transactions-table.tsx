@@ -23,7 +23,7 @@ const NO_CATEGORY = "__none__";
 
 function formatDayHeading(date: string) {
   const d = new Date(`${date}T00:00:00`);
-  return d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 export function TransactionsTable({
@@ -138,7 +138,7 @@ export function TransactionsTable({
                   onCheckedChange={(checked) => toggleAll(dayIds, checked === true)}
                 />
               ) : null}
-              <span className="text-table-header flex-1 capitalize">{formatDayHeading(date)}</span>
+              <span className="text-table-header flex-1">{formatDayHeading(date)}</span>
               <span
                 className="text-xs font-bold tabular-nums"
                 style={{ color: dayNet < 0 ? "var(--expense)" : "var(--income)" }}
@@ -156,7 +156,7 @@ export function TransactionsTable({
               return (
                 <div
                   key={row.id}
-                  className="flex min-h-[62px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors hover:bg-[#F9FAFB]"
+                  className="flex min-h-[62px] items-center gap-3 px-1 transition-colors hover:bg-[#F9FAFB]"
                 >
                   {selectionMode ? (
                     <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
