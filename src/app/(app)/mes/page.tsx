@@ -26,6 +26,7 @@ import { MonthSelector } from "@/components/month-selector";
 import { MonthDonut } from "./month-donut";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
+import { ForecastCard } from "./forecast-card";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
@@ -160,18 +161,21 @@ export default async function MesPage({
     .limit(1);
   const householdIsEmpty = !accounts || accounts.length === 0;
 
-  const [currentRows, prevRows, trendRows, colorMap, cashFlow, pendingPreview] = await Promise.all([
-    fetchMonthTransactions(supabase, householdId, start, end),
-    fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
-    fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
-    getCategoryColorMap(supabase, householdId),
-    getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS),
-    fetchPendingPreview(supabase, householdId),
-  ]);
+  const [currentRows, prevRows, trendRows, colorMap, cashFlow, pendingPreview, pendingCurrentRows] =
+    await Promise.all([
+      fetchMonthTransactions(supabase, householdId, start, end),
+      fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
+      fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
+      getCategoryColorMap(supabase, householdId),
+      getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS),
+      fetchPendingPreview(supabase, householdId),
+      fetchMonthTransactions(supabase, householdId, start, end, "pending"),
+    ]);
 
   const current = excludeTransfers(currentRows);
   const previous = excludeTransfers(prevRows);
   const trend = excludeTransfers(trendRows);
+  const pendingCurrent = excludeTransfers(pendingCurrentRows);
 
   const entrou = sumByDirection(current, "in");
   const saiu = sumByDirection(current, "out");
@@ -180,6 +184,12 @@ export default async function MesPage({
   const entrouPrev = sumByDirection(previous, "in");
   const saiuPrev = sumByDirection(previous, "out");
   const sobrouPrev = entrouPrev - saiuPrev;
+
+  const entrouPendente = sumByDirection(pendingCurrent, "in");
+  const saiuPendente = sumByDirection(pendingCurrent, "out");
+  const entrouPrevisto = entrou + entrouPendente;
+  const saiuPrevisto = saiu + saiuPendente;
+  const sobrouPrevisto = entrouPrevisto - saiuPrevisto;
 
   const slices = groupExpensesByCategory(current).map((slice) => ({
     ...slice,
@@ -320,7 +330,7 @@ export default async function MesPage({
         </Card>
       </div>
 
-      <div className="grid grid-cols-[1.4fr_1fr] gap-5">
+      <div className="grid grid-cols-[1.2fr_0.9fr_0.9fr] gap-5">
         <Card>
           <CardHeader>
             <CardTitle className="text-card-title">Transações recentes</CardTitle>
@@ -410,6 +420,16 @@ export default async function MesPage({
             </Link>
           </CardContent>
         </Card>
+
+        <ForecastCard
+          entradaRealizado={entrou}
+          entradaPrevisto={entrouPrevisto}
+          saidaRealizado={saiu}
+          saidaPrevisto={saiuPrevisto}
+          saldoRealizado={sobrou}
+          saldoPrevisto={sobrouPrevisto}
+          currency={currency}
+        />
       </div>
     </div>
   );
