@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, ArrowDownCircle, PiggyBank } from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, ArrowDownCircle, PiggyBank, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { formatCents } from "@/lib/money";
@@ -234,7 +234,7 @@ export default async function MesPage({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-4 gap-5">
         <StatCard
           label="Entrou"
           value={formatCents(entrou, currency)}
@@ -261,6 +261,15 @@ export default async function MesPage({
           badgeFg="var(--badge-blue-fg)"
           valueColor={sobrou < 0 ? "var(--expense)" : "var(--income)"}
           delta={<PercentBadge current={sobrou} previous={sobrouPrev} favorable="up" />}
+        />
+        <StatCard
+          label="Saldo total"
+          value={formatCents(cashFlow.currentTotal, currency)}
+          icon={Wallet}
+          badgeBg="var(--badge-blue-bg)"
+          badgeFg="var(--badge-blue-fg)"
+          valueColor={cashFlow.currentTotal < 0 ? "var(--expense)" : "var(--text-primary)"}
+          delta={<span className="text-xs text-(--text-light)">Todas as contas, hoje</span>}
         />
       </div>
 
