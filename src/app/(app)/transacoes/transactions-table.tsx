@@ -31,6 +31,7 @@ export function TransactionsTable({
   accounts,
   categories,
   categoryColors,
+  categoryIcons,
   currency = "USD",
   selectionMode = false,
 }: {
@@ -38,6 +39,7 @@ export function TransactionsTable({
   accounts: AccountOption[];
   categories: CategoryOption[];
   categoryColors: Record<string, CategoryColorPair>;
+  categoryIcons: Record<string, string | null>;
   currency?: CurrencyCode;
   selectionMode?: boolean;
 }) {
@@ -131,16 +133,17 @@ export function TransactionsTable({
 
         return (
           <div key={date} className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 border-b border-(--border-primary) pb-1.5">
+            <div className="flex items-center gap-3 py-1.5">
               {selectionMode ? (
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={(checked) => toggleAll(dayIds, checked === true)}
                 />
               ) : null}
-              <span className="text-table-header flex-1">{formatDayHeading(date)}</span>
+              <span className="text-table-header shrink-0">{formatDayHeading(date)}</span>
+              <span className="h-px flex-1" style={{ background: "var(--border-primary)" }} />
               <span
-                className="text-xs font-bold tabular-nums"
+                className="shrink-0 text-xs font-bold tabular-nums"
                 style={{ color: dayNet < 0 ? "var(--expense)" : "var(--income)" }}
               >
                 {dayNet < 0 ? "-" : "+"}
@@ -148,7 +151,11 @@ export function TransactionsTable({
               </span>
             </div>
             {dayRows.map((row) => {
-              const CategoryIcon = getCategoryIcon(row.category_name, row.direction);
+              const CategoryIcon = getCategoryIcon(
+                row.category_name,
+                row.direction,
+                row.category_name ? categoryIcons[row.category_name] : null,
+              );
               const iconColors = row.category_name
                 ? (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR)
                 : MUTED_CATEGORY_COLOR;
@@ -173,11 +180,19 @@ export function TransactionsTable({
                     <p className="truncate text-[13.5px] font-semibold text-(--text-primary)">
                       {row.description}
                     </p>
-                    <p className="truncate text-xs text-(--text-muted)">
-                      {row.account_name}
-                      {row.status === "pending" ? " • Pendente" : ""}
-                    </p>
+                    <p className="truncate text-xs text-(--text-muted)">{row.account_name}</p>
                   </div>
+
+                  <span className="flex w-20 shrink-0 justify-start">
+                    {row.status === "pending" ? (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+                        style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
+                      >
+                        Pendente
+                      </span>
+                    ) : null}
+                  </span>
 
                   <span className="w-40 shrink-0">
                     <Select
@@ -212,7 +227,7 @@ export function TransactionsTable({
                   </span>
 
                   <span
-                    className="shrink-0 text-right text-sm font-bold tabular-nums"
+                    className="w-24 shrink-0 text-right text-sm font-bold tabular-nums"
                     style={{
                       color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
                     }}
