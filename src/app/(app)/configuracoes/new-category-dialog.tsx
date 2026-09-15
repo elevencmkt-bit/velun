@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createCategory } from "@/lib/actions/categories";
 import { ColorSwatchGrid } from "./color-swatch-grid";
+import { IconSwatchGrid } from "./icon-swatch-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ export function NewCategoryDialog() {
   const [kind, setKind] = useState<"income" | "expense">("expense");
   const [name, setName] = useState("");
   const [color, setColor] = useState<string | null>(null);
+  const [icon, setIcon] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -32,11 +34,13 @@ export function NewCategoryDialog() {
     const formData = new FormData(event.currentTarget);
     formData.set("kind", kind);
     if (color) formData.set("color", color);
+    if (icon) formData.set("icon", icon);
     startTransition(async () => {
       try {
         await createCategory(formData);
         setName("");
         setColor(null);
+        setIcon(null);
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -94,6 +98,10 @@ export function NewCategoryDialog() {
           <div className="flex flex-col gap-2">
             <Label>Cor</Label>
             <ColorSwatchGrid value={color} onChange={setColor} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Ícone</Label>
+            <IconSwatchGrid value={icon} onChange={setIcon} />
           </div>
           {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
           <Button type="submit" disabled={isPending}>

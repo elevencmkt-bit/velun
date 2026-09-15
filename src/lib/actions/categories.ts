@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { findPaletteColorByFg } from "@/lib/category-colors";
+import { CATEGORY_ICON_OPTIONS } from "@/lib/category-icons";
+
+const VALID_ICON_KEYS = new Set(CATEGORY_ICON_OPTIONS.map((opt) => opt.key));
 
 // "" (não NULL, a coluna é NOT NULL) marca "sem cor manual" — a cor
 // real é derivada automaticamente em category-colors.ts. Categorias
@@ -28,12 +31,17 @@ export async function createCategory(formData: FormData) {
   const kind = String(formData.get("kind") ?? "expense");
   const colorInput = formData.get("color");
   const color = typeof colorInput === "string" ? colorInput : null;
+  const iconInput = formData.get("icon");
+  const icon = typeof iconInput === "string" ? iconInput : null;
 
   if (!name) throw new Error("Nome da categoria é obrigatório.");
   if (kind !== "income" && kind !== "expense") throw new Error("Tipo de categoria inválido.");
 
   if (color && !findPaletteColorByFg(color)) {
     throw new Error("Cor inválida.");
+  }
+  if (icon && !VALID_ICON_KEYS.has(icon)) {
+    throw new Error("Ícone inválido.");
   }
 
   const { data, error } = await supabase
@@ -43,6 +51,7 @@ export async function createCategory(formData: FormData) {
       name,
       kind,
       color: color ?? NO_MANUAL_COLOR,
+      icon,
     })
     .select("id")
     .single();
@@ -86,6 +95,27 @@ export async function updateCategoryColor(categoryId: string, color: string | nu
   const { error } = await supabase
     .from("categories")
     .update({ color: color ?? NO_MANUAL_COLOR })
+    .eq("id", categoryId)
+    .eq("household_id", householdId);
+
+  if (error) throw new Error(error.message);
+
+  revalidateCategoryPaths();
+}
+
+// `icon` deve ser uma das chaves de CATEGORY_ICON_OPTIONS, ou null
+// para voltar pro palpite automático por palavra-chave do nome.
+export async function updateCategoryIcon(categoryId: string, icon: string | null) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  if (icon !== null && !VALID_ICON_KEYS.has(icon)) {
+    throw new Error("Ícone inválido.");
+  }
+
+  const { error } = await supabase
+    .from("categories")
+    .update({ icon })
     .eq("id", categoryId)
     .eq("household_id", householdId);
 

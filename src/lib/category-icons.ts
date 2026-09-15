@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   Banknote,
   Bus,
@@ -20,10 +21,36 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// Ícone por categoria (avatar colorido nas linhas de Transações) —
-// casamento por palavra-chave no nome da categoria, já que categorias
-// são livres/customizadas pelo usuário, não um enum fixo. Sem match,
-// cai no fallback genérico por tipo (entrada/despesa).
+// Ícones selecionáveis manualmente (Configurações > categoria) — a
+// mesma lista alimenta o fallback automático por palavra-chave abaixo.
+export type CategoryIconOption = { key: string; icon: LucideIcon; label: string };
+
+export const CATEGORY_ICON_OPTIONS: CategoryIconOption[] = [
+  { key: "banknote", icon: Banknote, label: "Salário" },
+  { key: "laptop", icon: Laptop, label: "Serviços" },
+  { key: "trending-up", icon: TrendingUp, label: "Investimento" },
+  { key: "repeat", icon: Repeat2, label: "Assinatura" },
+  { key: "bus", icon: Bus, label: "Transporte" },
+  { key: "car", icon: Car, label: "Carro" },
+  { key: "shopping-cart", icon: ShoppingCart, label: "Compras" },
+  { key: "utensils", icon: UtensilsCrossed, label: "Alimentação" },
+  { key: "graduation-cap", icon: GraduationCap, label: "Educação" },
+  { key: "heart-pulse", icon: HeartPulse, label: "Saúde" },
+  { key: "home", icon: Home, label: "Moradia" },
+  { key: "gamepad", icon: Gamepad2, label: "Lazer" },
+  { key: "ticket", icon: Ticket, label: "Shows" },
+  { key: "plane", icon: Plane, label: "Viagem" },
+  { key: "gift", icon: Gift, label: "Presente" },
+  { key: "paw-print", icon: PawPrint, label: "Pet" },
+  { key: "dumbbell", icon: Dumbbell, label: "Academia" },
+  { key: "tag", icon: Tag, label: "Outros" },
+];
+
+const ICON_BY_KEY = new Map(CATEGORY_ICON_OPTIONS.map((opt) => [opt.key, opt.icon]));
+
+// Casamento por palavra-chave no nome da categoria — usado quando a
+// categoria não tem ícone escolhido manualmente. Categorias são
+// livres/customizadas pelo usuário, não um enum fixo.
 const KEYWORD_ICONS: [string[], LucideIcon][] = [
   [["salário", "salario", "renda", "pró-labore", "pro-labore"], Banknote],
   [["freelance", "prestação de serviço", "prestacao de servico", "serviço", "servico"], Laptop],
@@ -51,12 +78,40 @@ function normalize(text: string) {
     .replace(/[̀-ͯ]/g, "");
 }
 
-export function getCategoryIcon(categoryName: string | null, direction: "in" | "out"): LucideIcon {
+// `iconKey` vem de categories.icon (escolha manual). Sem escolha
+// manual ou chave desconhecida, cai no palpite por palavra-chave e,
+// por fim, num ícone genérico por tipo (entrada/despesa).
+export function getCategoryIcon(
+  categoryName: string | null,
+  direction: "in" | "out",
+  iconKey?: string | null,
+): LucideIcon {
+  if (iconKey) {
+    const manual = ICON_BY_KEY.get(iconKey);
+    if (manual) return manual;
+  }
+
   if (categoryName) {
     const normalized = normalize(categoryName);
     for (const [keywords, icon] of KEYWORD_ICONS) {
       if (keywords.some((k) => normalized.includes(normalize(k)))) return icon;
     }
   }
+
   return direction === "in" ? Banknote : Tag;
+}
+
+// Mapa nome -> ícone escolhido manualmente (ou null) — mesmo padrão de
+// getCategoryColorMap, pra resolver o avatar de cada linha em
+// Transações sem uma query por transação.
+export async function getCategoryIconMap(
+  supabase: SupabaseClient,
+  householdId: string,
+): Promise<Map<string, string | null>> {
+  const { data } = await supabase
+    .from("categories")
+    .select("name, icon")
+    .eq("household_id", householdId);
+
+  return new Map((data ?? []).map((row) => [row.name, row.icon as string | null]));
 }

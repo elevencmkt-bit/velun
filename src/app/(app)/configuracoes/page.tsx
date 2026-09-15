@@ -52,7 +52,7 @@ export default async function ConfiguracoesPage() {
     supabase.from("members").select("display_name, avatar_url").eq("id", memberId).maybeSingle(),
     supabase
       .from("categories")
-      .select("id, name, kind, color")
+      .select("id, name, kind, color, icon")
       .eq("household_id", householdId)
       .order("name"),
     getCategoryColorMap(supabase, householdId),

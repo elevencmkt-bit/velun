@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createElement, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
-import { deleteCategory, updateCategoryColor, updateCategoryName } from "@/lib/actions/categories";
+import {
+  deleteCategory,
+  updateCategoryColor,
+  updateCategoryIcon,
+  updateCategoryName,
+} from "@/lib/actions/categories";
 import { findPaletteColorByFg } from "@/lib/category-colors";
+import { getCategoryIcon } from "@/lib/category-icons";
 import { ColorSwatchGrid } from "./color-swatch-grid";
+import { IconSwatchGrid } from "./icon-swatch-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +40,7 @@ export type CategoryRowData = {
   name: string;
   kind: "income" | "expense";
   color: string | null;
+  icon: string | null;
 };
 
 export function CategoryRow({
@@ -45,9 +53,14 @@ export function CategoryRow({
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState<string | null>(findPaletteColorByFg(category.color)?.fg ?? null);
+  const [icon, setIcon] = useState<string | null>(category.icon);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const RowIcon = useMemo(
+    () => getCategoryIcon(category.name, category.kind === "income" ? "in" : "out", category.icon),
+    [category.name, category.kind, category.icon],
+  );
 
   function onSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +69,7 @@ export function CategoryRow({
       try {
         await updateCategoryName(category.id, name);
         await updateCategoryColor(category.id, color);
+        await updateCategoryIcon(category.id, icon);
         setEditOpen(false);
         router.refresh();
       } catch (err) {
@@ -74,9 +88,11 @@ export function CategoryRow({
   return (
     <div className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 last:border-0">
       <div
-        className="h-6 w-6 shrink-0 rounded-full"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
         style={{ backgroundColor: effectiveColor ?? "var(--text-light)" }}
-      />
+      >
+        {createElement(RowIcon, { className: "h-3.5 w-3.5" })}
+      </div>
       <span className="text-table-body text-(--text-primary)">{category.name}</span>
 
       <span className="ml-auto flex items-center gap-0.5">
@@ -110,6 +126,10 @@ export function CategoryRow({
               <div className="flex flex-col gap-2">
                 <Label>Cor</Label>
                 <ColorSwatchGrid value={color} onChange={setColor} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Ícone</Label>
+                <IconSwatchGrid value={icon} onChange={setIcon} />
               </div>
               {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
               <Button type="submit" disabled={isPending}>

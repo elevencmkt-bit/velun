@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getCategoryColorMap } from "@/lib/category-colors";
+import { getCategoryIconMap } from "@/lib/category-icons";
 import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
 import { formatCents } from "@/lib/money";
 import { TransactionsWorkspace } from "./workspace";
@@ -33,7 +34,7 @@ export default async function TransacoesPage({
   const prev = shiftMonth(year, monthIndex, -1);
   const next = shiftMonth(year, monthIndex, 1);
 
-  const [{ data: accounts }, { data: categories }, { data: members }, colorMap] =
+  const [{ data: accounts }, { data: categories }, { data: members }, colorMap, iconMap] =
     await Promise.all([
       supabase
         .from("accounts")
@@ -48,6 +49,7 @@ export default async function TransacoesPage({
         .order("name"),
       supabase.from("members").select("id, display_name").eq("household_id", householdId),
       getCategoryColorMap(supabase, householdId),
+      getCategoryIconMap(supabase, householdId),
     ]);
 
   let query = supabase
@@ -132,6 +134,7 @@ export default async function TransacoesPage({
       categories={categories ?? []}
       members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
       categoryColors={Object.fromEntries(colorMap)}
+      categoryIcons={Object.fromEntries(iconMap)}
       currency={currency}
       monthLabel={monthLabel(year, monthIndex)}
       prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}

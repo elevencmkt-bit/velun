@@ -17,6 +17,7 @@ export function TransactionsWorkspace({
   categories,
   members,
   categoryColors,
+  categoryIcons,
   currency,
   monthLabel,
   prevHref,
@@ -30,6 +31,7 @@ export function TransactionsWorkspace({
   categories: CategoryOption[];
   members: MemberOption[];
   categoryColors: Record<string, CategoryColorPair>;
+  categoryIcons: Record<string, string | null>;
   currency: CurrencyCode;
   monthLabel: string;
   prevHref: string;
@@ -89,6 +91,7 @@ export function TransactionsWorkspace({
             accounts={accounts}
             categories={categories}
             categoryColors={categoryColors}
+            categoryIcons={categoryIcons}
             currency={currency}
             selectionMode={selectionMode}
           />
