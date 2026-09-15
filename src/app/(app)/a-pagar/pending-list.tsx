@@ -1,7 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { markTransactionPaid } from "@/lib/actions/transactions";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ export type PendingRow = {
   category_name: string | null;
   is_overdue: boolean;
 };
+
+const PAGE_SIZE = 5;
 
 function formatDate(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
@@ -38,6 +41,7 @@ export function PendingList({
   currency?: CurrencyCode;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [page, setPage] = useState(0);
   const router = useRouter();
 
   if (rows.length === 0) {
@@ -49,56 +53,102 @@ export function PendingList({
     );
   }
 
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const currentPage = Math.min(page, totalPages - 1);
+  const visible = rows.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
+
   return (
-    <div className="flex flex-col">
-      {rows.map((row) => (
-        <div
-          key={row.id}
-          className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
-        >
-          <span className="text-table-body w-16">{formatDate(row.date)}</span>
-          {row.is_overdue ? (
-            <span
-              className="inline-flex h-[26px] items-center rounded-[6px] px-2 text-[11px] font-medium"
-              style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
-            >
-              Atrasada
+    <div className="flex flex-col gap-1">
+      <div className="text-table-header grid grid-cols-[1fr_120px_84px_100px] gap-3 border-b border-(--border-primary) px-1 pb-1.5">
+        <span>Lançamento</span>
+        <span>Categoria</span>
+        <span>Data</span>
+        <span className="text-right">Valor</span>
+      </div>
+
+      <div className="flex min-h-[250px] flex-col">
+        {visible.map((row) => (
+          <div
+            key={row.id}
+            className="grid grid-cols-[1fr_120px_84px_100px] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+          >
+            <span className="text-table-body min-w-0 truncate text-(--text-primary)">
+              {row.description}
             </span>
-          ) : null}
-          <span className="text-table-body w-48 truncate text-(--text-primary)">
-            {row.description}
+            <span className="min-w-0">
+              <CategoryBadge
+                name={row.category_name ?? ""}
+                color={row.category_name ? categoryColors[row.category_name] : undefined}
+              />
+            </span>
+            <span className="flex flex-col">
+              <span
+                className="text-table-body font-medium"
+                style={{ color: row.is_overdue ? "var(--warning-dark)" : undefined }}
+              >
+                {formatDate(row.date)}
+              </span>
+              {row.is_overdue ? (
+                <span className="text-[10px] font-semibold" style={{ color: "var(--warning-dark)" }}>
+                  Atrasada
+                </span>
+              ) : null}
+            </span>
+            <span className="flex flex-col items-end gap-1">
+              <span
+                className="text-right font-semibold tabular-nums"
+                style={{
+                  color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
+                }}
+              >
+                {row.direction === "out" ? "-" : "+"}
+                {formatCents(row.amount_cents, currency)}
+              </span>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await markTransactionPaid(row.id);
+                    router.refresh();
+                  })
+                }
+              >
+                {kind === "pay" ? "Marcar paga" : "Marcar recebida"}
+              </Button>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {totalPages > 1 ? (
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-metadata">
+            Página {currentPage + 1} de {totalPages}
           </span>
-          <span className="text-table-body w-28">{row.account_name}</span>
-          <span className="w-32">
-            <CategoryBadge
-              name={row.category_name ?? ""}
-              color={row.category_name ? categoryColors[row.category_name] : undefined}
-            />
-          </span>
-          <span
-            className="ml-auto text-right font-semibold tabular-nums"
-            style={{
-              color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
-            }}
-          >
-            {row.direction === "out" ? "-" : "+"}
-            {formatCents(row.amount_cents, currency)}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                await markTransactionPaid(row.id);
-                router.refresh();
-              })
-            }
-          >
-            {kind === "pay" ? "Marcar como paga" : "Marcar como recebida"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={currentPage === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={currentPage >= totalPages - 1}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              aria-label="Próxima página"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }

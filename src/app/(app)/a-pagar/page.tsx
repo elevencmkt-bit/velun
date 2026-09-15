@@ -92,6 +92,9 @@ export default async function AVencerPage() {
     };
   });
 
+  const recurrencesIn = recurrenceRows.filter((r) => r.direction === "in");
+  const recurrencesOut = recurrenceRows.filter((r) => r.direction === "out");
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
@@ -142,11 +145,32 @@ export default async function AVencerPage() {
           <h2 className="text-card-title">Recorrências</h2>
           <RecurrenceForm accounts={accounts ?? []} categories={categories ?? []} />
         </div>
-        <Card>
-          <CardContent className="pt-6">
-            <RecurrencesList rows={recurrenceRows} currency={currency} />
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-2 gap-5">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-card-title">Entradas recorrentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RecurrencesList
+                rows={recurrencesIn}
+                currency={currency}
+                emptyMessage="Nenhuma entrada recorrente cadastrada."
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-card-title">Saídas recorrentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RecurrencesList
+                rows={recurrencesOut}
+                currency={currency}
+                emptyMessage="Nenhuma saída recorrente cadastrada."
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

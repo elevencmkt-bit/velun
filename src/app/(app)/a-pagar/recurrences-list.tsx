@@ -24,57 +24,68 @@ const FREQUENCY_LABELS: Record<RecurrenceRow["frequency"], string> = {
 export function RecurrencesList({
   rows,
   currency = "USD",
+  emptyMessage = "Nenhuma recorrência cadastrada.",
 }: {
   rows: RecurrenceRow[];
   currency?: CurrencyCode;
+  emptyMessage?: string;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   if (rows.length === 0) {
-    return <p className="text-sm text-(--text-muted)">Nenhuma recorrência cadastrada.</p>;
+    return <p className="text-sm text-(--text-muted)">{emptyMessage}</p>;
   }
 
   return (
-    <div className="flex flex-col">
-      {rows.map((row) => (
-        <div
-          key={row.id}
-          className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
-        >
-          <span className="text-table-body w-48 truncate text-(--text-primary)">
-            {row.description}
-          </span>
-          <span className="text-table-body w-24">{FREQUENCY_LABELS[row.frequency]}</span>
-          {row.frequency === "monthly" && row.day_of_month ? (
-            <span className="text-table-body w-20">dia {row.day_of_month}</span>
-          ) : (
-            <span className="w-20" />
-          )}
-          <span
-            className="ml-auto text-right font-semibold tabular-nums"
-            style={{
-              color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
-            }}
+    <div className="flex flex-col gap-1">
+      <div className="text-table-header grid grid-cols-[1fr_84px_64px_96px] gap-3 border-b border-(--border-primary) px-1 pb-1.5">
+        <span>Lançamento</span>
+        <span>Período</span>
+        <span>Dia</span>
+        <span className="text-right">Valor</span>
+      </div>
+
+      <div className="flex flex-col">
+        {rows.map((row) => (
+          <div
+            key={row.id}
+            className="grid grid-cols-[1fr_84px_64px_96px] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB]"
           >
-            {row.direction === "out" ? "-" : "+"}
-            {formatCents(row.amount_cents, currency)}
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                await deactivateRecurrence(row.id);
-                router.refresh();
-              })
-            }
-          >
-            Desativar
-          </Button>
-        </div>
-      ))}
+            <span className="text-table-body min-w-0 truncate text-(--text-primary)">
+              {row.description}
+            </span>
+            <span className="text-table-body">{FREQUENCY_LABELS[row.frequency]}</span>
+            <span className="text-table-body">
+              {row.frequency === "monthly" && row.day_of_month ? row.day_of_month : "—"}
+            </span>
+            <span className="flex flex-col items-end gap-1">
+              <span
+                className="text-right font-semibold tabular-nums"
+                style={{
+                  color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
+                }}
+              >
+                {row.direction === "out" ? "-" : "+"}
+                {formatCents(row.amount_cents, currency)}
+              </span>
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={isPending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await deactivateRecurrence(row.id);
+                    router.refresh();
+                  })
+                }
+              >
+                Desativar
+              </Button>
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
