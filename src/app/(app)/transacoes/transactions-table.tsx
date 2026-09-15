@@ -31,7 +31,6 @@ export function TransactionsTable({
   accounts,
   categories,
   categoryColors,
-  categoryIcons,
   currency = "USD",
   selectionMode = false,
 }: {
@@ -39,7 +38,6 @@ export function TransactionsTable({
   accounts: AccountOption[];
   categories: CategoryOption[];
   categoryColors: Record<string, CategoryColorPair>;
-  categoryIcons: Record<string, string | null>;
   currency?: CurrencyCode;
   selectionMode?: boolean;
 }) {
@@ -151,11 +149,7 @@ export function TransactionsTable({
               </span>
             </div>
             {dayRows.map((row) => {
-              const CategoryIcon = getCategoryIcon(
-                row.category_name,
-                row.direction,
-                row.category_name ? categoryIcons[row.category_name] : null,
-              );
+              const CategoryIcon = getCategoryIcon(row.category_name, row.direction);
               const iconColors = row.category_name
                 ? (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR)
                 : MUTED_CATEGORY_COLOR;
