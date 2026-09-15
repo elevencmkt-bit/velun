@@ -1,13 +1,9 @@
-import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getCategoryColorMap } from "@/lib/category-colors";
 import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
 import { formatCents } from "@/lib/money";
-import { MonthSelector } from "@/components/month-selector";
-import { Card, CardContent } from "@/components/ui/card";
-import { TransactionFilters } from "./filters";
-import { TransactionsTable } from "./transactions-table";
+import { TransactionsWorkspace } from "./workspace";
 import type { TransactionRow } from "./types";
 
 // Constrói a URL de navegação de mês preservando os outros filtros ativos
@@ -130,44 +126,19 @@ export default async function TransacoesPage({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-page-title">Transações</h1>
-        <MonthSelector
-          label={monthLabel(year, monthIndex)}
-          prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
-          nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
-        />
-      </div>
-      <Card>
-        <CardContent className="flex flex-col gap-6 pt-6">
-          <Suspense>
-            <TransactionFilters
-              accounts={accounts ?? []}
-              categories={categories ?? []}
-              members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
-            />
-          </Suspense>
-          <div className="flex items-center justify-between border-b border-(--border-soft) pb-3">
-            <span className="text-metadata">
-              {rows.length} {rows.length === 1 ? "transação" : "transações"}
-            </span>
-            <span className="flex items-baseline gap-2">
-              <span className="text-metadata">{totalLabel}</span>
-              <span className="font-semibold tabular-nums" style={{ color: totalColor }}>
-                {totalDisplay}
-              </span>
-            </span>
-          </div>
-          <TransactionsTable
-            rows={rows}
-            accounts={accounts ?? []}
-            categories={categories ?? []}
-            categoryColors={Object.fromEntries(colorMap)}
-            currency={currency}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <TransactionsWorkspace
+      rows={rows}
+      accounts={accounts ?? []}
+      categories={categories ?? []}
+      members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
+      categoryColors={Object.fromEntries(colorMap)}
+      currency={currency}
+      monthLabel={monthLabel(year, monthIndex)}
+      prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
+      nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
+      totalLabel={totalLabel}
+      totalDisplay={totalDisplay}
+      totalColor={totalColor}
+    />
   );
 }
