@@ -6,6 +6,7 @@ export type TransactionRow = {
   amount_cents: number;
   direction: "in" | "out";
   status: "pending" | "cleared";
+  is_overdue: boolean;
   import_id: string | null;
   transfer_group_id: string | null;
   recurrence_id: string | null;

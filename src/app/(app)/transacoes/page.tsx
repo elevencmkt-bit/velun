@@ -88,6 +88,8 @@ export default async function TransacoesPage({
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const rows: TransactionRow[] = (rawRows ?? []).map((row) => ({
     id: row.id,
     date: row.date,
@@ -96,6 +98,7 @@ export default async function TransacoesPage({
     amount_cents: row.amount_cents,
     direction: row.direction,
     status: row.status,
+    is_overdue: row.status === "pending" && row.date < today,
     import_id: row.import_id,
     transfer_group_id: row.transfer_group_id,
     recurrence_id: row.recurrence_id,

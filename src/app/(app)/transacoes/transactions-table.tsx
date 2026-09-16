@@ -184,7 +184,14 @@ export function TransactionsTable({
                   </div>
 
                   <span className="flex w-20 shrink-0 justify-start">
-                    {row.status === "pending" ? (
+                    {row.is_overdue ? (
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+                        style={{ backgroundColor: "var(--expense-soft)", color: "var(--expense-dark)" }}
+                      >
+                        Atrasado
+                      </span>
+                    ) : row.status === "pending" ? (
                       <span
                         className="rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
                         style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
