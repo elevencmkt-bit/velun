@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { bulkUpdateCategory, updateTransactionCategory } from "@/lib/actions/transactions";
+import { Check } from "lucide-react";
+import {
+  bulkMarkPaid,
+  bulkUpdateCategory,
+  markTransactionPaid,
+  updateTransactionCategory,
+} from "@/lib/actions/transactions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +52,7 @@ export function TransactionsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [bulkCategoryId, setBulkCategoryId] = useState<string>("");
+  const [editingRow, setEditingRow] = useState<TransactionRow | null>(null);
   const router = useRouter();
 
   const groups = useMemo(() => {
@@ -74,6 +81,26 @@ export function TransactionsTable({
         else next.delete(id);
       }
       return next;
+    });
+  }
+
+  function onRowClick(row: TransactionRow) {
+    if (selectionMode) {
+      toggle(row.id);
+      return;
+    }
+    if (!row.transfer_group_id) setEditingRow(row);
+  }
+
+  const selectedPendingIds = rows
+    .filter((r) => selected.has(r.id) && r.status === "pending")
+    .map((r) => r.id);
+
+  function applyBulkConfirm() {
+    startTransition(async () => {
+      await bulkMarkPaid(selectedPendingIds);
+      setSelected(new Set());
+      router.refresh();
     });
   }
 
@@ -117,6 +144,11 @@ export function TransactionsTable({
           <Button size="sm" disabled={!bulkCategoryId || isPending} onClick={applyBulkCategory}>
             Aplicar
           </Button>
+          {selectedPendingIds.length > 0 ? (
+            <Button size="sm" variant="outline" disabled={isPending} onClick={applyBulkConfirm}>
+              <Check className="h-3.5 w-3.5" /> Confirmar {selectedPendingIds.length}
+            </Button>
+          ) : null}
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
             Limpar seleção
           </Button>
@@ -163,10 +195,21 @@ export function TransactionsTable({
               return (
                 <div
                   key={row.id}
-                  className="flex min-h-[62px] items-center gap-3 px-1 transition-colors hover:bg-[#F9FAFB]"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onRowClick(row)}
+                  onKeyDown={(e) => {
+                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      onRowClick(row);
+                    }
+                  }}
+                  className="flex min-h-[62px] cursor-pointer items-center gap-3 rounded-lg px-1 transition-colors outline-none hover:bg-[#F9FAFB] focus-visible:bg-[#F9FAFB]"
                 >
                   {selectionMode ? (
-                    <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
+                    </span>
                   ) : null}
 
                   <div
@@ -201,7 +244,7 @@ export function TransactionsTable({
                     ) : null}
                   </span>
 
-                  <span className="w-40 shrink-0">
+                  <span className="w-40 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Select
                       value={row.category_id ?? NO_CATEGORY}
                       onValueChange={(value) => {
@@ -243,24 +286,29 @@ export function TransactionsTable({
                     {formatCents(row.amount_cents, currency)}
                   </span>
 
-                  <span className="flex shrink-0 items-center gap-0.5">
-                    {row.transfer_group_id ? null : (
-                      <EditTransactionDialog
-                        transaction={{
-                          id: row.id,
-                          date: row.date,
-                          account_id: row.account_id,
-                          category_id: row.category_id,
-                          direction: row.direction,
-                          amount_cents: row.amount_cents,
-                          description: row.description,
-                          notes: row.notes,
-                          status: row.status,
-                          recurrence_id: row.recurrence_id,
-                        }}
-                        accounts={accounts}
-                        categories={categories}
-                      />
+                  <span
+                    className="flex shrink-0 items-center gap-0.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {row.status === "pending" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={isPending}
+                        aria-label="Marcar como confirmado"
+                        title="Marcar como confirmado"
+                        className="text-(--income-dark) hover:bg-(--income-soft) hover:text-(--income-dark)"
+                        onClick={() =>
+                          startTransition(async () => {
+                            await markTransactionPaid(row.id);
+                            router.refresh();
+                          })
+                        }
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <span className="h-7 w-7" />
                     )}
                     <DeleteTransactionButton
                       transactionId={row.id}
@@ -273,6 +321,31 @@ export function TransactionsTable({
           </div>
         );
       })}
+
+      {editingRow ? (
+        <EditTransactionDialog
+          key={editingRow.id}
+          open
+          onOpenChange={(next) => {
+            if (!next) setEditingRow(null);
+          }}
+          showTrigger={false}
+          transaction={{
+            id: editingRow.id,
+            date: editingRow.date,
+            account_id: editingRow.account_id,
+            category_id: editingRow.category_id,
+            direction: editingRow.direction,
+            amount_cents: editingRow.amount_cents,
+            description: editingRow.description,
+            notes: editingRow.notes,
+            status: editingRow.status,
+            recurrence_id: editingRow.recurrence_id,
+          }}
+          accounts={accounts}
+          categories={categories}
+        />
+      ) : null}
     </div>
   );
 }

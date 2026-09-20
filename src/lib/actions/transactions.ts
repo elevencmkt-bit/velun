@@ -264,6 +264,23 @@ export async function markTransactionPaid(transactionId: string) {
   revalidatePath("/mes");
 }
 
+export async function bulkMarkPaid(transactionIds: string[]) {
+  if (transactionIds.length === 0) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transactions")
+    .update({ status: "cleared" })
+    .in("id", transactionIds);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/a-pagar");
+  revalidatePath("/transacoes");
+  revalidatePath("/contas");
+  revalidatePath("/mes");
+}
+
 export async function createTransfer(formData: FormData) {
   const { memberId, householdId } = await getCurrentMember();
   const supabase = await createClient();

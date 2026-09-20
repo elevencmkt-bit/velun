@@ -45,12 +45,20 @@ export function EditTransactionDialog({
   transaction,
   accounts,
   categories: initialCategories,
+  open: controlledOpen,
+  onOpenChange,
+  showTrigger = true,
 }: {
   transaction: EditableTransaction;
   accounts: Account[];
   categories: Category[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [direction, setDirection] = useState<"in" | "out">(transaction.direction);
   const [categoryId, setCategoryId] = useState(transaction.category_id ?? "");
   const [categories, setCategories] = useState(initialCategories);
@@ -109,11 +117,13 @@ export function EditTransactionDialog({
         if (!next) setError(null);
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Editar transação">
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-      </DialogTrigger>
+      {showTrigger ? (
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon-sm" aria-label="Editar transação">
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        </DialogTrigger>
+      ) : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar transação</DialogTitle>
