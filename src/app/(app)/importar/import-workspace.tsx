@@ -83,7 +83,21 @@ export function ImportWorkspace({
   function onUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    run(() => importStatement(formData));
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await importStatement(formData);
+        // Falha prevista volta como resultado, não como exceção — a
+        // mensagem aqui é a real, não um código do React.
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Algo deu errado ao ler o extrato.");
+      }
+    });
   }
 
   const included = rows.filter((r) => r.isIncluded);

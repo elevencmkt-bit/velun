@@ -1,4 +1,3 @@
-import { PDFParse } from "pdf-parse";
 
 // Parser do extrato mensal da Regions Bank (LifeGreen eAccess).
 //
@@ -11,6 +10,16 @@ import { PDFParse } from "pdf-parse";
 //    mainframe. Lido da esquerda pra direita vira positivo.
 // 3. Os valores são todos positivos. Entrada ou saída depende da SEÇÃO
 //    em que a linha está, e a seção atravessa páginas com "(CONTINUED)".
+
+/**
+ * Falha esperada de leitura (arquivo errado, PDF escaneado, formato de
+ * outro banco). Quem chama devolve a mensagem pro usuário em vez de
+ * deixar virar erro de servidor — o Next mascara exceção de server
+ * action em produção, e o usuário acaba vendo um código do React.
+ */
+export class StatementParseError extends Error {
+  readonly expected = true;
+}
 
 export type ParsedTransaction = {
   date: string; // ISO (YYYY-MM-DD)
@@ -98,14 +107,34 @@ function extractMcc(description: string): string | null {
   return null;
 }
 
-export async function parseRegionsStatement(data: Uint8Array): Promise<ParsedStatement> {
-  const parser = new PDFParse({ data });
-  let text: string;
+async function extractText(data: Uint8Array): Promise<string> {
+  // Import dinâmico, e não no topo do arquivo, por dois motivos: mantém
+  // o pdf-parse fora de qualquer caminho de render que não importe
+  // extrato, e deixa uma falha de carregamento do pacote virar mensagem
+  // legível em vez de erro opaco de servidor.
+  let PDFParse: typeof import("pdf-parse").PDFParse;
   try {
-    text = (await parser.getText()).text;
+    ({ PDFParse } = await import("pdf-parse"));
+  } catch {
+    throw new StatementParseError(
+      "Não consegui carregar o leitor de PDF no servidor. Isso é um problema de configuração, não do seu arquivo.",
+    );
+  }
+
+  const parser = new PDFParse({ data });
+  try {
+    return (await parser.getText()).text;
+  } catch {
+    throw new StatementParseError(
+      "Não consegui ler esse PDF. Ele pode estar protegido por senha ou ser um documento escaneado.",
+    );
   } finally {
     await parser.destroy();
   }
+}
+
+export async function parseRegionsStatement(data: Uint8Array): Promise<ParsedStatement> {
+  const text = await extractText(data);
 
   const lines = text.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
 
@@ -125,7 +154,9 @@ export async function parseRegionsStatement(data: Uint8Array): Promise<ParsedSta
     }
   }
   if (!start || !end) {
-    throw new Error("Não encontrei o período do extrato no PDF.");
+    throw new StatementParseError(
+      "Não encontrei o período do extrato neste PDF. Confira se é o extrato mensal da Regions.",
+    );
   }
 
   // --- saldos do resumo -------------------------------------------------
@@ -138,7 +169,9 @@ export async function parseRegionsStatement(data: Uint8Array): Promise<ParsedSta
   const beginningBalanceCents = summaryValue("Beginning Balance");
   const endingBalanceCents = summaryValue("Ending Balance");
   if (beginningBalanceCents === null || endingBalanceCents === null) {
-    throw new Error("Não encontrei o saldo inicial ou final no resumo do extrato.");
+    throw new StatementParseError(
+      "Não encontrei o saldo inicial ou final no resumo deste extrato.",
+    );
   }
 
   // --- lançamentos e saldos diários -------------------------------------
@@ -190,7 +223,7 @@ export async function parseRegionsStatement(data: Uint8Array): Promise<ParsedSta
   }
 
   if (transactions.length === 0) {
-    throw new Error("Não encontrei nenhum lançamento no PDF.");
+    throw new StatementParseError("Não encontrei nenhum lançamento neste PDF.");
   }
 
   return {
