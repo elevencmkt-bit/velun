@@ -4,19 +4,22 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { computeFingerprint } from "@/lib/fingerprint";
-import { parseRegionsStatement } from "@/lib/import/regions-pdf";
+import { parseRegionsStatement, StatementParseError } from "@/lib/import/regions-pdf";
 import { verifyStatement } from "@/lib/import/verify";
 import { suggestCategoryId } from "@/lib/import/mcc";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
-export type ImportResult = {
-  importId: string;
-  matches: boolean;
-  count: number;
-  duplicates: number;
-  message: string | null;
-};
+export type ImportResult =
+  | {
+      ok: true;
+      importId: string;
+      matches: boolean;
+      count: number;
+      duplicates: number;
+      message: string | null;
+    }
+  | { ok: false; error: string };
 
 /**
  * Lê o PDF, confere contra o próprio extrato e grava em staging.
@@ -33,14 +36,26 @@ export async function importStatement(formData: FormData): Promise<ImportResult>
   const accountId = String(formData.get("account_id") ?? "");
   const file = formData.get("file");
 
-  if (!accountId) throw new Error("Escolha a conta do extrato.");
-  if (!(file instanceof File) || file.size === 0) throw new Error("Escolha um arquivo.");
-  if (file.size > MAX_BYTES) throw new Error("Arquivo maior que 10 MB.");
+  // Falhas previsíveis voltam como resultado, não como exceção: o Next
+  // mascara erro de server action em produção, e o usuário acabaria
+  // vendo um código do React no lugar da causa.
+  if (!accountId) return { ok: false, error: "Escolha a conta do extrato." };
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Escolha um arquivo." };
+  }
+  if (file.size > MAX_BYTES) return { ok: false, error: "Arquivo maior que 10 MB." };
   if (!file.name.toLowerCase().endsWith(".pdf")) {
-    throw new Error("Por enquanto só extrato em PDF da Regions.");
+    return { ok: false, error: "Por enquanto só extrato em PDF da Regions." };
   }
 
-  const statement = await parseRegionsStatement(new Uint8Array(await file.arrayBuffer()));
+  let statement;
+  try {
+    statement = await parseRegionsStatement(new Uint8Array(await file.arrayBuffer()));
+  } catch (err) {
+    if (err instanceof StatementParseError) return { ok: false, error: err.message };
+    throw err;
+  }
+
   const verification = verifyStatement(statement);
 
   // O nome do arquivo é registrado, não o conteúdo: o PDF não é guardado
@@ -129,7 +144,14 @@ export async function importStatement(formData: FormData): Promise<ImportResult>
 
   revalidatePath("/importar");
 
-  return { importId, matches: verification.matches, count: rows.length, duplicates, message };
+  return {
+    ok: true,
+    importId,
+    matches: verification.matches,
+    count: rows.length,
+    duplicates,
+    message,
+  };
 }
 
 /** Transforma o que está marcado na revisão em transações de verdade. */
