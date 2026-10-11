@@ -3,6 +3,7 @@ import { CalendarDays, TrendingDown, TrendingUp, WalletCards } from "lucide-reac
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { buildCashFlowInsight, getCashFlowProjection } from "@/lib/cash-flow";
+import { accountScope } from "@/lib/visibility";
 import { formatCents } from "@/lib/money";
 import { ProjectionChart } from "./projection-chart";
 import { ImpactsCard, InsightCard, UpcomingEventsCard } from "./support-cards";
@@ -28,7 +29,7 @@ export default async function FluxoDeCaixaPage({
     PERIODS.find((p) => p.days === parsedDays) ?? PERIODS.find((p) => p.days === DEFAULT_DAYS)!;
   const horizonDays = selectedPeriod.days;
 
-  const { householdId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
 
   const {
@@ -43,7 +44,12 @@ export default async function FluxoDeCaixaPage({
     netResult,
     upcomingEvents,
     highlightedEventIds,
-  } = await getCashFlowProjection(supabase, householdId, horizonDays);
+  } = await getCashFlowProjection(
+    supabase,
+    householdId,
+    horizonDays,
+    await accountScope(supabase, householdId, memberId, "balance"),
+  );
 
   const insight = buildCashFlowInsight({
     points,

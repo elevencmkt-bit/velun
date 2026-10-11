@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AccountScope } from "@/lib/visibility";
 import { getAccountBalances } from "@/lib/balances";
 
 export type CashFlowEvent = {
@@ -49,17 +50,19 @@ export async function getCashFlowProjection(
   supabase: SupabaseClient,
   householdId: string,
   horizonDays: number,
+  scope: AccountScope,
 ) {
   const today = new Date(new Date().toDateString());
   const horizon = addDays(today, horizonDays);
 
   const [balances, { data: pending }] = await Promise.all([
-    getAccountBalances(supabase, householdId),
+    getAccountBalances(supabase, householdId, scope),
     supabase
       .from("transactions")
       .select("id, date, description, amount_cents, direction, category:categories(name)")
       .eq("household_id", householdId)
       .eq("status", "pending")
+      .in("account_id", scope.ids)
       .gte("date", toISO(today))
       .lte("date", toISO(horizon))
       .order("date", { ascending: true }),

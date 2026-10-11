@@ -5,6 +5,7 @@
 
 export type MonthTransaction = {
   id: string;
+  account_id: string;
   date: string;
   amount_cents: number;
   direction: "in" | "out";

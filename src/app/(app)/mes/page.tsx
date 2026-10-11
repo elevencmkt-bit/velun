@@ -14,6 +14,7 @@ import {
   parseMonthParam,
 } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
+import { accountScope, scopeLabel, type AccountScope } from "@/lib/visibility";
 import {
   excludeTransfers,
   groupExpensesByCategory,
@@ -51,12 +52,16 @@ type PendingPreviewRow = {
 async function fetchPendingPreview(
   supabase: Awaited<ReturnType<typeof createClient>>,
   householdId: string,
+  scope: AccountScope,
 ): Promise<PendingPreviewRow[]> {
+  if (scope.ids.length === 0) return [];
+
   const { data, error } = await supabase
     .from("transactions")
     .select("id, date, description, amount_cents, direction")
     .eq("household_id", householdId)
     .eq("status", "pending")
+    .in("account_id", scope.ids)
     .order("date", { ascending: true })
     .limit(PENDING_PREVIEW_LIMIT);
 
@@ -141,7 +146,7 @@ export default async function MesPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const { householdId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
   const { month } = await searchParams;
   const { year, monthIndex } = parseMonthParam(month);
@@ -161,15 +166,25 @@ export default async function MesPage({
     .limit(1);
   const householdIsEmpty = !accounts || accounts.length === 0;
 
+  // Três escopos nesta tela. Os totais e o donut agregam por categoria, o
+  // saldo/fluxo aceita até `balance_only`, e o extrato só mostra conta
+  // `shared`. Como transactionsScope é subconjunto de categoriesScope, as
+  // transações recentes saem de `current` filtrado — sem segunda query.
+  const [categoriesScope, balanceScope, transactionsScope] = await Promise.all([
+    accountScope(supabase, householdId, memberId, "categories"),
+    accountScope(supabase, householdId, memberId, "balance"),
+    accountScope(supabase, householdId, memberId, "transactions"),
+  ]);
+
   const [currentRows, prevRows, trendRows, colorMap, cashFlow, pendingPreview, pendingCurrentRows] =
     await Promise.all([
-      fetchMonthTransactions(supabase, householdId, start, end),
-      fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end),
-      fetchMonthTransactions(supabase, householdId, trendRangeStart, end),
+      fetchMonthTransactions(supabase, householdId, start, end, categoriesScope),
+      fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, categoriesScope),
+      fetchMonthTransactions(supabase, householdId, trendRangeStart, end, categoriesScope),
       getCategoryColorMap(supabase, householdId),
-      getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS),
-      fetchPendingPreview(supabase, householdId),
-      fetchMonthTransactions(supabase, householdId, start, end, "pending"),
+      getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS, balanceScope),
+      fetchPendingPreview(supabase, householdId, transactionsScope),
+      fetchMonthTransactions(supabase, householdId, start, end, categoriesScope, "pending"),
     ]);
 
   const current = excludeTransfers(currentRows);
@@ -196,9 +211,15 @@ export default async function MesPage({
     color: (colorMap.get(slice.name) ?? MUTED_CATEGORY_COLOR).fg,
   }));
 
-  const recentTransactions = [...current]
+  const visibleIds = new Set(transactionsScope.ids);
+  const recentTransactions = current
+    .filter((row) => visibleIds.has(row.account_id))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, RECENT_TRANSACTIONS_LIMIT);
+
+  // Rótulo de escopo: quando a soma é parcial, o card diz quantas contas
+  // ficaram de fora — nunca qual nem quanto.
+  const totalsScopeLabel = scopeLabel(categoriesScope);
 
   const trendPoints: TrendPoint[] = [];
   for (let i = TREND_MONTHS - 1; i >= 0; i--) {
@@ -287,6 +308,9 @@ export default async function MesPage({
         <Card>
           <CardHeader>
             <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
+            {totalsScopeLabel ? (
+              <p className="text-xs text-(--text-muted)">{totalsScopeLabel}</p>
+            ) : null}
           </CardHeader>
           <CardContent>
             <MonthDonut slices={slices} compact currency={currency} />
