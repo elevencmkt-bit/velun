@@ -24,9 +24,10 @@ const NAV = [
   { href: "/relatorios", label: "Relatórios", icon: PieChart },
   { href: "/contas", label: "Contas", icon: Wallet },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
+  { href: "/importar", label: "Importar", icon: Upload },
 ];
 
-const DISABLED_NAV = [{ label: "Importar", icon: Upload }];
+const DISABLED_NAV: { label: string; icon: typeof Upload }[] = [];
 
 export function Sidebar() {
   const pathname = usePathname();
