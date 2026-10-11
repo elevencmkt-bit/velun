@@ -2,6 +2,7 @@ import { Banknote, CreditCard, LineChart, PiggyBank, Wallet } from "lucide-react
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getAccountBalances } from "@/lib/balances";
+import { accountScope } from "@/lib/visibility";
 import { formatCents } from "@/lib/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,7 @@ const ACCOUNT_TYPE_ICONS: Record<string, typeof Wallet> = {
 };
 
 export default async function ContasPage() {
-  const { householdId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
 
   const [{ data: accounts }, balances] = await Promise.all([
@@ -35,7 +36,9 @@ export default async function ContasPage() {
       .eq("household_id", householdId)
       .order("sort_order")
       .order("name"),
-    getAccountBalances(supabase, householdId),
+    accountScope(supabase, householdId, memberId, "balance").then((scope) =>
+      getAccountBalances(supabase, householdId, scope),
+    ),
   ]);
 
   const activeAccounts = (accounts ?? []).filter((a) => !a.is_archived);

@@ -7,6 +7,7 @@ import { formatCents } from "@/lib/money";
 import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { monthRange, shiftMonth, monthParam, monthLabel, shortMonthLabel, parseMonthParam } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
+import { accountScope } from "@/lib/visibility";
 import {
   buildReportInsight,
   dailySeries,
@@ -65,7 +66,7 @@ export default async function RelatoriosPage({
 }: {
   searchParams: Promise<{ month?: string; view?: string }>;
 }) {
-  const { householdId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
   const { month, view: viewParam } = await searchParams;
   const view: ReportView = viewParam === "a-vencer" ? "a-vencer" : "realizado";
@@ -79,9 +80,17 @@ export default async function RelatoriosPage({
 
   const status = view === "a-vencer" ? "pending" : "cleared";
 
+  // Relatórios agregam por categoria, então entram as contas pessoais a
+  // partir de `categories_only`. Uma promise só, reusada pelas duas buscas.
+  const categoriesScope = accountScope(supabase, householdId, memberId, "categories");
+
   const [rows, prevRows, colorMap] = await Promise.all([
-    fetchMonthTransactions(supabase, householdId, start, end, status),
-    fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, status),
+    categoriesScope.then((scope) =>
+      fetchMonthTransactions(supabase, householdId, start, end, scope, status),
+    ),
+    categoriesScope.then((scope) =>
+      fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, scope, status),
+    ),
     getCategoryColorMap(supabase, householdId),
   ]);
 
