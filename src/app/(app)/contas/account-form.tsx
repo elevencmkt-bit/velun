@@ -30,12 +30,24 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   investment: "Investimento",
 };
 
+// Cada nível é descrito pelo que o OUTRO membro vê, não pelo nome
+// técnico. A pessoa está decidindo quanto mostrar, então é esse o texto
+// que importa na hora da escolha.
+const VISIBILITY_LABELS: Record<string, string> = {
+  hidden: "Ninguém mais vê esta conta",
+  balance_only: "Só o saldo aparece",
+  categories_only: "Saldo e categorias, sem os lançamentos",
+  shared: "Tudo visível, como uma conta do casal",
+};
+
 export type EditableAccount = {
   id: string;
   name: string;
   type: string;
   institution: string | null;
   opening_balance_cents: number;
+  owner_id: string | null;
+  visibility: string;
 };
 
 export function AccountForm({ account }: { account?: EditableAccount }) {
@@ -45,6 +57,12 @@ export function AccountForm({ account }: { account?: EditableAccount }) {
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
+
+  // Controlado porque o seletor de nível só aparece quando a conta é
+  // pessoal — conta do casal não tem o que escolher.
+  const [ownership, setOwnership] = useState(
+    account?.owner_id ? "personal" : "joint",
+  );
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,6 +100,53 @@ export function AccountForm({ account }: { account?: EditableAccount }) {
           <DialogTitle>{isEdit ? "Editar conta" : "Nova conta"}</DialogTitle>
         </DialogHeader>
         <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ownership">De quem é esta conta</Label>
+            <Select
+              name="ownership"
+              value={ownership}
+              onValueChange={setOwnership}
+              required
+            >
+              <SelectTrigger id="ownership">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="joint">Conta do casal</SelectItem>
+                <SelectItem value="personal">Conta pessoal (minha)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-(--text-muted)">
+              {ownership === "joint"
+                ? "Tudo que entra e sai fica visível para os dois."
+                : "Só você lança nela. Você escolhe abaixo o que aparece no painel do casal."}
+            </p>
+          </div>
+
+          {ownership === "personal" ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="visibility">O que o outro membro vê</Label>
+              <Select
+                name="visibility"
+                defaultValue={
+                  account?.owner_id ? account.visibility : "categories_only"
+                }
+                required
+              >
+                <SelectTrigger id="visibility">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(VISIBILITY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Nome</Label>
             <Input
