@@ -62,7 +62,7 @@ export function ProfileForm({
             {initial}
           </div>
         )}
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col items-start gap-1.5">
           <Button
             type="button"
             variant="secondary"
@@ -71,7 +71,7 @@ export function ProfileForm({
           >
             Trocar foto
           </Button>
-          <span className="text-metadata">PNG, JPG ou WEBP, até 2MB.</span>
+          <span className="text-metadata">PNG, JPG ou WEBP, até 2 MB</span>
         </div>
         <input
           ref={fileInputRef}
@@ -83,16 +83,17 @@ export function ProfileForm({
         />
       </div>
 
-      <div className="flex flex-col gap-2 max-w-xs">
+      <div className="flex flex-col gap-2">
         <Label htmlFor="name">Nome</Label>
-        <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <div className="flex gap-2.5">
+          <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required className="min-w-0 flex-1" />
+          <Button type="submit" disabled={isPending} className="shrink-0">
+            {isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
       </div>
 
       {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
-
-      <Button type="submit" disabled={isPending} className="w-fit">
-        {isPending ? "Salvando..." : "Salvar perfil"}
-      </Button>
     </form>
   );
 }

@@ -52,7 +52,7 @@ export function HouseholdSettingsForm({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-1 flex-col gap-5">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="flex flex-col gap-2">
           <Label>País</Label>
@@ -115,7 +115,7 @@ export function HouseholdSettingsForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs leading-relaxed text-(--text-muted)">
           {currency !== initialCurrency
             ? "Trocar a moeda não converte nada: os valores continuam os mesmos, só muda o símbolo."

@@ -6,7 +6,7 @@ import { resetAllData, resetTransactionsData } from "@/lib/actions/household";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChevronDown, TriangleAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,42 +87,57 @@ function ResetAction({
 }
 
 export function DangerZone() {
+  const [open, setOpen] = useState(false);
+  // Fechada por padrão e só com contorno: é o que menos se usa na página.
   return (
-    <Card className="border-(--expense)/30">
-      <CardContent className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-card-title">Zona de risco</h2>
-          <p className="text-metadata">Essas ações apagam dados de verdade e não podem ser desfeitas.</p>
-        </div>
+    <section className="rounded-[20px] border border-[#E4E7EC]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-5 py-4 text-left md:px-6"
+      >
+        <TriangleAlert className="h-[18px] w-[18px] shrink-0 text-(--expense-dark)" />
+        <span className="text-sm font-semibold text-(--text-primary)">Zona de risco</span>
+        <span className="truncate text-[13px] text-(--text-light) max-sm:hidden">
+          Apagar transações ou começar do zero
+        </span>
+        <ChevronDown
+          className={`ml-auto h-[18px] w-[18px] shrink-0 text-(--text-muted) transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-(--border-soft) pb-5">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-(--text-primary)">Apagar transações e recorrências</span>
-            <span className="text-metadata">Mantém contas e categorias cadastradas.</span>
+      {open ? (
+        <div className="flex flex-col px-5 pb-5 md:px-6">
+          <p className="text-metadata pb-3">Essas ações apagam dados de verdade e não podem ser desfeitas.</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-soft) py-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-(--text-primary)">Apagar transações e recorrências</span>
+              <span className="text-metadata">Mantém contas e categorias cadastradas.</span>
+            </div>
+            <ResetAction
+              buttonLabel="Apagar transações"
+              title="Apagar todas as transações?"
+              description="Todo o histórico de lançamentos e recorrências será removido. Contas e categorias continuam como estão. Essa ação não pode ser desfeita."
+              confirmPhrase="EXCLUIR"
+              action={resetTransactionsData}
+            />
           </div>
-          <ResetAction
-            buttonLabel="Apagar transações"
-            title="Apagar todas as transações?"
-            description="Todo o histórico de lançamentos e recorrências será removido. Contas e categorias continuam como estão. Essa ação não pode ser desfeita."
-            confirmPhrase="EXCLUIR"
-            action={resetTransactionsData}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-(--text-primary)">Resetar tudo</span>
-            <span className="text-metadata">Apaga transações, recorrências, categorias e contas.</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-soft) pt-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-(--text-primary)">Resetar tudo</span>
+              <span className="text-metadata">Apaga transações, recorrências, categorias e contas.</span>
+            </div>
+            <ResetAction
+              buttonLabel="Resetar tudo"
+              title="Apagar todos os dados da casa?"
+              description="Transações, recorrências, categorias e contas serão apagadas — a casa volta a ficar como nova. Login e membros continuam existindo. Essa ação não pode ser desfeita."
+              confirmPhrase="EXCLUIR TUDO"
+              action={resetAllData}
+            />
           </div>
-          <ResetAction
-            buttonLabel="Resetar tudo"
-            title="Apagar todos os dados da casa?"
-            description="Transações, recorrências, categorias e contas serão apagadas — a casa volta a ficar como nova. Login e membros continuam existindo. Essa ação não pode ser desfeita."
-            confirmPhrase="EXCLUIR TUDO"
-            action={resetAllData}
-          />
         </div>
-      </CardContent>
-    </Card>
+      ) : null}
+    </section>
   );
 }

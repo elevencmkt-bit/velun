@@ -1,11 +1,10 @@
-import { ChartNoAxesColumnIncreasing, Folder, Plus, UserRoundCheck, UsersRound } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, Folder, Plus, UserRoundCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getCategoryColorMap } from "@/lib/category-colors";
 import { Card, CardContent } from "@/components/ui/card";
 import { ProfileForm } from "./profile-form";
-import { CategoryRow } from "./category-row";
-import { NewCategoryDialog } from "./new-category-dialog";
+import { CategoriesPanel } from "./categories-panel";
 import { DangerZone } from "./danger-zone";
 import { InviteManager } from "./invite-manager";
 import { HouseholdSettingsForm } from "./household-settings-form";
@@ -16,30 +15,39 @@ const BENEFITS = [
   { icon: UserRoundCheck, label: "Tomar decisões em conjunto", bg: "#FFF0F3", fg: "#F04469" },
 ];
 
-function MemberAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
+function MemberRow({
+  name,
+  avatarUrl,
+  note,
+}: {
+  name: string;
+  avatarUrl: string | null;
+  note: string;
+}) {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex items-center gap-3 rounded-[14px] bg-white/80 p-2.5">
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={avatarUrl}
-          alt={name}
-          className="h-[42px] w-[42px] shrink-0 rounded-full border-2 border-(--bg-surface) object-cover"
-          style={{ boxShadow: "0 0 0 1px var(--border-soft), 0 3px 8px rgba(16,24,40,.08)" }}
-        />
+        <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
       ) : (
         <div
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border-2 border-(--bg-surface) text-sm font-semibold text-white"
-          style={{
-            background: "var(--sidebar-active-gradient)",
-            boxShadow: "0 0 0 1px var(--border-soft), 0 3px 8px rgba(16,24,40,.08)",
-          }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+          style={{ background: "var(--sidebar-active-gradient)" }}
         >
           {initial}
         </div>
       )}
-      <span className="max-w-[64px] truncate text-[11px] font-semibold text-(--text-primary)">{name}</span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-(--text-primary)">{name}</div>
+        <div className="text-xs text-(--text-muted)">{note}</div>
+      </div>
+      <span
+        className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
+        style={{ backgroundColor: "var(--income-soft)", color: "var(--income-dark)" }}
+      >
+        Ativo
+      </span>
     </div>
   );
 }
@@ -101,95 +109,83 @@ export default async function ConfiguracoesPage() {
       }
     : null;
 
+  const toItem = (c: (typeof categories)[number]) => ({
+    category: c,
+    color: colorMap.get(c.name)?.fg ?? null,
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-page-title">Configurações</h1>
-        <p className="text-page-subtitle">Sua casa, seu perfil, quem divide a casa com você e as categorias.</p>
+        <p className="text-page-subtitle">Você, sua casa, quem divide com você e as categorias.</p>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          <div>
-            <h2 className="text-card-title">Sua casa</h2>
-            <p className="mt-1 text-sm text-(--text-muted)">País, fuso e moeda valem pra todo mundo da casa.</p>
-          </div>
-          <HouseholdSettingsForm country={country} timezone={timezone} currency={currency} />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <Card className="lg:col-span-5">
+          <CardContent className="flex flex-col gap-5">
+            <div>
+              <h2 className="text-card-title">Perfil</h2>
+              <p className="mt-1 text-sm text-(--text-muted)">Como você aparece pra quem divide a casa.</p>
+            </div>
+            <ProfileForm name={member?.display_name ?? ""} avatarUrl={member?.avatar_url ?? null} />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          <h2 className="text-card-title">Perfil</h2>
-          <ProfileForm name={member?.display_name ?? ""} avatarUrl={member?.avatar_url ?? null} />
-        </CardContent>
-      </Card>
+        <Card className="lg:col-span-7">
+          <CardContent className="flex flex-1 flex-col gap-5">
+            <div>
+              <h2 className="text-card-title">Sua casa</h2>
+              <p className="mt-1 text-sm text-(--text-muted)">Vale pra todo mundo da casa. A moeda nunca é convertida.</p>
+            </div>
+            <HouseholdSettingsForm country={country} timezone={timezone} currency={currency} />
+          </CardContent>
+        </Card>
+      </div>
 
+      {/* Pessoas da casa: o diferencial do Velun, por isso o degradê azul. */}
       <section
-        className="relative overflow-hidden rounded-[20px]"
+        className="overflow-hidden rounded-[20px]"
         style={{
           background:
             "radial-gradient(circle at 38% 15%, rgba(91,108,255,0.10), transparent 34%), linear-gradient(135deg, #FFFFFF 0%, #F9FAFF 58%, #F4F6FF 100%)",
           boxShadow: "var(--shadow-card)",
         }}
       >
-        <div className="grid grid-cols-1 gap-6 p-5 pb-5 md:gap-7 md:p-7 md:[grid-template-columns:minmax(0,1fr)_1px_minmax(460px,1.12fr)]">
-          {/* COLUNA ESQUERDA */}
+        <div className="grid grid-cols-1 gap-6 p-5 md:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-10">
           <div className="min-w-0">
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
-                style={{ background: "linear-gradient(135deg, #E9EDFF 0%, #DDE4FF 100%)" }}
-              >
-                <UsersRound className="h-5 w-5" style={{ color: "var(--primary)" }} />
-              </div>
-              <div>
-                <h3 className="mb-1.5 text-[18px] leading-tight font-bold tracking-tight text-(--text-primary)">
-                  Orçamento compartilhado
-                </h3>
-                <p className="max-w-[460px] text-sm leading-relaxed text-(--text-secondary)">
-                  Convide quem divide a casa com você. Contas do casal ficam abertas pros dois; nas
-                  suas contas pessoais, você escolhe o que o outro vê — nada, só o saldo, os gastos
-                  por categoria ou tudo.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap items-start gap-3">
-              {members.map((m) => (
-                <MemberAvatar key={m.id} name={m.display_name} avatarUrl={m.avatar_url} />
+            <h2 className="text-card-title">Pessoas da casa</h2>
+            <p className="mt-1 max-w-[460px] text-sm leading-relaxed text-(--text-muted)">
+              Contas do casal ficam abertas pros dois. Nas suas contas pessoais, você escolhe o que o
+              outro vê — nada, só o saldo, os gastos por categoria ou tudo.
+            </p>
+            <div className="mt-5 flex flex-col gap-2.5">
+              {members.map((m, i) => (
+                <MemberRow
+                  key={m.id}
+                  name={m.display_name}
+                  avatarUrl={m.avatar_url}
+                  note={[m.id === memberId ? "Você" : null, i === 0 ? "criou a casa" : null].filter(Boolean).join(" · ") || "Na casa"}
+                />
               ))}
-              <button
-                type="button"
-                aria-label="Adicionar membro"
-                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border border-dashed transition-colors"
-                style={{ borderColor: "#B9C2DF", color: "var(--primary)", backgroundColor: "rgba(255,255,255,.65)" }}
+              <a
+                href="#convite"
+                className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-[#D0D5DD] p-2.5 text-(--primary) transition-colors hover:bg-white/60"
               >
-                <Plus className="h-4 w-4" />
-              </button>
-              <span
-                className="ml-1 inline-flex h-[42px] w-fit items-center gap-1.5 rounded-full px-2.5 text-xs font-medium"
-                style={{ backgroundColor: "var(--income-soft)", color: "#297A50" }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "var(--income)" }} />
-                {members.length} {members.length === 1 ? "membro ativo" : "membros ativos"}
-              </span>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--primary-light)">
+                  <Plus className="h-[18px] w-[18px]" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold">Convidar alguém</span>
+                  <span className="block text-xs text-(--text-muted)">A pessoa entra na casa com a conta dela</span>
+                </span>
+              </a>
             </div>
           </div>
 
-          {/* DIVISOR */}
-          <div
-            className="hidden md:block"
-            style={{
-              background: "linear-gradient(to bottom, transparent, #E0E5F2 12%, #E0E5F2 88%, transparent)",
-            }}
-          />
-
-          {/* COLUNA DIREITA */}
           <InviteManager pendingInvite={pendingInvite} />
         </div>
 
-        {/* BENEFÍCIOS */}
         <div
           className="grid grid-cols-1 border-t sm:grid-cols-3"
           style={{ borderColor: "rgba(230,234,242,.85)", backgroundColor: "rgba(255,255,255,.35)" }}
@@ -197,59 +193,25 @@ export default async function ConfiguracoesPage() {
           {BENEFITS.map((benefit, i) => (
             <div
               key={benefit.label}
-              className={`flex min-h-[58px] items-center justify-center gap-2.5 border-[rgba(230,234,242,.8)] px-5 py-2.5 sm:justify-start ${
+              className={`flex min-h-[58px] items-center gap-3 border-[rgba(230,234,242,.8)] px-5 py-3 md:px-7 ${
                 i > 0 ? "border-t sm:border-t-0 sm:border-l" : ""
               }`}
             >
               <div
-                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]"
+                className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px]"
                 style={{ backgroundColor: benefit.bg, color: benefit.fg }}
               >
-                <benefit.icon className="h-3.5 w-3.5" />
+                <benefit.icon className="h-4 w-4" />
               </div>
-              <span className="text-[11px] leading-tight text-(--text-secondary)">{benefit.label}</span>
+              <span className="text-[13px] leading-tight text-(--text-secondary)">{benefit.label}</span>
             </div>
           ))}
         </div>
       </section>
 
       <Card>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-card-title">Categorias</h2>
-            <NewCategoryDialog />
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div className="flex flex-col gap-1">
-              <span className="text-metadata mb-1">Despesas</span>
-              {expenseCategories.length === 0 ? (
-                <p className="text-sm text-(--text-muted)">Nenhuma categoria de despesa ainda.</p>
-              ) : (
-                expenseCategories.map((category) => (
-                  <CategoryRow
-                    key={category.id}
-                    category={category}
-                    effectiveColor={colorMap.get(category.name)?.fg ?? null}
-                  />
-                ))
-              )}
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-metadata mb-1">Receitas</span>
-              {incomeCategories.length === 0 ? (
-                <p className="text-sm text-(--text-muted)">Nenhuma categoria de receita ainda.</p>
-              ) : (
-                incomeCategories.map((category) => (
-                  <CategoryRow
-                    key={category.id}
-                    category={category}
-                    effectiveColor={colorMap.get(category.name)?.fg ?? null}
-                  />
-                ))
-              )}
-            </div>
-          </div>
+        <CardContent>
+          <CategoriesPanel expense={expenseCategories.map(toItem)} income={incomeCategories.map(toItem)} />
         </CardContent>
       </Card>
 
