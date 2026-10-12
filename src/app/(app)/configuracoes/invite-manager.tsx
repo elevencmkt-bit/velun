@@ -69,23 +69,33 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <h4 className="text-sm font-bold text-(--text-primary)">Convide alguém para o seu orçamento</h4>
+    <div
+      id="convite"
+      className="flex scroll-mt-24 flex-col gap-3 rounded-[18px] bg-white/75 p-5 shadow-[0_1px_3px_rgba(16,24,40,.05)] md:p-6"
+    >
+      <h3 className="text-sm font-bold text-(--text-primary)">Convite</h3>
 
-      <form onSubmit={onInvite} className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="relative">
-          <Mail className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-1/2 text-(--text-light)" />
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="E-mail da pessoa (só ele vai poder usar o link)"
-            className="h-[42px] pl-9 text-[13px]"
-          />
+      <form onSubmit={onInvite} className="flex flex-col gap-2">
+        <label htmlFor="invite-email" className="text-xs font-semibold text-(--text-secondary)">
+          Email da pessoa
+        </label>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="relative">
+            <Mail className="pointer-events-none absolute top-1/2 left-3.5 h-3.5 w-3.5 -translate-y-1/2 text-(--text-light)" />
+            <Input
+              id="invite-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="nome@email.com"
+              className="h-11 pl-9"
+            />
+          </div>
+          <Button type="submit" disabled={isPending} className="h-11 shrink-0">
+            {isPending ? "Gerando..." : "Gerar convite"}
+          </Button>
         </div>
-        <Button type="submit" disabled={isPending} className="h-[42px] shrink-0">
-          {isPending ? "Gerando..." : "Gerar convite"}
-        </Button>
+        <span className="text-xs text-(--text-light)">Só esse email vai poder usar o link.</span>
       </form>
 
       {invited ? (
@@ -95,35 +105,22 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
         </p>
       ) : null}
 
-      <div
-        className="mt-1 flex flex-col items-start gap-3 rounded-xl border p-2.5 sm:flex-row sm:items-center sm:justify-between"
-        style={{ borderColor: "#E0E5F0", backgroundColor: "rgba(255,255,255,0.62)" }}
-      >
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[9px]"
-            style={{ backgroundColor: "var(--primary-light)", color: "var(--primary)" }}
-          >
-            <Link2 className="h-4 w-4" />
-          </div>
-          <div className="flex flex-col">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-(--text-primary)">
-              Ou compartilhe um link de convite
-              {pendingInvite?.email ? (
-                <span
-                  className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                  style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
-                >
-                  Pendente
-                </span>
-              ) : null}
-            </span>
-            <span className="text-[11px] text-(--text-light)">
-              {pendingInvite?.email
-                ? `Convite pendente — só ${pendingInvite.email} pode usar o link.`
-                : "Qualquer pessoa com o link pode se juntar."}
-            </span>
-          </div>
+      <div className="mt-1 flex flex-col items-start gap-3 border-t border-(--border-soft) pt-4 sm:flex-row sm:items-center">
+        <Link2 className="h-[18px] w-[18px] shrink-0 text-(--text-muted) max-sm:hidden" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-center gap-1.5 text-[13px] text-(--text-secondary)">
+            {pendingInvite?.email
+              ? `Convite pendente — só ${pendingInvite.email} pode usar o link.`
+              : "Ou mande um link que qualquer pessoa pode usar"}
+            {pendingInvite?.email ? (
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
+              >
+                Pendente
+              </span>
+            ) : null}
+          </span>
         </div>
         <Button
           type="button"

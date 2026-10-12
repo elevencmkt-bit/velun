@@ -85,17 +85,28 @@ export function CategoryRow({
     });
   }
 
-  return (
-    <div className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 last:border-0">
-      <div
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
-        style={{ backgroundColor: effectiveColor ?? "var(--text-light)" }}
-      >
-        {createElement(RowIcon, { className: "h-3.5 w-3.5" })}
-      </div>
-      <span className="text-table-body text-(--text-primary)">{category.name}</span>
+  const tint = effectiveColor ?? "var(--text-light)";
 
-      <span className="ml-auto flex items-center gap-0.5">
+  // Bloco da categoria. No computador, editar e apagar aparecem ao passar
+  // o mouse; no celular (sem mouse) ficam sempre à mostra, discretos.
+  return (
+    <div className="group relative flex h-12 min-w-0 items-center gap-2.5 rounded-[14px] bg-[#F7F8FA] pr-1.5 pl-1.5 transition-colors hover:bg-[#F0F2F6]">
+      <button
+        type="button"
+        onClick={() => setEditOpen(true)}
+        className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none"
+        aria-label={`Editar ${category.name}`}
+      >
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
+          style={{ backgroundColor: `color-mix(in srgb, ${tint} 13%, transparent)`, color: tint }}
+        >
+          {createElement(RowIcon, { className: "h-[17px] w-[17px]" })}
+        </span>
+        <span className="truncate text-[14px] font-semibold text-(--text-primary)">{category.name}</span>
+      </button>
+
+      <span className="flex shrink-0 items-center opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
         <Dialog
           open={editOpen}
           onOpenChange={(next) => {
@@ -104,7 +115,7 @@ export function CategoryRow({
           }}
         >
           <DialogTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Editar categoria">
+            <Button variant="ghost" size="icon-sm" aria-label="Editar categoria" className="max-md:hidden">
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           </DialogTrigger>
@@ -141,7 +152,7 @@ export function CategoryRow({
 
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Excluir categoria">
+            <Button variant="ghost" size="icon-sm" aria-label="Excluir categoria" className="text-(--text-light)">
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </AlertDialogTrigger>
