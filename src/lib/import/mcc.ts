@@ -142,12 +142,29 @@ export function findMccInDescription(description: string): string | null {
  * Resolve o id da categoria do household a partir do MCC. Devolve null
  * quando o MCC não é conhecido OU quando o household não tem categoria
  * com aquele nome — melhor deixar sem sugestão do que sugerir errado.
+ *
+ * `direction` não é opcional de propósito. Todo MCC desta tabela aponta
+ * pra categoria de despesa, mas estorno de cartão vem com o MESMO
+ * código e direção invertida ("Card Credit Manus Ai 5734 ..."). Sem o
+ * filtro, um reembolso de $20 entrava classificado como Assinaturas, o
+ * seletor da revisão ficava em branco (ele só lista categoria da
+ * direção certa, e não encontrava a que estava marcada) e o relatório
+ * passava a mostrar Assinaturas como receita.
+ *
+ * Estorno fica sem sugestão, que é o certo: não existe código de
+ * categoria que diga de onde o dinheiro está voltando.
  */
 export function suggestCategoryId(
   mcc: string | null,
-  categoriesByName: Map<string, string>,
+  categories: Map<string, { id: string; kind: string }>,
+  direction: "in" | "out",
 ): string | null {
   const name = categoryNameForMcc(mcc);
   if (!name) return null;
-  return categoriesByName.get(name.toLowerCase()) ?? null;
+
+  const category = categories.get(name.toLowerCase());
+  if (!category) return null;
+
+  const wanted = direction === "in" ? "income" : "expense";
+  return category.kind === wanted ? category.id : null;
 }

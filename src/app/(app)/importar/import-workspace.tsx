@@ -72,6 +72,53 @@ function shortDate(iso: string) {
   return `${d}/${m}`;
 }
 
+/**
+ * Seletor de categoria de uma linha da revisão.
+ *
+ * As opções são filtradas pela direção da linha — categoria de despesa
+ * não serve pra entrada. E se a categoria marcada não estiver entre
+ * elas, o seletor mostra "Sem categoria" em vez de ficar em branco:
+ * seletor vazio é pior que seletor errado, porque esconde que tem algo
+ * marcado e quem revisa nem sabe que precisa mexer.
+ */
+function CategoryCell({
+  row,
+  categories,
+  disabled,
+  onChange,
+}: {
+  row: Row;
+  categories: Category[];
+  disabled: boolean;
+  onChange: (categoryId: string | null) => void;
+}) {
+  const options = categories.filter((c) =>
+    row.direction === "in" ? c.kind === "income" : c.kind === "expense",
+  );
+
+  const selected = options.some((c) => c.id === row.categoryId) ? row.categoryId : null;
+
+  return (
+    <Select
+      value={selected ?? NO_CATEGORY}
+      disabled={disabled}
+      onValueChange={(value) => onChange(value === NO_CATEGORY ? null : value)}
+    >
+      <SelectTrigger className="h-8">
+        <SelectValue placeholder="Sem categoria" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
+        {options.map((c) => (
+          <SelectItem key={c.id} value={c.id}>
+            {c.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function ImportWorkspace({
   accounts,
   categories,
@@ -437,31 +484,12 @@ export function ImportWorkspace({
                     </div>
                   </td>
                   <td className="px-2 py-2">
-                    <Select
-                      value={row.categoryId ?? NO_CATEGORY}
+                    <CategoryCell
+                      row={row}
+                      categories={categories}
                       disabled={isPending}
-                      onValueChange={(value) =>
-                        run(() =>
-                          setStagedCategory(row.id, value === NO_CATEGORY ? null : value),
-                        )
-                      }
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Sem categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
-                        {categories
-                          .filter((c) =>
-                            row.direction === "in" ? c.kind === "income" : c.kind === "expense",
-                          )
-                          .map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(categoryId) => run(() => setStagedCategory(row.id, categoryId))}
+                    />
                   </td>
                   <td
                     className="px-4 py-2 text-right tabular-nums"
