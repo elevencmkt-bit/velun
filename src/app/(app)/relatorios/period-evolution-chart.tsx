@@ -34,7 +34,7 @@ function ChartTooltip({
       className="min-w-[170px] rounded-lg border p-3 text-xs shadow-lg"
       style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 4px 14px rgba(16,24,40,.08)" }}
     >
-      <div className="mb-1.5 font-semibold text-(--text-primary) capitalize">{dateLabel}</div>
+      <div className="mb-1.5 font-semibold text-(--text-primary) first-letter:uppercase">{dateLabel}</div>
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3">
           <span className="text-(--text-secondary)">Receitas</span>

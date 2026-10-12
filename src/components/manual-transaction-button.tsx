@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NEW_TRANSACTION_EVENT } from "@/components/nav-items";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; kind: "income" | "expense" };
@@ -63,8 +64,16 @@ export function ManualTransactionButton({
         setOpen(true);
       }
     }
+    // O "+" da barra de baixo do celular abre este mesmo formulário.
+    function onOpenRequest() {
+      setOpen(true);
+    }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener(NEW_TRANSACTION_EVENT, onOpenRequest);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(NEW_TRANSACTION_EVENT, onOpenRequest);
+    };
   }, []);
 
   const categoriesForDirection = categories.filter(

@@ -59,10 +59,10 @@ export default async function ContasPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Contas</h1>
-          <p className="text-page-subtitle">Saldo por conta, derivado das transações cleared.</p>
+          <p className="text-page-subtitle">Saldo de cada conta, a partir dos lançamentos confirmados.</p>
         </div>
         <AccountForm />
       </div>
@@ -88,7 +88,7 @@ export default async function ContasPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
             {accounts.map((account) => {
               const balance = balances.get(account.id) ?? 0;
               const Icon = ACCOUNT_TYPE_ICONS[account.type] ?? Wallet;

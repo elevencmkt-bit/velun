@@ -84,10 +84,10 @@ export function RecurrencesList({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-table-header grid grid-cols-[1fr_84px_64px_96px] gap-3 border-b border-(--border-primary) px-1 pb-1.5">
+      <div className="text-table-header grid grid-cols-[1fr_auto] gap-3 border-b border-(--border-primary) px-1 pb-1.5 sm:grid-cols-[1fr_84px_64px_96px]">
         <span>Lançamento</span>
-        <span>Período</span>
-        <span>Dia</span>
+        <span className="hidden sm:block">Período</span>
+        <span className="hidden sm:block">Dia</span>
         <span className="text-right">Valor</span>
       </div>
 
@@ -95,7 +95,7 @@ export function RecurrencesList({
         {rows.map((row) => (
           <div
             key={row.id}
-            className="grid grid-cols-[1fr_84px_64px_96px] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+            className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB] sm:grid-cols-[1fr_84px_64px_96px]"
           >
             <span className="flex min-w-0 flex-col">
               <span className="text-table-body truncate text-(--text-primary)">
@@ -103,6 +103,12 @@ export function RecurrencesList({
               </span>
               <span className="truncate text-xs text-(--text-muted)">
                 {row.account_name}
+                {/* No celular período e dia saem das colunas e vêm aqui. */}
+                <span className="sm:hidden">
+                  {" · "}
+                  {FREQUENCY_LABELS[row.frequency]}
+                  {row.frequency === "monthly" && row.day_of_month ? `, dia ${row.day_of_month}` : ""}
+                </span>
               </span>
               {movingId === row.id ? (
                 <span className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -154,10 +160,10 @@ export function RecurrencesList({
                 </span>
               ) : null}
             </span>
-            <span className="text-table-body">
+            <span className="text-table-body hidden sm:block">
               {FREQUENCY_LABELS[row.frequency]}
             </span>
-            <span className="text-table-body">
+            <span className="text-table-body hidden sm:block">
               {row.frequency === "monthly" && row.day_of_month
                 ? row.day_of_month
                 : "—"}

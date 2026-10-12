@@ -105,7 +105,7 @@ export default async function ConfiguracoesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-page-title">Configurações</h1>
-        <p className="text-page-subtitle">Seu perfil, categorias e dados do household.</p>
+        <p className="text-page-subtitle">Seu perfil, quem divide a casa com você e as categorias.</p>
       </div>
 
       <Card>
@@ -225,7 +225,7 @@ export default async function ConfiguracoesPage() {
             <NewCategoryDialog />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <span className="text-metadata mb-1">Despesas</span>
               {expenseCategories.length === 0 ? (

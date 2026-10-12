@@ -27,9 +27,25 @@ import type { AccountOption, CategoryOption, TransactionRow } from "./types";
 
 const NO_CATEGORY = "__none__";
 
+// "Hoje", "Ontem", ou "Terça, 30 de setembro" — como se fala da data,
+// não como ela é guardada. O ano só aparece quando não é o atual.
 function formatDayHeading(date: string) {
   const d = new Date(`${date}T00:00:00`);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Hoje";
+  if (diffDays === 1) return "Ontem";
+
+  const label = d.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    ...(d.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  });
+  // "terça-feira, 30 de setembro" → "Terça, 30 de setembro"
+  const short = label.replace("-feira", "");
+  return short.charAt(0).toUpperCase() + short.slice(1);
 }
 
 export function TransactionsTable({
@@ -174,7 +190,7 @@ export function TransactionsTable({
                   onCheckedChange={(checked) => toggleAll(editableDayIds, checked === true)}
                 />
               ) : null}
-              <span className="text-table-header shrink-0">{formatDayHeading(date)}</span>
+              <span className="shrink-0 text-[12.5px] font-semibold text-(--text-secondary)">{formatDayHeading(date)}</span>
               <span className="h-px flex-1" style={{ background: "var(--border-primary)" }} />
               <span
                 className="shrink-0 text-xs font-bold tabular-nums"
@@ -194,11 +210,23 @@ export function TransactionsTable({
                 ? (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR)
                 : MUTED_CATEGORY_COLOR;
 
+              // Linha calma, como no Organizze: o que é, de onde e quanto.
+              // Categoria e situação viram texto discreto na segunda linha
+              // — antes eram uma pílula colorida e um selo vermelho
+              // disputando atenção com o valor. Trocar a categoria rápido
+              // continua no computador (seletor discreto à direita); no
+              // celular, tocar na linha abre a edição.
+              const status = row.is_overdue
+                ? { label: "Atrasado", color: "var(--expense-dark)" }
+                : row.status === "pending"
+                  ? { label: "Pendente", color: "var(--warning-dark)" }
+                  : null;
+
               return (
                 <div
                   key={row.id}
-                  role="button"
-                  tabIndex={0}
+                  role={row.can_edit ? "button" : undefined}
+                  tabIndex={row.can_edit ? 0 : undefined}
                   onClick={() => onRowClick(row)}
                   onKeyDown={(e) => {
                     if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
@@ -206,7 +234,9 @@ export function TransactionsTable({
                       onRowClick(row);
                     }
                   }}
-                  className="flex min-h-[62px] cursor-pointer items-center gap-3 rounded-lg px-1 transition-colors outline-none hover:bg-[#F9FAFB] focus-visible:bg-[#F9FAFB]"
+                  className={`group flex min-h-[60px] items-center gap-3 rounded-xl px-2 outline-none transition-colors focus-visible:bg-(--bg-subtle) ${
+                    row.can_edit ? "cursor-pointer hover:bg-(--bg-subtle)" : ""
+                  }`}
                 >
                   {selectionMode ? (
                     <span onClick={(e) => e.stopPropagation()}>
@@ -226,64 +256,65 @@ export function TransactionsTable({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold text-(--text-primary)">
+                    <p className="truncate text-[14px] font-medium text-(--text-primary)">
                       {row.description}
                     </p>
-                    <p className="truncate text-xs text-(--text-muted)">{row.account_name}</p>
+                    <p className="truncate text-xs text-(--text-muted)">
+                      {/* A categoria só aparece aqui no celular; no
+                          computador ela tem o seletor à direita. */}
+                      <span className="md:hidden">{row.category_name ?? "Sem categoria"} · </span>
+                      {row.account_name}
+                      {status ? (
+                        <span style={{ color: status.color }} className="font-medium">
+                          {" · "}
+                          {status.label}
+                        </span>
+                      ) : null}
+                    </p>
                   </div>
 
-                  <span className="flex w-20 shrink-0 justify-start">
-                    {row.is_overdue ? (
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
-                        style={{ backgroundColor: "var(--expense-soft)", color: "var(--expense-dark)" }}
+                  {row.can_edit ? (
+                    <span className="hidden w-40 shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={row.category_id ?? NO_CATEGORY}
+                        onValueChange={(value) => {
+                          const categoryId = value === NO_CATEGORY ? null : value;
+                          startTransition(async () => {
+                            await updateTransactionCategory(row.id, categoryId);
+                            router.refresh();
+                          });
+                        }}
                       >
-                        Atrasado
-                      </span>
-                    ) : row.status === "pending" ? (
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
-                        style={{ backgroundColor: "var(--warning-soft)", color: "var(--warning-dark)" }}
-                      >
-                        Pendente
-                      </span>
-                    ) : null}
-                  </span>
-
-                  <span className="w-40 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <Select
-                      value={row.category_id ?? NO_CATEGORY}
-                      onValueChange={(value) => {
-                        const categoryId = value === NO_CATEGORY ? null : value;
-                        startTransition(async () => {
-                          await updateTransactionCategory(row.id, categoryId);
-                          router.refresh();
-                        });
-                      }}
-                    >
-                      <SelectTrigger
-                        className="h-8 w-full justify-center rounded-full border-transparent text-center text-[12px] font-semibold"
-                        style={(() => {
-                          if (!row.category_name) return undefined;
-                          const pair = categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR;
-                          return { backgroundColor: pair.bg, color: pair.fg };
-                        })()}
-                      >
-                        <SelectValue placeholder="Sem categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
-                        {categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </span>
+                        <SelectTrigger
+                          className="h-8 w-full justify-between gap-1.5 rounded-lg border-transparent bg-transparent px-2.5 text-[12.5px] font-medium text-(--text-secondary) shadow-none hover:border-(--border-primary) hover:bg-white"
+                          aria-label="Categoria"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{ background: row.category_name ? iconColors.fg : "var(--text-light)" }}
+                            />
+                            <SelectValue placeholder="Sem categoria" />
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
+                          {categories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </span>
+                  ) : (
+                    <span className="hidden w-40 shrink-0 truncate px-2.5 text-[12.5px] text-(--text-secondary) md:block">
+                      {row.category_name ?? "Sem categoria"}
+                    </span>
+                  )}
 
                   <span
-                    className="w-24 shrink-0 text-right text-sm font-bold tabular-nums"
+                    className="shrink-0 text-right text-[14px] font-semibold tabular-nums md:w-28"
                     style={{
                       color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
                     }}
@@ -292,40 +323,45 @@ export function TransactionsTable({
                     {formatCents(row.amount_cents, currency)}
                   </span>
 
+                  {/* Ações. Confirmar aparece sempre que há o que confirmar
+                      — é a ação do dia a dia. Excluir fica pro passar do
+                      mouse no computador, e dentro da edição no celular. */}
                   <span
                     className="flex shrink-0 items-center gap-0.5"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {row.can_edit ? (
                       <>
-                      {row.status === "pending" ? (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={isPending}
-                          aria-label="Marcar como confirmado"
-                          title="Marcar como confirmado"
-                          className="text-(--income-dark) hover:bg-(--income-soft) hover:text-(--income-dark)"
-                          onClick={() =>
-                            startTransition(async () => {
-                              await markTransactionPaid(row.id);
-                              router.refresh();
-                            })
-                          }
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <span className="h-7 w-7" />
-                      )}
-                      <DeleteTransactionButton
-                        transactionId={row.id}
-                        transferGroupId={row.transfer_group_id}
-                      />
+                        {row.status === "pending" ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={isPending}
+                            aria-label="Marcar como confirmado"
+                            title="Marcar como confirmado"
+                            className="text-(--income-dark) hover:bg-(--income-soft) hover:text-(--income-dark)"
+                            onClick={() =>
+                              startTransition(async () => {
+                                await markTransactionPaid(row.id);
+                                router.refresh();
+                              })
+                            }
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="hidden h-7 w-7 md:block" />
+                        )}
+                        <span className="hidden opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 md:block">
+                          <DeleteTransactionButton
+                            transactionId={row.id}
+                            transferGroupId={row.transfer_group_id}
+                          />
+                        </span>
                       </>
                     ) : (
                       <span
-                        className="flex h-7 w-[60px] items-center justify-center text-(--text-muted)"
+                        className="flex h-7 w-7 items-center justify-center text-(--text-light) md:w-[60px]"
                         title="Conta pessoal de outra pessoa: só leitura"
                         aria-label="Só leitura"
                       >

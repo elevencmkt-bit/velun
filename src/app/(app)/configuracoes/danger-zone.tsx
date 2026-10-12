@@ -116,8 +116,8 @@ export function DangerZone() {
           </div>
           <ResetAction
             buttonLabel="Resetar tudo"
-            title="Resetar o household inteiro?"
-            description="Transações, recorrências, categorias e contas serão apagadas — o household volta ao estado de conta nova. Login e membros continuam existindo. Essa ação não pode ser desfeita."
+            title="Apagar todos os dados da casa?"
+            description="Transações, recorrências, categorias e contas serão apagadas — a casa volta a ficar como nova. Login e membros continuam existindo. Essa ação não pode ser desfeita."
             confirmPhrase="EXCLUIR TUDO"
             action={resetAllData}
           />

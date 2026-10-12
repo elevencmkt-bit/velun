@@ -61,10 +61,10 @@ export function PendingList({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-table-header grid grid-cols-[1fr_120px_84px_100px] gap-3 border-b border-(--border-primary) px-1 pb-1.5">
+      <div className="text-table-header grid grid-cols-[1fr_auto] gap-3 border-b border-(--border-primary) px-1 pb-1.5 sm:grid-cols-[1fr_120px_84px_100px]">
         <span>Lançamento</span>
-        <span>Categoria</span>
-        <span>Data</span>
+        <span className="hidden sm:block">Categoria</span>
+        <span className="hidden sm:block">Data</span>
         <span className="text-right">Valor</span>
       </div>
 
@@ -72,18 +72,27 @@ export function PendingList({
         {visible.map((row) => (
           <div
             key={row.id}
-            className="grid grid-cols-[1fr_120px_84px_100px] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+            className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB] sm:grid-cols-[1fr_120px_84px_100px]"
           >
-            <span className="text-table-body min-w-0 truncate text-(--text-primary)">
-              {row.description}
+            {/* No celular a data desce pra baixo do nome e a categoria some:
+                sobram duas colunas, o que é e quanto. */}
+            <span className="flex min-w-0 flex-col">
+              <span className="text-table-body truncate text-(--text-primary)">{row.description}</span>
+              <span
+                className="text-xs sm:hidden"
+                style={{ color: row.is_overdue ? "var(--warning-dark)" : "var(--text-muted)" }}
+              >
+                {formatDate(row.date)}
+                {row.is_overdue ? " · atrasada" : ""}
+              </span>
             </span>
-            <span className="min-w-0">
+            <span className="hidden min-w-0 sm:block">
               <CategoryBadge
                 name={row.category_name ?? ""}
                 color={row.category_name ? categoryColors[row.category_name] : undefined}
               />
             </span>
-            <span className="flex flex-col">
+            <span className="hidden flex-col sm:flex">
               <span
                 className="text-table-body font-medium"
                 style={{ color: row.is_overdue ? "var(--warning-dark)" : undefined }}

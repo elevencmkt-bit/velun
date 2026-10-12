@@ -20,9 +20,14 @@ import {
 export function DeleteTransactionButton({
   transactionId,
   transferGroupId,
+  variant = "icon",
+  onDeleted,
 }: {
   transactionId: string;
   transferGroupId: string | null;
+  /** "icon": lixeira na lista. "text": botão com nome, dentro da edição. */
+  variant?: "icon" | "text";
+  onDeleted?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -35,6 +40,7 @@ export function DeleteTransactionButton({
       } else {
         await deleteTransaction(transactionId);
       }
+      onDeleted?.();
       router.refresh();
     });
   }
@@ -42,9 +48,16 @@ export function DeleteTransactionButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Excluir transação">
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        {variant === "text" ? (
+          <Button type="button" variant="ghost" className="text-(--expense) hover:text-(--expense-dark)">
+            <Trash2 className="h-4 w-4" />
+            Excluir
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon-sm" aria-label="Excluir transação">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
