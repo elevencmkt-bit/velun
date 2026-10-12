@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMember } from "@/lib/current-member";
 import { logout } from "@/app/(auth)/login/actions";
 import { ManualTransactionButton } from "@/components/manual-transaction-button";
 import { Sidebar } from "@/components/sidebar";
@@ -9,62 +9,31 @@ import { fetchVisibilityNotifications } from "@/lib/notifications";
 import { UserMenu } from "@/components/user-menu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Mesma conferência de sessão e mesmo cadastro que a página usa: o
+  // `getCurrentMember` é memorizado por requisição, então layout e página
+  // dividem uma ida ao Supabase em vez de fazer cada um a sua.
+  const member = await getCurrentMember();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const withAvatar = await supabase
-    .from("members")
-    .select("display_name, avatar_url, household_id, notifications_seen_at")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  // avatar_url pode ainda não existir se a migração 0003 não rodou —
-  // refaz sem a coluna em vez de derrubar o layout inteiro nesse caso.
-  let member: {
-    display_name: string;
-    avatar_url: string | null;
-    household_id: string;
-    notifications_seen_at: string | null;
-  } | null = withAvatar.data;
-
-  // Mesmo motivo do fallback original (0003 pode não ter rodado), agora
-  // valendo também pra 0011: melhor o layout abrir sem sino do que cair.
-  if (withAvatar.error) {
-    const { data: withoutAvatar } = await supabase
-      .from("members")
-      .select("display_name, household_id")
-      .eq("id", user.id)
-      .maybeSingle();
-    member = withoutAvatar
-      ? { ...withoutAvatar, avatar_url: null, notifications_seen_at: null }
-      : null;
-  }
 
   const [{ data: accounts }, { data: categories }, notifications] = await Promise.all([
     supabase
       .from("accounts")
       .select("id, name")
-      .eq("household_id", member?.household_id ?? "")
+      .eq("household_id", member.householdId)
       .eq("is_archived", false)
       .order("sort_order")
       .order("name"),
     supabase
       .from("categories")
       .select("id, name, kind")
-      .eq("household_id", member?.household_id ?? "")
+      .eq("household_id", member.householdId)
       .eq("is_archived", false)
       .order("name"),
     fetchVisibilityNotifications(
       supabase,
-      member?.household_id ?? "",
-      user.id,
-      member?.notifications_seen_at ?? null,
+      member.householdId,
+      member.memberId,
+      member.notificationsSeenAt,
     ),
   ]);
 
@@ -81,9 +50,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
             <NotificationBell notifications={notifications} />
             <UserMenu
-              displayName={member?.display_name ?? user.email ?? "Você"}
+              displayName={member.displayName}
               subtitle="Dashboard Financeiro"
-              avatarUrl={member?.avatar_url ?? null}
+              avatarUrl={member.avatarUrl}
               onLogout={logout}
             />
           </div>
