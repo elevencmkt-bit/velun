@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import type { CashFlowPoint } from "@/lib/cash-flow";
+import { Money } from "@/components/money";
 
 function colorFor(balanceCents: number) {
   return balanceCents >= 0 ? "var(--income)" : "var(--expense)";
@@ -102,7 +103,7 @@ function ChartTooltip({
         className="font-bold"
         style={{ color: point.balance_cents < 0 ? "var(--expense)" : "var(--income)" }}
       >
-        {formatCents(point.balance_cents, currency)}
+        <Money cents={point.balance_cents} currency={currency} />
       </div>
       {point.events.length > 0 ? (
         <div className="mt-1.5 flex flex-col gap-1 border-t border-(--border-soft) pt-1.5">
@@ -114,7 +115,7 @@ function ChartTooltip({
                 style={{ color: event.type === "income" ? "var(--income)" : "var(--expense)" }}
               >
                 {event.type === "income" ? "+" : ""}
-                {formatCents(event.amount_cents, currency)}
+                <Money cents={event.amount_cents} currency={currency} />
               </span>
             </div>
           ))}

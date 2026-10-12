@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import {
   deactivateRecurrence,
   moveRecurrence,
 } from "@/lib/actions/recurrences";
 import { Button } from "@/components/ui/button";
+import { Money } from "@/components/money";
 
 export type RecurrenceRow = {
   id: string;
@@ -179,7 +180,7 @@ export function RecurrencesList({
                 }}
               >
                 {row.direction === "out" ? "-" : "+"}
-                {formatCents(row.amount_cents, currency)}
+                <Money cents={row.amount_cents} currency={currency} />
               </span>
               {row.can_edit ? (
                 <span className="flex items-center gap-1">

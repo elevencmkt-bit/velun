@@ -3,11 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getAccountBalances } from "@/lib/balances";
 import { accountScope } from "@/lib/visibility";
-import { formatCents } from "@/lib/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AccountForm } from "./account-form";
 import { AccountRowActions } from "./account-row-actions";
+import { Money } from "@/components/money";
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   checking: "Conta corrente",
@@ -83,7 +83,7 @@ export default async function ContasPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-kpi-label">Saldo total</span>
-                <span className="text-kpi-value">{formatCents(total, currency)}</span>
+                <span className="text-kpi-value"><Money cents={total} currency={currency} /></span>
               </div>
             </CardContent>
           </Card>
@@ -158,7 +158,7 @@ export default async function ContasPage() {
                       className="text-kpi-value"
                       style={{ color: balance < 0 ? "var(--expense)" : undefined }}
                     >
-                      {formatCents(balance, currency)}
+                      <Money cents={balance} currency={currency} />
                     </span>
                   </CardContent>
                 </Card>

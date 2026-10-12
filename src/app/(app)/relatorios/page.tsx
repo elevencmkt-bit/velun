@@ -3,7 +3,6 @@ import Link from "next/link";
 import { ArrowRight, Banknote, Tag, TrendingDown, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { formatCents } from "@/lib/money";
 import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { monthRange, shiftMonth, monthParam, monthLabel, shortMonthLabel, parseMonthParam } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
@@ -22,6 +21,7 @@ import { ReportViewToggle, type ReportView } from "./report-view-toggle";
 import { MonthDonut } from "../mes/month-donut";
 import { PeriodEvolutionChart } from "./period-evolution-chart";
 import { InsightVelunCard, TopCategoriesCard } from "./bottom-cards";
+import { Money } from "@/components/money";
 
 const KPI_TONES = {
   green: { bg: "#EAFBF2", fg: "#22C55E" },
@@ -171,7 +171,7 @@ export default async function RelatoriosPage({
           <div className="min-w-0">
             <span className="block text-[12px] text-(--text-secondary)">Receitas do período</span>
             <span className="mt-0.5 block text-[18px] font-extrabold tabular-nums text-(--text-primary)">
-              {formatCents(totalIncome, currency)}
+              <Money cents={totalIncome} currency={currency} />
             </span>
             <PercentHelper current={totalIncome} previous={totalIncomePrev} prevLabel={prevLabel} />
           </div>
@@ -184,7 +184,7 @@ export default async function RelatoriosPage({
           <div className="min-w-0">
             <span className="block text-[12px] text-(--text-secondary)">Despesas do período</span>
             <span className="mt-0.5 block text-[18px] font-extrabold tabular-nums text-(--text-primary)">
-              {formatCents(totalExpense, currency)}
+              <Money cents={totalExpense} currency={currency} />
             </span>
             <PercentHelper current={totalExpense} previous={totalExpensePrev} prevLabel={prevLabel} />
           </div>
@@ -200,7 +200,7 @@ export default async function RelatoriosPage({
               className="mt-0.5 block text-[18px] font-extrabold tabular-nums"
               style={{ color: balance < 0 ? "var(--expense)" : "var(--text-primary)" }}
             >
-              {formatCents(balance, currency)}
+              <Money cents={balance} currency={currency} />
             </span>
             <PercentHelper current={balance} previous={balancePrev} prevLabel={prevLabel} />
           </div>
@@ -216,7 +216,13 @@ export default async function RelatoriosPage({
               {topExpense?.name ?? "—"}
             </span>
             <span className="mt-1.5 block text-[11px] text-(--text-secondary)">
-              {topExpense ? `${formatCents(topExpense.amount_cents, currency)} (${topCategoryShare}% das despesas)` : "Nenhuma despesa ainda"}
+              {topExpense ? (
+                <>
+                  <Money cents={topExpense.amount_cents} currency={currency} /> ({topCategoryShare}% das despesas)
+                </>
+              ) : (
+                "Nenhuma despesa ainda"
+              )}
             </span>
           </div>
         </CardSurface>
@@ -253,7 +259,7 @@ export default async function RelatoriosPage({
                 <div>
                   <h2 className="text-[16px] font-extrabold text-(--text-primary)">{expenseTitle}</h2>
                   <p className="mt-0.5 text-[12px] text-(--text-secondary)">
-                    Total de {formatCents(totalExpense, currency)} no período
+                    Total de <Money cents={totalExpense} currency={currency} /> no período
                   </p>
                 </div>
                 <Link
@@ -276,7 +282,7 @@ export default async function RelatoriosPage({
                 <div>
                   <h2 className="text-[16px] font-extrabold text-(--text-primary)">{incomeTitle}</h2>
                   <p className="mt-0.5 text-[12px] text-(--text-secondary)">
-                    Total de {formatCents(totalIncome, currency)} no período
+                    Total de <Money cents={totalIncome} currency={currency} /> no período
                   </p>
                 </div>
                 <Link

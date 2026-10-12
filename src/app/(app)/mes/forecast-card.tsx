@@ -1,6 +1,7 @@
 import { Target } from "lucide-react";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Money } from "@/components/money";
 
 function ForecastRow({
   label,
@@ -28,9 +29,9 @@ function ForecastRow({
       </div>
       <div className="flex items-center justify-between text-xs">
         <span className="text-(--text-secondary)">
-          Realizado: <strong className="font-semibold text-(--text-primary)">{formatCents(realizado, currency)}</strong>
+          Realizado: <strong className="font-semibold text-(--text-primary)"><Money cents={realizado} currency={currency} /></strong>
         </span>
-        <span className="text-(--text-muted)">Previsto: {formatCents(previsto, currency)}</span>
+        <span className="text-(--text-muted)">Previsto: <Money cents={previsto} currency={currency} /></span>
       </div>
     </div>
   );
@@ -89,7 +90,7 @@ export function ForecastCard({
               className="text-sm font-semibold tabular-nums"
               style={{ color: saldoRealizado < 0 ? "var(--expense)" : "var(--text-primary)" }}
             >
-              {formatCents(saldoRealizado, currency)}
+              <Money cents={saldoRealizado} currency={currency} />
             </span>
           </div>
           <div className="flex flex-col items-end">
@@ -98,7 +99,7 @@ export function ForecastCard({
               className="text-sm font-semibold tabular-nums"
               style={{ color: saldoPrevisto < 0 ? "var(--expense)" : "var(--text-primary)" }}
             >
-              {formatCents(saldoPrevisto, currency)}
+              <Money cents={saldoPrevisto} currency={currency} />
             </span>
           </div>
         </div>

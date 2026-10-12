@@ -90,7 +90,7 @@ export function TransactionsWorkspace({
             </span>
             <span className="flex items-baseline gap-2">
               <span className="text-metadata">{totalLabel}</span>
-              <span className="font-semibold tabular-nums" style={{ color: totalColor }}>
+              <span className="money font-semibold tabular-nums" style={{ color: totalColor }}>
                 {totalDisplay}
               </span>
             </span>

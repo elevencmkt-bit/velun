@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import type { DailyReportPoint } from "@/lib/reports";
+import { Money } from "@/components/money";
 
 function ChartTooltip({
   active,
@@ -39,19 +40,19 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-3">
           <span className="text-(--text-secondary)">Receitas</span>
           <span className="font-semibold tabular-nums" style={{ color: "#22C55E" }}>
-            {formatCents(point.income_cents, currency)}
+            <Money cents={point.income_cents} currency={currency} />
           </span>
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-(--text-secondary)">Despesas</span>
           <span className="font-semibold tabular-nums" style={{ color: "#F04469" }}>
-            {formatCents(point.expense_cents, currency)}
+            <Money cents={point.expense_cents} currency={currency} />
           </span>
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-(--text-secondary)">Saldo</span>
           <span className="font-semibold tabular-nums" style={{ color: "#3B82F6" }}>
-            {formatCents(point.net_cents, currency)}
+            <Money cents={point.net_cents} currency={currency} />
           </span>
         </div>
       </div>
