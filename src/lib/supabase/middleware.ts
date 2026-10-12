@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { classifyClaims } from "@/lib/auth-check";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -25,10 +26,11 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  // Mesma decisão que o servidor das páginas usa (src/lib/auth-check.ts):
+  // `getClaims()` confere a assinatura do token em vez de perguntar ao
+  // servidor de autenticação a cada clique, e renova a sessão quando o
+  // token está pra vencer — que é o trabalho do porteiro.
+  const auth = classifyClaims(await supabase.auth.getClaims());
 
   // /convite é a página pública de aceite de convite — quem não tem
   // conta ainda precisa conseguir abri-la sem ser jogado pro /login.
@@ -39,20 +41,19 @@ export async function updateSession(request: NextRequest) {
   // Erro de rede/timeout ao consultar o Supabase (ex.: Gateway Timeout) não
   // significa que a sessão expirou — só que não deu pra confirmar agora.
   // Nesse caso deixamos a navegação passar em vez de chutar pro login;
-  // só redireciona quando o Supabase respondeu e realmente não há usuário.
-  const sessionCheckFailed = Boolean(error) && error?.name !== "AuthSessionMissingError";
-  if (sessionCheckFailed) {
-    console.error("[middleware] falha ao verificar sessão, deixando passar:", error?.message);
+  // a página confere de novo e, sem sessão, redireciona ela mesma.
+  if (auth.status === "unavailable") {
+    console.error("[middleware] falha ao verificar sessão, deixando passar:", auth.message);
     return supabaseResponse;
   }
 
-  if (!user && !isAuthRoute) {
+  if (auth.status === "no-session" && !isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  if (auth.status === "ok" && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/mes";
     return NextResponse.redirect(url);

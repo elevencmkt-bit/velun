@@ -1,5 +1,7 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { classifyClaims, type AuthCheck } from "@/lib/auth-check";
 import type { CurrencyCode } from "@/lib/money";
 
 const RETRY_ATTEMPTS = 3;
@@ -22,35 +24,51 @@ async function withRetry<T>(fn: () => PromiseLike<T>, shouldRetry: (result: T) =
   return result;
 }
 
-export async function getCurrentMember() {
+/**
+ * Quem está logado, conferido uma vez por requisição.
+ *
+ * `cache()` faz o layout e a página — que antes conferiam cada um por
+ * conta própria — receberem a mesma resposta sem ir ao Supabase de novo.
+ */
+const getAuth = cache(async (): Promise<AuthCheck> => {
   const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } = await withRetry(
-    () => supabase.auth.getUser(),
-    (r) => Boolean(r.error) && r.error?.name !== "AuthSessionMissingError",
+  return withRetry(
+    async () => classifyClaims(await supabase.auth.getClaims()),
+    (r) => r.status === "unavailable",
   );
+});
+
+/**
+ * Membro logado e a casa dele. Uma busca por requisição, compartilhada
+ * entre o layout (nome, foto, sino) e a página (casa, moeda).
+ *
+ * Antes eram duas buscas do mesmo cadastro, cada uma precedida de sua
+ * própria conferência de sessão.
+ */
+export const getCurrentMember = cache(async () => {
+  const auth = await getAuth();
 
   // Erro de rede/timeout ao falar com o Supabase (comum, passageiro) não é
-  // a mesma coisa que "sem sessão" — só quando o Supabase confirma que não
-  // há usuário (ou não há sessão nenhuma) é que faz sentido ir pro login.
-  // Do contrário a gente jogava fora uma sessão válida a cada instabilidade.
-  if (authError && authError.name !== "AuthSessionMissingError") {
-    throw new Error(`Falha ao verificar sessão, tente novamente: ${authError.message}`);
+  // a mesma coisa que "sem sessão" — só quando não há sessão (ou o token
+  // não é válido) faz sentido ir pro login. Do contrário a gente jogava
+  // fora uma sessão válida a cada instabilidade.
+  if (auth.status === "unavailable") {
+    throw new Error(`Falha ao verificar sessão, tente novamente: ${auth.message}`);
   }
-
-  if (!user) {
+  if (auth.status === "no-session") {
     redirect("/login");
   }
+
+  const supabase = await createClient();
 
   const { data: member, error } = await withRetry(
     () =>
       supabase
         .from("members")
-        .select("id, household_id, households(currency)")
-        .eq("id", user.id)
+        .select(
+          "id, household_id, display_name, avatar_url, notifications_seen_at, households(currency)",
+        )
+        .eq("id", auth.userId)
         .single(),
     (r) => Boolean(r.error) && r.error?.code !== "PGRST116",
   );
@@ -75,5 +93,8 @@ export async function getCurrentMember() {
     memberId: member.id as string,
     householdId: member.household_id as string,
     currency,
+    displayName: (member.display_name as string | null) ?? auth.email ?? "Você",
+    avatarUrl: (member.avatar_url as string | null) ?? null,
+    notificationsSeenAt: (member.notifications_seen_at as string | null) ?? null,
   };
-}
+});
