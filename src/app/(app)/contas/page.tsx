@@ -231,7 +231,7 @@ export default async function ContasPage() {
                   Ver faturas →
                 </Link>
               </div>
-              <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0 lg:grid-cols-3">
+              <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0 lg:grid-cols-3">
                 {cards.map((a) => {
                   const isMine = a.owner_id === memberId;
                   const owner = a.owner_id === null ? "Do casal" : isMine ? "Minha" : (memberNames.get(a.owner_id as string) ?? "");

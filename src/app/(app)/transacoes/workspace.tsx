@@ -175,7 +175,7 @@ export function TransactionsWorkspace({
       <Card className="max-md:[--card-spacing:--spacing(4)]">
         <CardContent className="flex flex-col gap-4 md:gap-5 md:pt-1">
           <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-            <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:w-fit md:shrink-0 md:gap-1 md:rounded-[14px] md:bg-[#F4F5F8] md:p-1 md:px-1">
+            <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:w-fit md:shrink-0 md:gap-1 md:rounded-[14px] md:bg-[#F4F5F8] md:p-1 md:px-1">
               {TABS.map((t) => {
                 const on = activeStatus === t.key;
                 return (
