@@ -90,7 +90,7 @@ export function DangerZone() {
   const [open, setOpen] = useState(false);
   // Fechada por padrão e só com contorno: é o que menos se usa na página.
   return (
-    <section className="rounded-[20px] border border-(--border-soft)">
+    <section className="rounded-[20px] border border-[#E4E7EC]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

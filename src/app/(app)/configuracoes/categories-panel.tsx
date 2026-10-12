@@ -44,7 +44,7 @@ export function CategoriesPanel({ expense, income }: { expense: Item[]; income: 
           {tab === "expense" ? "Nenhuma categoria de despesa ainda." : "Nenhuma categoria de receita ainda."}
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 md:gap-2.5 lg:grid-cols-3 xl:grid-cols-4">
           {items.map(({ category, color }) => (
             <CategoryRow key={category.id} category={category} effectiveColor={color} />
           ))}

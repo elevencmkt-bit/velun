@@ -51,6 +51,7 @@ export function CategoryRow({
   effectiveColor?: string | null;
 }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState<string | null>(findPaletteColorByFg(category.color)?.fg ?? null);
   const [icon, setIcon] = useState<string | null>(category.icon);
@@ -88,7 +89,7 @@ export function CategoryRow({
   const tint = effectiveColor ?? "var(--text-light)";
 
   // Bloco da categoria. No computador, editar e apagar aparecem ao passar
-  // o mouse; no celular (sem mouse) ficam sempre à mostra, discretos.
+  // o mouse; no celular, um toque abre a edição, que também tem o excluir.
   return (
     <div className="group relative flex h-12 min-w-0 items-center gap-2.5 rounded-[14px] bg-[#F7F8FA] pr-1.5 pl-1.5 transition-colors hover:bg-[#F0F2F6]">
       <button
@@ -146,13 +147,25 @@ export function CategoryRow({
               <Button type="submit" disabled={isPending}>
                 {isPending ? "Salvando..." : "Salvar"}
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-(--expense-dark) hover:bg-(--expense-soft) hover:text-(--expense-dark)"
+                onClick={() => {
+                  setEditOpen(false);
+                  setDeleteOpen(true);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir categoria
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
 
-        <AlertDialog>
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Excluir categoria" className="text-(--text-light)">
+            <Button variant="ghost" size="icon-sm" aria-label="Excluir categoria" className="max-md:hidden">
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </AlertDialogTrigger>
