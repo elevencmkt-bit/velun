@@ -93,6 +93,30 @@ export function categoryNameForMcc(mcc: string | null): string | null {
 }
 
 /**
+ * Encontra o MCC dentro da descrição do lançamento.
+ *
+ * Não dá pra pegar o primeiro número de 4 dígitos: muito
+ * estabelecimento carrega número de loja com 4 dígitos antes do código
+ * ("Racetrac 2603 5541", "Outback 1069 5812"), e aí o número da loja
+ * ganharia do MCC.
+ *
+ * A regra é pegar o token de 4 dígitos que EXISTE nesta tabela, e entre
+ * vários o último — o MCC vem depois do nome e do número da loja.
+ * Número de loja quase nunca coincide com um código válido, e se
+ * coincidir, o de verdade está mais à direita.
+ *
+ * MCC não mapeado some aqui, o que não custa nada: sem entrada na
+ * tabela não haveria categoria a sugerir de qualquer jeito.
+ */
+export function findMccInDescription(description: string): string | null {
+  let found: string | null = null;
+  for (const token of description.split(/\s+/)) {
+    if (/^\d{4}$/.test(token) && token in MCC_TO_CATEGORY) found = token;
+  }
+  return found;
+}
+
+/**
  * Resolve o id da categoria do household a partir do MCC. Devolve null
  * quando o MCC não é conhecido OU quando o household não tem categoria
  * com aquele nome — melhor deixar sem sugestão do que sugerir errado.
