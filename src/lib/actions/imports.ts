@@ -255,123 +255,19 @@ export async function confirmImport(importId: string): Promise<ActionResult> {
 }
 
 async function runConfirmImport(importId: string) {
-  const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
 
-  const { data: imp, error: impError } = await supabase
-    .from("imports")
-    .select("id, account_id, status")
-    .eq("id", importId)
-    .single();
-
-  if (impError) throw new Error(impError.message);
-  if (imp.status === "confirmed") throw new Error("Esta importação já foi confirmada.");
-
-  const { data: staged, error: stagedError } = await supabase
-    .from("staged_transactions")
-    .select(
-      "id, date, description, amount_cents, direction, suggested_category_id, fingerprint, match_transaction_id, merge_accepted",
-    )
-    .eq("import_id", importId)
-    .eq("is_included", true);
-
-  if (stagedError) throw new Error(stagedError.message);
-
-  const toMerge = (staged ?? []).filter((s) => s.match_transaction_id && s.merge_accepted);
-  const toInsert = (staged ?? []).filter((s) => !(s.match_transaction_id && s.merge_accepted));
-
-  // --- junção: a previsão é quitada pelo lançamento real -----------------
+  // Tudo acontece numa função do banco (migração 0013), que roda como
+  // uma transação só: junta as previsões, grava os lançamentos e marca a
+  // importação — ou não faz nada. E trava a importação no começo, então
+  // um segundo clique espera o primeiro e encontra a importação já
+  // confirmada.
   //
-  // Vira UPDATE na transação que já existe, não um par
-  // apagar-e-inserir. Assim o id, o vínculo com a recorrência e a
-  // categoria que o usuário escolheu sobrevivem, e nada mais no banco
-  // que aponte pra essa transação quebra.
-  //
-  // Quem ganha o quê:
-  // - data e valor: o banco. Ele é o fato; a previsão era um palpite.
-  // - descrição: a da previsão ("Spectrum Internet" em vez de "Card
-  //   Purchase Spectrum 4899 ..."). Quem cadastrou escolheu um nome
-  //   legível, e perder isso piora a tela toda.
-  // - categoria: a da previsão quando tem. Escolha do usuário ganha de
-  //   sugestão por código de MCC.
-  // - texto do banco: vai pra `notes`, pra não sumir.
-  for (const row of toMerge) {
-    const { data: previous, error: previousError } = await supabase
-      .from("transactions")
-      .select("id, date, amount_cents, description, notes, status, category_id")
-      .eq("id", row.match_transaction_id as string)
-      .maybeSingle();
-
-    if (previousError) throw new Error(previousError.message);
-
-    // Previsão apagada entre a importação e a confirmação: não há o que
-    // juntar, então entra como lançamento novo.
-    if (!previous) {
-      toInsert.push(row);
-      continue;
-    }
-
-    // Guardado ANTES de sobrescrever: é o que o desfazer restaura.
-    const { error: snapshotError } = await supabase
-      .from("staged_transactions")
-      .update({
-        match_previous: {
-          date: previous.date,
-          amount_cents: previous.amount_cents,
-          description: previous.description,
-          notes: previous.notes,
-          status: previous.status,
-          category_id: previous.category_id,
-        },
-      })
-      .eq("id", row.id as string);
-
-    if (snapshotError) throw new Error(snapshotError.message);
-
-    const { error: mergeError } = await supabase
-      .from("transactions")
-      .update({
-        date: row.date,
-        amount_cents: row.amount_cents,
-        status: "cleared",
-        category_id: previous.category_id ?? row.suggested_category_id,
-        // Observação que o usuário tinha escrito vem primeiro; o texto
-        // do banco entra abaixo em vez de apagá-la.
-        notes: [previous.notes, row.description].filter(Boolean).join("\n"),
-        fingerprint: row.fingerprint,
-        import_id: importId,
-      })
-      .eq("id", previous.id as string);
-
-    if (mergeError) throw new Error(mergeError.message);
-  }
-
-  // --- o resto entra como lançamento novo --------------------------------
-  if (toInsert.length > 0) {
-    const { error: insertError } = await supabase.from("transactions").insert(
-      toInsert.map((s) => ({
-        household_id: householdId,
-        account_id: imp.account_id,
-        category_id: s.suggested_category_id,
-        date: s.date,
-        amount_cents: s.amount_cents,
-        direction: s.direction,
-        description: s.description,
-        status: "cleared",
-        fingerprint: s.fingerprint,
-        import_id: importId,
-        created_by: memberId,
-      })),
-    );
-    if (insertError) throw new Error(insertError.message);
-  }
-
-  const { error: doneError } = await supabase
-    .from("imports")
-    .update({ status: "confirmed" })
-    .eq("id", importId);
-
-  if (doneError) throw new Error(doneError.message);
+  // Antes eram chamadas soltas daqui, e na importação de setembro a
+  // primeira tentativa gravou os lançamentos e morreu antes de marcar a
+  // importação. O segundo clique gravou tudo de novo.
+  const { error } = await supabase.rpc("confirm_import", { p_import_id: importId });
+  if (error) throw new Error(error.message);
 
   revalidatePath("/importar");
   revalidatePath("/transacoes");
@@ -498,96 +394,14 @@ export async function undoImport(importId: string): Promise<ActionResult> {
 }
 
 async function runUndoImport(importId: string) {
-  const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 
-  const { data: imp, error: loadError } = await supabase
-    .from("imports")
-    .select("account_id")
-    .eq("id", importId)
-    .single();
-
-  if (loadError) throw new Error(loadError.message);
-  const accountId = imp.account_id as string;
-
-  // Previsão que foi quitada por junção volta ao que era, em vez de ser
-  // apagada: aquela transação existia antes da importação e não é dela
-  // pra apagar. O estado anterior ficou guardado em `match_previous` na
-  // hora da junção — lido agora, porque apagar a importação leva o
-  // staging em cascata.
-  const { data: merged, error: mergedError } = await supabase
-    .from("staged_transactions")
-    .select("match_transaction_id, match_previous")
-    .eq("import_id", importId)
-    .not("match_previous", "is", null);
-
-  if (mergedError) throw new Error(mergedError.message);
-
-  const restoredIds: string[] = [];
-
-  for (const row of merged ?? []) {
-    const id = row.match_transaction_id as string | null;
-    const previous = row.match_previous as {
-      date: string;
-      amount_cents: number;
-      description: string;
-      notes: string | null;
-      status: "pending" | "cleared";
-      category_id: string | null;
-    } | null;
-
-    if (!id || !previous) continue;
-
-    const { error: restoreError } = await supabase
-      .from("transactions")
-      .update({
-        date: previous.date,
-        amount_cents: previous.amount_cents,
-        description: previous.description,
-        notes: previous.notes,
-        status: previous.status,
-        category_id: previous.category_id,
-        import_id: null,
-        // A impressão digital acompanha data, valor e descrição: voltando
-        // os três, ela tem que voltar também, senão a previsão restaurada
-        // não é mais reconhecida como duplicata de si mesma.
-        fingerprint: computeFingerprint({
-          accountId,
-          date: previous.date,
-          amountCents: previous.amount_cents,
-          description: previous.description,
-        }),
-      })
-      .eq("id", id)
-      .eq("household_id", householdId);
-
-    if (restoreError) throw new Error(restoreError.message);
-    restoredIds.push(id);
-  }
-
-  // Só os lançamentos que a importação criou. As previsões restauradas
-  // já tiveram `import_id` zerado acima, então ficam de fora — mas a
-  // exclusão é explícita por segurança, pra uma restauração que falhe no
-  // meio não virar lançamento apagado.
-  let deleteQuery = supabase
-    .from("transactions")
-    .delete()
-    .eq("household_id", householdId)
-    .eq("import_id", importId);
-
-  if (restoredIds.length > 0) {
-    deleteQuery = deleteQuery.not("id", "in", `(${restoredIds.join(",")})`);
-  }
-
-  const { error: txError } = await deleteQuery;
-  if (txError) throw new Error(txError.message);
-
-  const { error: deleteImportError } = await supabase
-    .from("imports")
-    .delete()
-    .eq("id", importId);
-
-  if (deleteImportError) throw new Error(deleteImportError.message);
+  // Mesma razão do confirmar: restaurar as previsões, apagar os
+  // lançamentos e apagar a importação acontecem juntos ou não acontecem.
+  // Desfazer pela metade deixaria lançamento sem importação, que nenhum
+  // desfazer posterior alcança.
+  const { error } = await supabase.rpc("undo_import", { p_import_id: importId });
+  if (error) throw new Error(error.message);
 
   revalidatePath("/importar");
   revalidatePath("/transacoes");
