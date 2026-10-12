@@ -103,7 +103,7 @@ export function CashFlowChart({
           )}
           <ReferenceLine y={0} stroke="var(--border-primary)" strokeDasharray="3 3" />
           <Line
-            type="stepAfter"
+            type="monotone"
             dataKey="balance_cents"
             stroke={`url(#${gradientId})`}
             strokeWidth={2}

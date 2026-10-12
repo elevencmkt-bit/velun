@@ -196,7 +196,7 @@ export default async function AVencerPage({ searchParams }: { searchParams: Prom
           <h1 className="text-page-title">A vencer</h1>
           <p className="text-page-subtitle">O que sai e o que entra nos próximos {HORIZON_DAYS} dias.</p>
         </div>
-        <nav aria-label="Filtro" className="-mx-1 flex gap-1 overflow-x-auto rounded-[14px] bg-white p-1 max-lg:self-start">
+        <nav aria-label="Filtro" className="flex max-w-full gap-0.5 overflow-x-auto rounded-[14px] bg-white p-1 [scrollbar-width:none] max-lg:self-start sm:gap-1">
           {TABS.map((tab) => {
             const active = tab.key === view;
             return (
@@ -204,7 +204,7 @@ export default async function AVencerPage({ searchParams }: { searchParams: Prom
                 key={tab.key}
                 href={tab.key === "tudo" ? "/a-pagar" : `/a-pagar?ver=${tab.key}`}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-9 shrink-0 items-center rounded-[11px] px-4 text-[14px] font-semibold transition-colors ${
+                className={`flex h-9 shrink-0 items-center rounded-[11px] px-3 text-[13px] font-semibold transition-colors sm:px-4 sm:text-[14px] ${
                   active ? "bg-(--text-primary) text-white" : "text-(--text-muted) hover:text-(--text-primary)"
                 }`}
               >

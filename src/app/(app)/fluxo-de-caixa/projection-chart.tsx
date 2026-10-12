@@ -173,7 +173,7 @@ export function ProjectionChart({
           />
           <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="5 5" strokeOpacity={0.8} />
           <Line
-            type="stepAfter"
+            type="monotone"
             dataKey="balance_cents"
             stroke={`url(#${gradientId})`}
             strokeWidth={2}

@@ -88,13 +88,22 @@ function Sparkline({ points }: { points: CashFlowPoint[] }) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
-  const path = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * 400;
-      const y = 62 - ((v - min) / span) * 54;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const pts = values.map((v, i) => ({
+    x: (i / (values.length - 1)) * 400,
+    y: 62 - ((v - min) / span) * 54,
+  }));
+  // Curva suave pelos pontos médios: cada trecho é uma curva que usa o
+  // ponto real como controle. Fica arredondada sem passar além dos
+  // valores de verdade.
+  const f = (n: number) => n.toFixed(1);
+  let path = `M${f(pts[0].x)} ${f(pts[0].y)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2;
+    const my = (pts[i].y + pts[i + 1].y) / 2;
+    path += ` Q${f(pts[i].x)} ${f(pts[i].y)} ${f(mx)} ${f(my)}`;
+  }
+  const last = pts[pts.length - 1];
+  path += ` L${f(last.x)} ${f(last.y)}`;
   return (
     <svg viewBox="0 0 400 70" preserveAspectRatio="none" aria-hidden className="h-14 w-full">
       <path
