@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
 import { getCashFlowProjection } from "@/lib/cash-flow";
+import { addDaysISO } from "@/lib/today";
 import type { CurrencyCode } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Money } from "@/components/money";
@@ -20,14 +21,6 @@ const TABS: { key: View; label: string }[] = [
   { key: "receber", label: "A receber" },
   { key: "recorrencias", label: "Recorrências" },
 ];
-
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
-
-function addDays(base: Date, days: number) {
-  return new Date(base.getTime() + days * 86_400_000);
-}
 
 function shortDate(date: string) {
   return new Date(`${date}T00:00:00`)
@@ -50,7 +43,7 @@ function Signed({ cents, currency }: { cents: number; currency: CurrencyCode }) 
 const PER_MONTH: Record<string, number> = { weekly: 52 / 12, monthly: 1, yearly: 1 / 12 };
 
 export default async function AVencerPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
-  const { householdId, memberId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
   const { ver } = await searchParams;
   const view: View = TABS.some((t) => t.key === ver) ? (ver as View) : "tudo";
@@ -65,10 +58,8 @@ export default async function AVencerPage({ searchParams }: { searchParams: Prom
   const visibleIds = scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
   const visibleSet = new Set(scope.ids);
 
-  const now = new Date();
-  const today = isoDate(now);
-  const weekEnd = isoDate(addDays(now, 6));
-  const horizon = isoDate(addDays(now, HORIZON_DAYS));
+  const weekEnd = addDaysISO(today, 6);
+  const horizon = addDaysISO(today, HORIZON_DAYS);
 
   const [{ data: accounts }, { data: categories }, { data: pendingRaw }, { data: recurrencesRaw }, cashFlow] =
     await Promise.all([
@@ -102,7 +93,7 @@ export default async function AVencerPage({ searchParams }: { searchParams: Prom
         .eq("household_id", householdId)
         .eq("is_active", true)
         .order("created_at", { ascending: true }),
-      getCashFlowProjection(supabase, householdId, HORIZON_DAYS, balanceScope),
+      getCashFlowProjection(supabase, householdId, HORIZON_DAYS, balanceScope, today),
     ]);
 
   // Onde quem está vendo pode mexer: conta do casal e as próprias.
@@ -148,7 +139,7 @@ export default async function AVencerPage({ searchParams }: { searchParams: Prom
 
   // Faixa dos próximos 30 dias: uma barrinha por dia, do tamanho do que
   // sai ou entra naquele dia. Mostra num relance onde o mês aperta.
-  const days = Array.from({ length: HORIZON_DAYS }, (_, i) => isoDate(addDays(now, i)));
+  const days = Array.from({ length: HORIZON_DAYS }, (_, i) => addDaysISO(today, i));
   const perDay = new Map<string, { out: number; in: number }>();
   for (const r of allPending) {
     if (r.date < today) continue;

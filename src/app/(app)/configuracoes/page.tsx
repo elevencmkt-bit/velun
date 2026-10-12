@@ -8,7 +8,7 @@ import { CategoryRow } from "./category-row";
 import { NewCategoryDialog } from "./new-category-dialog";
 import { DangerZone } from "./danger-zone";
 import { InviteManager } from "./invite-manager";
-import { CurrencySelect } from "./currency-select";
+import { HouseholdSettingsForm } from "./household-settings-form";
 
 const BENEFITS = [
   { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
@@ -45,7 +45,7 @@ function MemberAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | n
 }
 
 export default async function ConfiguracoesPage() {
-  const { memberId, householdId, currency } = await getCurrentMember();
+  const { memberId, householdId, currency, country, timezone } = await getCurrentMember();
   const supabase = await createClient();
 
   const [withAvatar, categoriesResult, colorMap, membersResult, inviteResult] = await Promise.all([
@@ -105,8 +105,18 @@ export default async function ConfiguracoesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-page-title">Configurações</h1>
-        <p className="text-page-subtitle">Seu perfil, quem divide a casa com você e as categorias.</p>
+        <p className="text-page-subtitle">Sua casa, seu perfil, quem divide a casa com você e as categorias.</p>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-card-title">Sua casa</h2>
+            <p className="mt-1 text-sm text-(--text-muted)">País, fuso e moeda valem pra todo mundo da casa.</p>
+          </div>
+          <HouseholdSettingsForm country={country} timezone={timezone} currency={currency} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="flex flex-col gap-4">
@@ -116,12 +126,11 @@ export default async function ConfiguracoesPage() {
       </Card>
 
       <section
-        className="relative overflow-hidden rounded-2xl border"
+        className="relative overflow-hidden rounded-[20px]"
         style={{
-          borderColor: "#CCD3FF",
           background:
             "radial-gradient(circle at 38% 15%, rgba(91,108,255,0.10), transparent 34%), linear-gradient(135deg, #FFFFFF 0%, #F9FAFF 58%, #F4F6FF 100%)",
-          boxShadow: "0 8px 24px rgba(20,28,60,.04)",
+          boxShadow: "var(--shadow-card)",
         }}
       >
         <div className="grid grid-cols-1 gap-6 p-5 pb-5 md:gap-7 md:p-7 md:[grid-template-columns:minmax(0,1fr)_1px_minmax(460px,1.12fr)]">
@@ -178,20 +187,6 @@ export default async function ConfiguracoesPage() {
 
           {/* COLUNA DIREITA */}
           <InviteManager pendingInvite={pendingInvite} />
-        </div>
-
-        {/* MOEDA */}
-        <div
-          className="flex flex-col items-start gap-2 border-t px-5 py-3.5 md:px-7 sm:flex-row sm:items-center sm:justify-between"
-          style={{ borderColor: "rgba(230,234,242,.9)" }}
-        >
-          <div>
-            <strong className="block text-xs font-semibold text-(--text-primary)">Moeda do orçamento</strong>
-            <span className="mt-0.5 block text-[11px] text-(--text-light)">
-              Usada nos lançamentos e relatórios deste orçamento.
-            </span>
-          </div>
-          <CurrencySelect currency={currency} />
         </div>
 
         {/* BENEFÍCIOS */}

@@ -51,8 +51,10 @@ export async function getCashFlowProjection(
   householdId: string,
   horizonDays: number,
   scope: AccountScope,
+  /** Hoje no fuso da casa (AAAA-MM-DD). */
+  todayISO?: string,
 ) {
-  const today = new Date(new Date().toDateString());
+  const today = todayISO ? new Date(`${todayISO}T00:00:00`) : new Date(new Date().toDateString());
   const horizon = addDays(today, horizonDays);
 
   const [balances, { data: pending }] = await Promise.all([

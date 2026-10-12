@@ -28,9 +28,10 @@ export function shortMonthLabel(year: number, monthIndex: number) {
     .replace(".", "");
 }
 
-// Lê ?month=YYYY-MM da URL, cai no mês atual se ausente/inválido.
-export function parseMonthParam(month: string | undefined) {
-  const now = new Date();
+// Lê ?month=YYYY-MM da URL, cai no mês atual se ausente/inválido. `today`
+// (AAAA-MM-DD, no fuso da casa) decide qual é o mês atual.
+export function parseMonthParam(month: string | undefined, today?: string) {
+  const now = today ? new Date(`${today}T12:00:00`) : new Date();
   let year = now.getFullYear();
   let monthIndex = now.getMonth();
   if (month && /^\d{4}-\d{2}$/.test(month)) {
