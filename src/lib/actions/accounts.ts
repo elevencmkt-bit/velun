@@ -194,6 +194,20 @@ export async function deleteAccount(accountId: string): Promise<DeleteAccountRes
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 
+  // Conta do casal é dos dois: com mais alguém na casa, ninguém exclui
+  // sozinho. (O pedido de aprovação do outro vem num passo seguinte.)
+  const [{ data: acc }, { count: members }] = await Promise.all([
+    supabase.from("accounts").select("owner_id").eq("id", accountId).eq("household_id", householdId).maybeSingle(),
+    supabase.from("members").select("id", { count: "exact", head: true }).eq("household_id", householdId),
+  ]);
+  if (!acc) return { ok: false, error: "Conta não encontrada." };
+  if (acc.owner_id === null && (members ?? 1) > 1) {
+    return {
+      ok: false,
+      error: "Conta do casal só sai com o aval dos dois. Por enquanto, arquive — o pedido de exclusão pro outro aprovar vem em seguida.",
+    };
+  }
+
   const { count, error: countError } = await supabase
     .from("transactions")
     .select("id", { count: "exact", head: true })
