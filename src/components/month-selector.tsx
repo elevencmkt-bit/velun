@@ -24,7 +24,7 @@ export function MonthSelector({
       </Link>
       <div className="flex items-center gap-1.5 px-1.5 text-[13px] font-medium text-(--text-primary)">
         <CalendarDays className="h-4 w-4 text-(--text-muted)" />
-        <span className="capitalize">{label}</span>
+        <span className="inline-block whitespace-nowrap first-letter:uppercase">{label}</span>
       </div>
       <Link
         href={nextHref}

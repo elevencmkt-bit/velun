@@ -163,11 +163,11 @@ export default async function FluxoDeCaixaPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-3.5 xl:grid-cols-4">
         {kpis.map((kpi) => (
           <div
             key={kpi.key}
-            className="flex min-h-[116px] items-center gap-4 rounded-2xl border p-5"
+            className="flex flex-col items-start gap-2.5 rounded-2xl border p-4 sm:min-h-[116px] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
             style={{
               background: "#FFFFFF",
               borderColor: "#E8ECF4",
@@ -175,7 +175,7 @@ export default async function FluxoDeCaixaPage({
             }}
           >
             <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-12 sm:w-12 sm:rounded-[14px]"
               style={{ background: kpi.iconBg, color: kpi.iconFg }}
             >
               <kpi.icon className="h-5 w-5" />
@@ -183,7 +183,7 @@ export default async function FluxoDeCaixaPage({
             <div className="min-w-0">
               <span className="mb-1 block text-[12px] font-semibold text-(--text-secondary)">{kpi.label}</span>
               <p
-                className="text-[24px] leading-[1.1] font-extrabold tracking-[-0.025em] tabular-nums"
+                className="text-[19px] leading-[1.1] font-extrabold sm:text-[24px] tracking-[-0.025em] tabular-nums"
                 style={{ color: kpi.valueColor ?? "var(--text-primary)" }}
               >
                 {kpi.value}

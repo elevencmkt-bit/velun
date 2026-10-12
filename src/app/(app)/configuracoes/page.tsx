@@ -105,7 +105,7 @@ export default async function ConfiguracoesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-page-title">Configurações</h1>
-        <p className="text-page-subtitle">Seu perfil, categorias e dados do household.</p>
+        <p className="text-page-subtitle">Seu perfil, quem divide a casa com você e as categorias.</p>
       </div>
 
       <Card>
@@ -124,10 +124,10 @@ export default async function ConfiguracoesPage() {
           boxShadow: "0 8px 24px rgba(20,28,60,.04)",
         }}
       >
-        <div className="grid grid-cols-1 gap-7 p-7 pb-5 md:[grid-template-columns:minmax(0,1fr)_1px_minmax(460px,1.12fr)]">
+        <div className="grid grid-cols-1 gap-6 p-5 pb-5 md:gap-7 md:p-7 md:[grid-template-columns:minmax(0,1fr)_1px_minmax(460px,1.12fr)]">
           {/* COLUNA ESQUERDA */}
           <div className="min-w-0">
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
                 style={{ background: "linear-gradient(135deg, #E9EDFF 0%, #DDE4FF 100%)" }}
@@ -182,7 +182,7 @@ export default async function ConfiguracoesPage() {
 
         {/* MOEDA */}
         <div
-          className="flex flex-col items-start gap-2 border-t px-7 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col items-start gap-2 border-t px-5 py-3.5 md:px-7 sm:flex-row sm:items-center sm:justify-between"
           style={{ borderColor: "rgba(230,234,242,.9)" }}
         >
           <div>
@@ -225,7 +225,7 @@ export default async function ConfiguracoesPage() {
             <NewCategoryDialog />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <span className="text-metadata mb-1">Despesas</span>
               {expenseCategories.length === 0 ? (

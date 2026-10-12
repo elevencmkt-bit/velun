@@ -282,3 +282,24 @@
     color: var(--text-light);
   }
 }
+
+/* Celular: a mesma escala, um degrau abaixo. Num cartão de meia tela
+   (dois indicadores lado a lado), 26px não cabe "-$1.393,98" sem quebrar. */
+@layer components {
+  @media (max-width: 639px) {
+    .text-page-title {
+      font-size: 24px;
+      line-height: 1.25;
+    }
+    .text-kpi-value {
+      font-size: 20px;
+      line-height: 26px;
+    }
+    .text-card-title {
+      font-size: 16px;
+      line-height: 23px;
+    }
+  }
+}
+
+

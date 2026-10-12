@@ -59,10 +59,10 @@ export default async function ContasPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
+      <div className="flex items-start justify-between gap-3 sm:items-center">
+        <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-page-title">Contas</h1>
-          <p className="text-page-subtitle">Saldo por conta, derivado das transações cleared.</p>
+          <p className="text-page-subtitle">Saldo de cada conta, a partir dos lançamentos confirmados.</p>
         </div>
         <AccountForm />
       </div>
@@ -73,13 +73,13 @@ export default async function ContasPage() {
         </p>
       ) : (
         <>
-          <Card className="w-fit">
-            <CardContent className="flex min-h-[128px] items-center gap-5">
+          <Card className="sm:w-fit">
+            <CardContent className="flex items-center gap-4 sm:min-h-[128px] sm:gap-5">
               <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-16 sm:w-16"
                 style={{ backgroundColor: "var(--badge-blue-bg)" }}
               >
-                <Wallet className="h-8 w-8" style={{ color: "var(--badge-blue-fg)" }} />
+                <Wallet className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: "var(--badge-blue-fg)" }} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-kpi-label">Saldo total</span>
@@ -88,7 +88,7 @@ export default async function ContasPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
             {accounts.map((account) => {
               const balance = balances.get(account.id) ?? 0;
               const Icon = ACCOUNT_TYPE_ICONS[account.type] ?? Wallet;
@@ -108,10 +108,10 @@ export default async function ContasPage() {
                   <CardContent className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <div
-                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl"
                         style={{ backgroundColor: "var(--badge-purple-bg)" }}
                       >
-                        <Icon className="h-8 w-8" style={{ color: "var(--badge-purple-fg)" }} />
+                        <Icon className="h-5 w-5 sm:h-8 sm:w-8" style={{ color: "var(--badge-purple-fg)" }} />
                       </div>
                       {canManage ? (
                         <div className="flex items-center gap-1">

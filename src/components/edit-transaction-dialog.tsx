@@ -6,6 +6,7 @@ import { Pencil } from "lucide-react";
 import { updateTransaction } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
+import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -289,9 +290,19 @@ export function EditTransactionDialog({
 
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}
 
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Salvando..." : "Salvar alterações"}
-          </Button>
+          {/* Excluir mora aqui também: no celular a lista não mostra a
+              lixeira, e editar é o único caminho até o lançamento. */}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <DeleteTransactionButton
+              transactionId={transaction.id}
+              transferGroupId={null}
+              variant="text"
+              onDeleted={() => setOpen(false)}
+            />
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

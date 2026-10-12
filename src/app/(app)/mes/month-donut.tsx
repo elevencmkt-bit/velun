@@ -17,7 +17,7 @@ export function MonthDonut({
   const total = slices.reduce((sum, s) => sum + s.amount_cents, 0);
 
   if (slices.length === 0 || total === 0) {
-    return <p className="text-sm text-(--text-muted)">Nenhuma despesa cleared neste mês.</p>;
+    return <p className="text-sm text-(--text-muted)">Nenhuma despesa confirmada neste mês.</p>;
   }
 
   const size = compact ? "h-36 w-36" : "h-56 w-56";

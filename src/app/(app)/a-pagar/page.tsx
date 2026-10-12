@@ -150,7 +150,7 @@ export default async function AVencerPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-card-title">A pagar</CardTitle>
@@ -204,7 +204,7 @@ export default async function AVencerPage() {
             categories={categories ?? []}
           />
         </div>
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
           <Card>
             <CardHeader>
               <CardTitle className="text-card-title">

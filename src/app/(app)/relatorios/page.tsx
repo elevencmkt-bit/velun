@@ -144,7 +144,7 @@ export default async function RelatoriosPage({
 
   return (
     <div className="flex flex-col gap-6" style={{ background: "#F6F7FB" }}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Relatórios</h1>
           <p className="text-page-subtitle">
@@ -153,7 +153,7 @@ export default async function RelatoriosPage({
               : "Para onde o dinheiro foi e de onde veio, por categoria."}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <ReportViewToggle view={view} />
           <MonthSelector
             label={monthLabel(year, monthIndex)}
@@ -163,9 +163,9 @@ export default async function RelatoriosPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <CardSurface className="flex min-h-[104px] items-center gap-3.5 p-[18px]">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: KPI_TONES.green.bg, color: KPI_TONES.green.fg }}>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.green.bg, color: KPI_TONES.green.fg }}>
             <TrendingUp className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -177,8 +177,8 @@ export default async function RelatoriosPage({
           </div>
         </CardSurface>
 
-        <CardSurface className="flex min-h-[104px] items-center gap-3.5 p-[18px]">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: KPI_TONES.red.bg, color: KPI_TONES.red.fg }}>
+        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.red.bg, color: KPI_TONES.red.fg }}>
             <TrendingDown className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -190,8 +190,8 @@ export default async function RelatoriosPage({
           </div>
         </CardSurface>
 
-        <CardSurface className="flex min-h-[104px] items-center gap-3.5 p-[18px]">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: KPI_TONES.blue.bg, color: KPI_TONES.blue.fg }}>
+        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.blue.bg, color: KPI_TONES.blue.fg }}>
             <Banknote className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -206,8 +206,8 @@ export default async function RelatoriosPage({
           </div>
         </CardSurface>
 
-        <CardSurface className="flex min-h-[104px] items-center gap-3.5 p-[18px]">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: KPI_TONES.purple.bg, color: KPI_TONES.purple.fg }}>
+        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.purple.bg, color: KPI_TONES.purple.fg }}>
             <Tag className="h-5 w-5" />
           </div>
           <div className="min-w-0">

@@ -122,14 +122,16 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex min-h-[128px] items-center gap-5">
+      {/* Celular: dois indicadores por linha, então o ícone sobe e o
+          valor ganha a largura toda do cartão. */}
+      <CardContent className="flex min-h-[112px] flex-col items-start gap-3 sm:min-h-[128px] sm:flex-row sm:items-center sm:gap-5">
         <div
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl"
           style={{ backgroundColor: badgeBg }}
         >
-          <Icon className="h-8 w-8" style={{ color: badgeFg }} />
+          <Icon className="h-5 w-5 sm:h-8 sm:w-8" style={{ color: badgeFg }} />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1 sm:gap-1.5">
           <span className="text-kpi-label">{label}</span>
           <span className="text-kpi-value" style={{ color: valueColor }}>
             {value}
@@ -239,7 +241,7 @@ export default async function MesPage({
         <h1 className="text-page-title">Dashboard</h1>
         <Card>
           <CardHeader>
-            <CardTitle className="text-card-title">Household vazio</CardTitle>
+            <CardTitle className="text-card-title">Nada por aqui ainda</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-(--text-secondary)">
             Nenhuma conta ainda. Cadastre uma conta em{" "}
@@ -252,8 +254,8 @@ export default async function MesPage({
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-6 sm:gap-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Dashboard</h1>
           <p className="text-page-subtitle">Resumo financeiro de {monthLabel(year, monthIndex)}.</p>
@@ -265,7 +267,7 @@ export default async function MesPage({
         />
       </div>
 
-      <div className="grid grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
         <StatCard
           label="Saldo total"
           value={formatCents(cashFlow.currentTotal, currency)}
@@ -304,7 +306,7 @@ export default async function MesPage({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5">
         <Card>
           <CardHeader>
             <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
@@ -354,7 +356,7 @@ export default async function MesPage({
         </Card>
       </div>
 
-      <div className="grid grid-cols-[1.2fr_0.9fr_0.9fr] gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.9fr_0.9fr] lg:gap-5">
         <Card>
           <CardHeader>
             <CardTitle className="text-card-title">Transações recentes</CardTitle>

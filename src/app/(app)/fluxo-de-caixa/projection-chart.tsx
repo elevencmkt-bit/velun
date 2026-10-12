@@ -97,7 +97,7 @@ function ChartTooltip({
         boxShadow: "0 4px 14px rgba(16,24,40,.08)",
       }}
     >
-      <div className="mb-1 font-semibold text-(--text-primary) capitalize">{dateLabel}</div>
+      <div className="mb-1 font-semibold text-(--text-primary) first-letter:uppercase">{dateLabel}</div>
       <div
         className="font-bold"
         style={{ color: point.balance_cents < 0 ? "var(--expense)" : "var(--income)" }}
