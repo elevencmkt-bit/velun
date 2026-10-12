@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
 import { getCashFlowProjection } from "@/lib/cash-flow";
-import { cardBillsForScope } from "@/lib/cards";
+import { cardBills, loadCards } from "@/lib/cards";
+import { CardTile } from "@/components/card-tile";
 import { addDaysISO } from "@/lib/today";
 import type { CurrencyCode } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,7 +84,7 @@ export default async function AVencerPage({
     { data: pendingRaw },
     { data: recurrencesRaw },
     cashFlow,
-    { cardIds, bills },
+    cards,
   ] = await Promise.all([
     supabase
       .from("accounts")
@@ -122,8 +123,18 @@ export default async function AVencerPage({
       balanceScope,
       today,
     ),
-    cardBillsForScope(supabase, householdId, scope.ids, today),
+    loadCards(supabase, householdId, memberId, today),
   ]);
+
+  // Faturas que esta pessoa paga ou pode ver por inteiro (do cartão
+  // pessoal do outro, só se ele estiver aberto).
+  const myCards = cards.filter((c) => c.canEdit || c.canSeeTransactions);
+  const cardIds = new Set(cards.map((c) => c.id));
+  const bills = cardBills(myCards);
+  // Cartão da lateral: o da próxima fatura a vencer.
+  const nextBill = bills.find((b) => b.amountCents > 0) ?? null;
+  const tileCard =
+    myCards.find((c) => c.id === nextBill?.cardId) ?? myCards[0] ?? null;
 
   // Onde quem está vendo pode mexer: conta do casal e as próprias.
   const mine = (accounts ?? []).filter(
@@ -470,6 +481,49 @@ export default async function AVencerPage({
             </div>
 
             <div className="flex min-w-0 flex-col gap-4 md:gap-6 lg:col-span-4">
+              {tileCard ? (
+                <CardTile
+                  title={nextBill ? "Próxima fatura" : "Cartão"}
+                  href={`/cartoes?cartao=${tileCard.id}${nextBill ? `&fatura=${nextBill.closing}` : ""}`}
+                  linkLabel="Ver fatura"
+                  name={tileCard.name}
+                  lastFour={tileCard.lastFour}
+                  color={tileCard.color}
+                  caption={
+                    nextBill
+                      ? `${nextBill.status === "open" ? "Aberta" : nextBill.status === "overdue" ? "Vencida" : "Fechada"} · vence ${shortDate(nextBill.date)}`
+                      : `Fatura aberta · vence ${shortDate(tileCard.current.due)}`
+                  }
+                  amount={
+                    <Money
+                      cents={
+                        nextBill
+                          ? nextBill.amountCents
+                          : tileCard.current.totalCents
+                      }
+                      currency={currency}
+                    />
+                  }
+                  usedPct={
+                    tileCard.limitCents
+                      ? Math.min(
+                          100,
+                          (tileCard.debtCents / tileCard.limitCents) * 100,
+                        )
+                      : null
+                  }
+                  footerLeft={
+                    tileCard.limitCents
+                      ? `${Math.round((tileCard.debtCents / tileCard.limitCents) * 100)}% do limite`
+                      : `Fecha ${shortDate(tileCard.current.closing)}`
+                  }
+                  footerRight={
+                    tileCard.limitCents
+                      ? `fecha ${shortDate(tileCard.current.closing)}`
+                      : undefined
+                  }
+                />
+              ) : null}
               <section
                 className="rounded-[20px] bg-white p-5 md:p-6"
                 style={{ boxShadow: "var(--shadow-card)" }}

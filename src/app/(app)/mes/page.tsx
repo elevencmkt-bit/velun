@@ -34,7 +34,7 @@ import { Money } from "@/components/money";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
 import { cardBills, loadCards } from "@/lib/cards";
-import { CardArt } from "@/components/card-art";
+import { CardTile } from "@/components/card-tile";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
@@ -529,73 +529,39 @@ export default async function MesPage({
         {/* Cartão de crédito: o primeiro cartão desenhado, com a fatura
             aberta. Sem cartão, o espaço mostra o saldo dos próximos 30 dias. */}
         {cards.length > 0 ? (
-          <Card className="lg:col-span-4">
-            <CardContent className="flex h-full flex-col gap-4">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-card-title">
-                  {cards.length === 1 ? "Cartão" : "Cartões"}
-                </h2>
-                <SectionLink href="/cartoes">Ver faturas</SectionLink>
-              </div>
-              <Link
-                href={`/cartoes?cartao=${cards[0].id}`}
-                className="relative block"
-              >
-                {cards.length > 1 ? (
-                  <div
-                    aria-hidden
-                    className="absolute top-0 right-[-6px] left-6 h-[140px] rotate-[4deg] rounded-[18px] opacity-80"
-                    style={{
-                      background:
-                        cards[1].color === "ink" ? "#27C499" : "#151821",
-                    }}
-                  />
-                ) : null}
-                <div className="relative pt-2.5 pr-4">
-                  <CardArt
-                    name={cards[0].name}
-                    color={cards[0].color}
-                    lastFour={cards[0].lastFour}
-                    caption="Fatura aberta"
-                    amount={
-                      <Money
-                        cents={cards[0].current.totalCents}
-                        currency={currency}
-                      />
-                    }
-                    size="sm"
-                  />
-                </div>
-              </Link>
-              <div className="mt-auto">
-                {cards[0].limitCents ? (
-                  <div className="mb-2 h-2 overflow-hidden rounded-full bg-(--bg-subtle)">
-                    <div
-                      className="h-full rounded-full bg-(--primary)"
-                      style={{
-                        width: `${Math.min(100, (cards[0].debtCents / cards[0].limitCents) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                ) : null}
-                <div className="flex justify-between gap-2 text-xs text-(--text-muted)">
-                  <span>
-                    Fecha {shortDate(cards[0].current.closing)} · vence{" "}
-                    {shortDate(cards[0].current.due)}
-                  </span>
-                  {cards[0].limitCents ? (
-                    <span>
-                      <Signed
-                        cents={cards[0].limitCents - cards[0].debtCents}
-                        currency={currency}
-                      />{" "}
-                      livres
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <CardTile
+            className="lg:col-span-4"
+            title={cards.length === 1 ? "Cartão" : `Cartões · ${cards.length}`}
+            href={`/cartoes?cartao=${cards[0].id}`}
+            linkLabel="Faturas"
+            name={cards[0].name}
+            lastFour={cards[0].lastFour}
+            color={cards[0].color}
+            caption={`Fatura aberta · vence ${shortDate(cards[0].current.due)}`}
+            amount={
+              <Money cents={cards[0].current.totalCents} currency={currency} />
+            }
+            usedPct={
+              cards[0].limitCents
+                ? Math.min(
+                    100,
+                    (cards[0].debtCents / cards[0].limitCents) * 100,
+                  )
+                : null
+            }
+            footerLeft={`Fecha ${shortDate(cards[0].current.closing)}`}
+            footerRight={
+              cards[0].limitCents ? (
+                <>
+                  <Signed
+                    cents={cards[0].limitCents - cards[0].debtCents}
+                    currency={currency}
+                  />{" "}
+                  livres
+                </>
+              ) : undefined
+            }
+          />
         ) : (
           <Card className="lg:col-span-4">
             <CardContent className="flex h-full flex-col gap-3">
