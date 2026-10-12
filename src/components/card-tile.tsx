@@ -39,26 +39,13 @@ export function CardTile({
       className={`relative flex min-h-[236px] flex-col overflow-hidden rounded-[24px] p-6 md:p-7 ${className}`}
       style={{ background: c.bg, color: c.fg }}
     >
-      <svg
-        viewBox="0 0 220 200"
-        fill="none"
+      <img
+        src="/velun-mark.png"
+        alt=""
         aria-hidden
-        className="pointer-events-none absolute -top-10 -right-16 h-[300px] w-[320px]"
+        className="object-contain pointer-events-none absolute -top-10 -right-16 h-[300px] w-[320px]"
         style={{ opacity: color === "ink" ? 0.28 : 0.18 }}
-      >
-        <path
-          d="M10 10 C80 70 110 120 110 200"
-          stroke={c.motif}
-          strokeWidth={14}
-          strokeLinecap="round"
-        />
-        <path
-          d="M210 10 C140 70 110 120 110 200"
-          stroke={c.motif}
-          strokeWidth={14}
-          strokeLinecap="round"
-        />
-      </svg>
+      />
 
       <div className="relative flex items-center justify-between gap-3">
         <span className="text-[14px] font-medium opacity-80">{title}</span>

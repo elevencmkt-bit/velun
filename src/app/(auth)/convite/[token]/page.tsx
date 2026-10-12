@@ -1,10 +1,11 @@
-import Image from "next/image";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { acceptInvite } from "@/lib/actions/accept-invite";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AuthField,
+  AuthShell,
+  authInputClass,
+} from "@/components/auth/auth-shell";
+import { PasswordInput, SubmitButton } from "@/components/auth/auth-controls";
 
 export default async function ConvitePage({
   params,
@@ -38,65 +39,86 @@ export default async function ConvitePage({
   const isValid = Boolean(invite) && !isExpired && !isUsed;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-(--paper) p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="flex flex-col items-center gap-2 pb-2">
-          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl">
-            <Image src="/velun-icon.png" alt="Velun" width={44} height={44} className="h-full w-full" />
-          </div>
-          <span className="text-lg font-bold text-(--text-primary)">Velun</span>
-          <CardTitle>{isValid ? "Você foi convidado(a)" : "Convite indisponível"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!isValid ? (
-            <p className="text-sm text-(--text-muted)">
-              {!invite
-                ? "Esse link de convite não é válido."
-                : isUsed
-                  ? "Esse convite já foi usado."
-                  : "Esse convite expirou. Peça um novo link pra quem te convidou."}
-            </p>
-          ) : (
-            <form action={acceptInvite.bind(null, token)} className="flex flex-col gap-4">
-              {inviterName ? (
-                <p className="text-sm text-(--text-secondary)">
-                  {inviterName} te convidou para compartilhar as finanças no Velun.
-                </p>
-              ) : null}
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="name">Seu nome</Label>
-                <Input id="name" name="name" required autoComplete="name" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email">Email</Label>
-                {/* Convite feito pra um email: ele já vem preenchido e travado —
-                    só esse email consegue usar o link. */}
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  defaultValue={invite?.email ?? undefined}
-                  readOnly={Boolean(invite?.email)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="new-password"
-                />
-              </div>
-              {error ? <p className="text-sm text-(--out)">{error}</p> : null}
-              <Button type="submit">Criar conta e entrar</Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <AuthShell>
+      {!isValid ? (
+        <>
+          <h1 className="text-[30px] leading-tight font-extrabold tracking-[-0.03em] text-(--text-primary)">
+            Convite indisponível
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-(--text-muted)">
+            {!invite
+              ? "Esse link de convite não é válido."
+              : isUsed
+                ? "Esse convite já foi usado. Se a conta é sua, é só entrar."
+                : "Esse convite expirou. Peça um novo link pra quem te convidou."}
+          </p>
+          <a
+            href="/login"
+            className="mt-8 flex h-12 w-full items-center justify-center rounded-[14px] bg-(--primary) text-[15px] font-semibold text-white"
+          >
+            Ir pra tela de entrar
+          </a>
+        </>
+      ) : (
+        <>
+          <h1 className="text-[30px] leading-tight font-extrabold tracking-[-0.03em] text-(--text-primary)">
+            {inviterName
+              ? `${inviterName.split(" ")[0]} te chamou pro Velun`
+              : "Você foi convidado(a)"}
+          </h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-(--text-muted)">
+            Crie sua conta pra dividir as finanças da casa. Suas contas pessoais
+            continuam suas: você escolhe o que aparece pro outro.
+          </p>
+
+          <form
+            action={acceptInvite.bind(null, token)}
+            className="mt-8 flex flex-col gap-5"
+          >
+            <AuthField label="Seu nome" htmlFor="name">
+              <input
+                id="name"
+                name="name"
+                required
+                autoComplete="name"
+                className={authInputClass}
+              />
+            </AuthField>
+            <AuthField label="Email" htmlFor="email">
+              {/* Convite feito pra um email: ele já vem preenchido e travado —
+                  só esse email consegue usar o link. */}
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                defaultValue={invite?.email ?? undefined}
+                readOnly={Boolean(invite?.email)}
+                className={authInputClass}
+              />
+            </AuthField>
+            <AuthField label="Crie uma senha" htmlFor="password">
+              <PasswordInput
+                id="password"
+                name="password"
+                autoComplete="new-password"
+              />
+            </AuthField>
+            {error ? (
+              <p
+                className="rounded-[14px] bg-(--expense-soft) px-4 py-3 text-sm text-(--expense-dark)"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+            <SubmitButton pendingLabel="Criando sua conta…">
+              Criar conta e entrar
+            </SubmitButton>
+          </form>
+        </>
+      )}
+    </AuthShell>
   );
 }
