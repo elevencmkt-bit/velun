@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { computeFingerprint } from "@/lib/fingerprint";
-import { parseRegionsStatement, StatementParseError } from "@/lib/import/regions-pdf";
+import { parseRegionsStatementText, StatementParseError } from "@/lib/import/regions-pdf";
 import { verifyStatement } from "@/lib/import/verify";
 import { suggestCategoryId } from "@/lib/import/mcc";
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_TEXT_LENGTH = 2 * 1024 * 1024;
 
 export type ImportResult =
   | {
@@ -22,35 +22,44 @@ export type ImportResult =
   | { ok: false; error: string };
 
 /**
- * Lê o PDF, confere contra o próprio extrato e grava em staging.
+ * Recebe o TEXTO já extraído do extrato, confere e grava em staging.
+ *
+ * O PDF não chega aqui: a extração acontece no navegador, então o
+ * arquivo nunca sai da máquina de quem importa. O servidor vê só o
+ * texto, e guarda só o que foi extraído.
  *
  * Nada vira transação aqui: a importação só preenche
  * `staged_transactions`, que é o que a tela de revisão mostra. Confirmar
  * é um segundo passo deliberado — importação automática que escreve
  * direto no histórico é importação em que você não pode confiar.
  */
-export async function importStatement(formData: FormData): Promise<ImportResult> {
+export async function importStatement(input: {
+  accountId: string;
+  fileName: string;
+  text: string;
+}): Promise<ImportResult> {
   const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
 
-  const accountId = String(formData.get("account_id") ?? "");
-  const file = formData.get("file");
+  const { accountId, fileName, text } = input;
 
   // Falhas previsíveis voltam como resultado, não como exceção: o Next
   // mascara erro de server action em produção, e o usuário acabaria
   // vendo um código do React no lugar da causa.
   if (!accountId) return { ok: false, error: "Escolha a conta do extrato." };
-  if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Escolha um arquivo." };
+  if (!text.trim()) {
+    return {
+      ok: false,
+      error: "Não consegui ler texto nesse PDF. Ele pode ser um documento escaneado.",
+    };
   }
-  if (file.size > MAX_BYTES) return { ok: false, error: "Arquivo maior que 10 MB." };
-  if (!file.name.toLowerCase().endsWith(".pdf")) {
-    return { ok: false, error: "Por enquanto só extrato em PDF da Regions." };
+  if (text.length > MAX_TEXT_LENGTH) {
+    return { ok: false, error: "Esse extrato é grande demais para importar de uma vez." };
   }
 
   let statement;
   try {
-    statement = await parseRegionsStatement(new Uint8Array(await file.arrayBuffer()));
+    statement = parseRegionsStatementText(text);
   } catch (err) {
     if (err instanceof StatementParseError) return { ok: false, error: err.message };
     throw err;
@@ -65,7 +74,7 @@ export async function importStatement(formData: FormData): Promise<ImportResult>
     .insert({
       household_id: householdId,
       account_id: accountId,
-      file_path: file.name,
+      file_path: fileName,
       file_type: "pdf",
       status: "review",
       statement_start: statement.periodStart,
