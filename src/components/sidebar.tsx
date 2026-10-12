@@ -97,9 +97,9 @@ export function Sidebar() {
           className="flex flex-col gap-1 rounded-xl p-4"
           style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
         >
-          <span className="text-sm font-medium text-white">Um só caixa, dois nomes</span>
+          <span className="text-sm font-medium text-white">Juntos, cada um com o seu</span>
           <span className="text-xs" style={{ color: "var(--sidebar-fg-muted)" }}>
-            Visibilidade compartilhada, decisões em conjunto.
+            Conta do casal, os dois veem. Conta sua, você escolhe o que o outro vê.
           </span>
         </div>
       </div>
