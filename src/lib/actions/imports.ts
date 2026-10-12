@@ -29,6 +29,38 @@ export type ImportResult =
   | { ok: false; error: string };
 
 /**
+ * Resultado das ações da importação.
+ *
+ * Elas não podem lançar exceção. O Next mascara erro de server action em
+ * produção: o cliente recebe só um código opaco ("digest"), a mensagem
+ * real fica no log do servidor, e a tela não mostra nada. Quem clicou vê
+ * o botão não fazer efeito e não tem como saber por quê.
+ *
+ * Isso já tinha sido consertado na importação e eu deixei o resto do
+ * arquivo lançando. Resultado: confirmar uma importação quebrou em
+ * produção e o usuário levou um clique no vazio, sem mensagem nenhuma.
+ */
+export type ActionResult = { ok: true } | { ok: false; error: string; detail?: string };
+
+/**
+ * Roda a ação e traduz qualquer exceção em resultado.
+ *
+ * `error` é a frase pra quem está usando; `detail` é a mensagem técnica,
+ * que a tela mostra embaixo em letra miúda. Sem o detalhe, erro de banco
+ * vira "algo deu errado" e a depuração depende de acesso ao log — o que
+ * não serve nem pra mim nem pra quem for usar isso depois.
+ */
+async function attempt(error: string, fn: () => Promise<void>): Promise<ActionResult> {
+  try {
+    await fn();
+    return { ok: true };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return { ok: false, error, detail };
+  }
+}
+
+/**
  * Recebe o TEXTO já extraído do extrato, confere e grava em staging.
  *
  * O PDF não chega aqui: a extração acontece no navegador, então o
@@ -218,7 +250,11 @@ export async function importStatement(input: {
 }
 
 /** Transforma o que está marcado na revisão em transações de verdade. */
-export async function confirmImport(importId: string) {
+export async function confirmImport(importId: string): Promise<ActionResult> {
+  return attempt('Não consegui confirmar a importação.', () => runConfirmImport(importId));
+}
+
+async function runConfirmImport(importId: string) {
   const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
 
@@ -346,7 +382,11 @@ export async function confirmImport(importId: string) {
 }
 
 /** Marca ou desmarca uma linha da revisão. */
-export async function toggleStagedRow(stagedId: string, isIncluded: boolean) {
+export async function toggleStagedRow(stagedId: string, isIncluded: boolean): Promise<ActionResult> {
+  return attempt('Não consegui marcar essa linha.', () => runToggleStagedRow(stagedId, isIncluded));
+}
+
+async function runToggleStagedRow(stagedId: string, isIncluded: boolean) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("staged_transactions")
@@ -361,7 +401,11 @@ export async function toggleStagedRow(stagedId: string, isIncluded: boolean) {
  * Responde o "essa linha parece ser a sua recorrência X": juntar ou
  * tratar como lançamento separado.
  */
-export async function setStagedMerge(stagedId: string, accepted: boolean) {
+export async function setStagedMerge(stagedId: string, accepted: boolean): Promise<ActionResult> {
+  return attempt('Não consegui mudar o cruzamento dessa linha.', () => runSetStagedMerge(stagedId, accepted));
+}
+
+async function runSetStagedMerge(stagedId: string, accepted: boolean) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("staged_transactions")
@@ -383,7 +427,11 @@ export async function setStagedMerge(stagedId: string, accepted: boolean) {
  * Só apaga previsão: `status` pendente e vinda de recorrência. Nunca
  * encosta em lançamento confirmado.
  */
-export async function dismissForecast(transactionId: string) {
+export async function dismissForecast(transactionId: string): Promise<ActionResult> {
+  return attempt('Não consegui apagar essa previsão.', () => runDismissForecast(transactionId));
+}
+
+async function runDismissForecast(transactionId: string) {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 
@@ -405,7 +453,11 @@ export async function dismissForecast(transactionId: string) {
 }
 
 /** Troca a categoria sugerida de uma linha da revisão. */
-export async function setStagedCategory(stagedId: string, categoryId: string | null) {
+export async function setStagedCategory(stagedId: string, categoryId: string | null): Promise<ActionResult> {
+  return attempt('Não consegui trocar a categoria.', () => runSetStagedCategory(stagedId, categoryId));
+}
+
+async function runSetStagedCategory(stagedId: string, categoryId: string | null) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("staged_transactions")
@@ -417,7 +469,11 @@ export async function setStagedCategory(stagedId: string, categoryId: string | n
 }
 
 /** Descarta uma importação em revisão sem criar nada. */
-export async function discardImport(importId: string) {
+export async function discardImport(importId: string): Promise<ActionResult> {
+  return attempt('Não consegui descartar a importação.', () => runDiscardImport(importId));
+}
+
+async function runDiscardImport(importId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("imports").delete().eq("id", importId);
   if (error) throw new Error(error.message);
@@ -437,7 +493,11 @@ export async function discardImport(importId: string) {
  * preço de ter um desfazer de verdade, e a tela avisa quantos são antes
  * de perguntar.
  */
-export async function undoImport(importId: string) {
+export async function undoImport(importId: string): Promise<ActionResult> {
+  return attempt('Não consegui desfazer a importação.', () => runUndoImport(importId));
+}
+
+async function runUndoImport(importId: string) {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 

@@ -12,6 +12,7 @@ import {
   setStagedMerge,
   toggleStagedRow,
   undoImport,
+  type ActionResult,
 } from "@/lib/actions/imports";
 import { extractPdfText } from "@/lib/import/extract-pdf-text";
 import { formatCents, type CurrencyCode } from "@/lib/money";
@@ -138,22 +139,43 @@ export function ImportWorkspace({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Mensagem técnica do erro, quando houver. Fica separada da frase pra
+  // quem está usando: aparece embaixo, menor, e é o que permite
+  // descobrir a causa sem acesso ao log do servidor.
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   // Desfazer apaga lançamentos. Pede confirmação na própria linha em vez
   // de um dialog: a pergunta fica ao lado do que vai ser apagado.
   const [confirmingUndo, setConfirmingUndo] = useState<string | null>(null);
   const router = useRouter();
 
-  function run(fn: () => Promise<unknown>) {
+  function run(fn: () => Promise<ActionResult>) {
     setError(null);
+    setErrorDetail(null);
     startTransition(async () => {
       try {
-        await fn();
+        const result = await fn();
+        if (!result.ok) {
+          setError(result.error);
+          setErrorDetail(result.detail ?? null);
+          return;
+        }
         router.refresh();
       } catch (err) {
+        // Só chega aqui falha de rede ou do próprio Next — as ações não
+        // lançam mais.
         setError(err instanceof Error ? err.message : "Algo deu errado.");
       }
     });
   }
+
+  const errorBlock = error ? (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm text-(--expense)">{error}</p>
+      {errorDetail ? (
+        <p className="font-mono text-xs break-all text-(--text-muted)">{errorDetail}</p>
+      ) : null}
+    </div>
+  ) : null;
 
   function onUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -246,7 +268,7 @@ export function ImportWorkspace({
                 />
               </div>
 
-              {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
+              {errorBlock}
 
               <Button type="submit" disabled={isPending || accounts.length === 0}>
                 <Upload className="mr-2 h-4 w-4" />
@@ -395,7 +417,7 @@ export function ImportWorkspace({
         </p>
       ) : null}
 
-      {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
+      {errorBlock}
 
       <Card>
         <CardContent className="p-0">
