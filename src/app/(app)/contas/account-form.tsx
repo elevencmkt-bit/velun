@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { createAccount, updateAccount } from "@/lib/actions/accounts";
+import { CARD_COLORS } from "@/lib/credit-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,9 +49,29 @@ export type EditableAccount = {
   opening_balance_cents: number;
   owner_id: string | null;
   visibility: string;
+  credit_limit_cents?: number | null;
+  statement_close_day?: number | null;
+  payment_due_day?: number | null;
+  payment_account_id?: string | null;
+  last_four?: string | null;
+  card_color?: string | null;
 };
 
-export function AccountForm({ account }: { account?: EditableAccount }) {
+const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
+
+export function AccountForm({
+  account,
+  paymentAccounts = [],
+  defaultType,
+  trigger,
+}: {
+  account?: EditableAccount;
+  /** Contas que podem pagar a fatura de um cartão (correntes do casal ou próprias). */
+  paymentAccounts?: { id: string; name: string }[];
+  defaultType?: string;
+  /** Botão que abre o formulário, quando não é o padrão. */
+  trigger?: React.ReactNode;
+}) {
   const isEdit = Boolean(account);
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -63,6 +84,11 @@ export function AccountForm({ account }: { account?: EditableAccount }) {
   const [ownership, setOwnership] = useState(
     account?.owner_id ? "personal" : "joint",
   );
+  // Cartão pede mais campos (fechamento, vencimento…); controlado pra
+  // mostrar ou esconder.
+  const [type, setType] = useState(account?.type ?? defaultType ?? "checking");
+  const isCard = type === "credit_card";
+  const [cardColor, setCardColor] = useState(account?.card_color ?? "ink");
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,17 +113,19 @@ export function AccountForm({ account }: { account?: EditableAccount }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {isEdit ? (
+        {trigger ?? (isEdit ? (
           <Button variant="ghost" size="icon" aria-label="Editar conta">
             <Pencil className="h-4 w-4" />
           </Button>
         ) : (
           <Button size="sm">Nova conta</Button>
-        )}
+        ))}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar conta" : "Nova conta"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? (isCard ? "Editar cartão" : "Editar conta") : isCard ? "Novo cartão" : "Nova conta"}
+          </DialogTitle>
         </DialogHeader>
         <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -153,13 +181,13 @@ export function AccountForm({ account }: { account?: EditableAccount }) {
               id="name"
               name="name"
               required
-              placeholder="Ex: Chase Checking"
+              placeholder={isCard ? "Ex: Cartão principal" : "Ex: Chase Checking"}
               defaultValue={account?.name}
             />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="type">Tipo</Label>
-            <Select name="type" defaultValue={account?.type ?? "checking"} required>
+            <Select name="type" value={type} onValueChange={setType} required>
               <SelectTrigger id="type">
                 <SelectValue />
               </SelectTrigger>
@@ -181,18 +209,124 @@ export function AccountForm({ account }: { account?: EditableAccount }) {
               defaultValue={account?.institution ?? ""}
             />
           </div>
+          {isCard ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="close_day">Fecha todo dia</Label>
+                  <Select name="close_day" defaultValue={String(account?.statement_close_day ?? 28)} required>
+                    <SelectTrigger id="close_day">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAYS.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="due_day">Vence todo dia</Label>
+                  <Select name="due_day" defaultValue={String(account?.payment_due_day ?? 22)} required>
+                    <SelectTrigger id="due_day">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAYS.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="credit_limit">Limite (opcional)</Label>
+                  <Input
+                    id="credit_limit"
+                    name="credit_limit"
+                    inputMode="decimal"
+                    placeholder="3000.00"
+                    defaultValue={account?.credit_limit_cents ? (account.credit_limit_cents / 100).toFixed(2) : ""}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="last_four">Final (opcional)</Label>
+                  <Input
+                    id="last_four"
+                    name="last_four"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="4821"
+                    defaultValue={account?.last_four ?? ""}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="payment_account_id">Fatura paga com</Label>
+                <Select name="payment_account_id" defaultValue={account?.payment_account_id ?? "none"}>
+                  <SelectTrigger id="payment_account_id">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Escolho na hora</SelectItem>
+                    {paymentAccounts
+                      .filter((a) => a.id !== account?.id)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-2 text-sm font-medium">Cor do cartão</legend>
+                <input type="hidden" name="card_color" value={cardColor} />
+                <div className="flex gap-2.5">
+                  {Object.entries(CARD_COLORS).map(([key, c]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setCardColor(key)}
+                      aria-label={c.label}
+                      aria-pressed={cardColor === key}
+                      className="h-9 w-12 rounded-lg transition-transform"
+                      style={{
+                        background: c.bg,
+                        boxShadow: cardColor === key ? "0 0 0 2px #FFFFFF, 0 0 0 4px var(--primary)" : "none",
+                      }}
+                    />
+                  ))}
+                </div>
+              </fieldset>
+            </>
+          ) : null}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="opening_balance">Saldo inicial (USD)</Label>
+            <Label htmlFor="opening_balance">
+              {isCard ? "Quanto você deve hoje neste cartão" : "Saldo inicial"}
+            </Label>
             <Input
               id="opening_balance"
               name="opening_balance"
               type="text"
               inputMode="decimal"
               defaultValue={
-                account ? (account.opening_balance_cents / 100).toFixed(2) : "0"
+                account
+                  ? ((isCard ? -account.opening_balance_cents : account.opening_balance_cents) / 100).toFixed(2)
+                  : "0"
               }
               placeholder="0.00"
             />
+            {isCard ? (
+              <p className="text-xs text-(--text-muted)">
+                Só o que já estava na fatura antes de você começar a lançar as compras aqui.
+              </p>
+            ) : null}
           </div>
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}
           <Button type="submit" disabled={isPending}>

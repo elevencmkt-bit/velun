@@ -296,6 +296,21 @@ check "fuso inexistente é recusado" "$(as_user $LEVI "update households set tim
 check "país fora da lista é recusado" "$(as_user $LEVI "update households set country = 'XX' where id = '11111111-0000-0000-0000-000000000001';" | grep -o 'violates check' | head -1)" "violates check"
 check "ninguém mexe na casa dos outros" "$(as_user $LEVI "update households set timezone = 'America/Chicago' where id = '22222222-0000-0000-0000-000000000002' returning id;" | grep -c 2222)" "0"
 
+echo "cartão de crédito:"
+admin "update households set country='US', timezone='America/New_York', currency='USD' where id='11111111-0000-0000-0000-000000000001'"
+as_user $LEVI "insert into accounts (id, household_id, name, type, owner_id, visibility, credit_limit_cents, statement_close_day, payment_due_day, payment_account_id, last_four, card_color) values ('acc00000-0000-0000-0000-0000000000c1', '11111111-0000-0000-0000-000000000001', 'Cartão principal', 'credit_card', '$LEVI', 'balance_only', 300000, 28, 22, 'acc00000-0000-0000-0000-000000000002', '4821', 'ink');" >/dev/null
+check "Levi cadastra o cartão dele" "$(admin "select name||' · '||last_four||' · '||statement_close_day||'/'||payment_due_day from accounts where id='acc00000-0000-0000-0000-0000000000c1'")" "Cartão principal · 4821 · 28/22"
+check "dia de fechamento fora de 1–31 é recusado" "$(as_user $LEVI "update accounts set statement_close_day = 32 where id = 'acc00000-0000-0000-0000-0000000000c1';" | grep -o 'violates check' | head -1)" "violates check"
+check "final com letras é recusado" "$(as_user $LEVI "update accounts set last_four = '48a1' where id = 'acc00000-0000-0000-0000-0000000000c1';" | grep -o 'violates check' | head -1)" "violates check"
+check "cartão não paga a si mesmo" "$(as_user $LEVI "update accounts set payment_account_id = id where id = 'acc00000-0000-0000-0000-0000000000c1';" | grep -o 'violates check' | head -1)" "violates check"
+as_user $ESPOSA "update accounts set credit_limit_cents = 999999 where id = 'acc00000-0000-0000-0000-0000000000c1';" >/dev/null
+check "esposa não mexe no cartão dele" "$(admin "select credit_limit_cents from accounts where id='acc00000-0000-0000-0000-0000000000c1'")" "300000"
+as_user $LEVI "select create_transfer('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', 'acc00000-0000-0000-0000-0000000000c1', '2026-11-22', 128430, 'Pagamento da fatura', null, '$LEVI', 'pf-1', 'pf-2');" >/dev/null
+check "pagar a fatura vira transferência (sai do casal, entra no cartão)" "$(admin "select string_agg(direction::text, ',' order by direction) from transactions where description='Pagamento da fatura' and transfer_group_id is not null")" "in,out"
+
+check "cartão com saldo inicial positivo é recusado" "$(as_user $LEVI "update accounts set opening_balance_cents = 2500 where id = 'acc00000-0000-0000-0000-0000000000c1';" | grep -o 'violates check' | head -1)" "violates check"
+check "conta corrente com saldo positivo continua normal" "$(as_user $LEVI "update accounts set opening_balance_cents = 2500 where id = 'acc00000-0000-0000-0000-000000000002' returning opening_balance_cents;" | head -1)" "2500"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL

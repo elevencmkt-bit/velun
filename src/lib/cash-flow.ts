@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountScope } from "@/lib/visibility";
 import { getAccountBalances } from "@/lib/balances";
+import { cardBillsForScope } from "@/lib/cards";
 
 export type CashFlowEvent = {
   id: string;
@@ -57,27 +58,55 @@ export async function getCashFlowProjection(
   const today = todayISO ? new Date(`${todayISO}T00:00:00`) : new Date(new Date().toDateString());
   const horizon = addDays(today, horizonDays);
 
-  const [balances, { data: pending }] = await Promise.all([
+  const [balances, { data: pending }, { cardIds, bills }] = await Promise.all([
     getAccountBalances(supabase, householdId, scope),
     supabase
       .from("transactions")
-      .select("id, date, description, amount_cents, direction, category:categories(name)")
+      .select("id, date, description, amount_cents, direction, account_id, category:categories(name)")
       .eq("household_id", householdId)
       .eq("status", "pending")
       .in("account_id", scope.ids)
       .gte("date", toISO(today))
       .lte("date", toISO(horizon))
       .order("date", { ascending: true }),
+    cardBillsForScope(supabase, householdId, scope.ids, toISO(today)),
   ]);
 
-  const currentTotal = Array.from(balances.values()).reduce((sum, v) => sum + v, 0);
+  // Cartão fica fora do saldo em dinheiro: compra no cartão não tira
+  // dinheiro da conta no dia — quem tira é o pagamento da fatura, que
+  // entra abaixo como saída no vencimento.
+  const currentTotal = Array.from(balances.entries())
+    .filter(([id]) => !cardIds.has(id))
+    .reduce((sum, [, v]) => sum + v, 0);
+
+  type Row = {
+    id: string;
+    date: string;
+    description: string;
+    amount_cents: number;
+    direction: "in" | "out";
+    category: unknown;
+  };
+  const rows: Row[] = [
+    ...((pending ?? []) as (Row & { account_id?: string })[]).filter((r) => !cardIds.has(r.account_id ?? "")),
+    ...bills
+      .filter((b) => b.date >= toISO(today) && b.date <= toISO(horizon))
+      .map((b) => ({
+        id: `fatura:${b.id}`,
+        date: b.date,
+        description: `Fatura · ${b.cardName}`,
+        amount_cents: b.amountCents,
+        direction: "out" as const,
+        category: null,
+      })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
 
   const eventsByDate = new Map<string, CashFlowEvent[]>();
   const upcomingEvents: UpcomingEvent[] = [];
   let totalIncome = 0;
   let totalExpense = 0;
 
-  for (const row of pending ?? []) {
+  for (const row of rows) {
     const isIncome = row.direction === "in";
     if (isIncome) totalIncome += row.amount_cents;
     else totalExpense += row.amount_cents;
@@ -97,7 +126,7 @@ export async function getCashFlowProjection(
       description: row.description,
       direction: row.direction,
       amount_cents: row.amount_cents,
-      category_name: single<{ name: string }>(row.category)?.name ?? null,
+      category_name: single<{ name: string }>(row.category as { name: string } | null)?.name ?? null,
     });
   }
 
