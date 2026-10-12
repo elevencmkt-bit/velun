@@ -71,6 +71,16 @@ export async function resetTransactionsData() {
     .eq("household_id", householdId);
   if (recError) throw new Error(recError.message);
 
+  // Histórico de importações vai junto: sem os lançamentos, cada linha
+  // ficaria "0 lançamentos" com um Desfazer que não desfaz nada. As
+  // linhas em revisão (staged) saem em cascata. Os nomes que a pessoa
+  // ensinou (merchant_names) ficam — servem pra reimportar.
+  const { error: impError } = await supabase
+    .from("imports")
+    .delete()
+    .eq("household_id", householdId);
+  if (impError) throw new Error(impError.message);
+
   revalidateEverything();
 }
 
