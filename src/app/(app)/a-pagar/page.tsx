@@ -5,7 +5,7 @@ import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
 import { getCashFlowProjection } from "@/lib/cash-flow";
 import { cardBills, loadCards } from "@/lib/cards";
-import { CardTile } from "@/components/card-tile";
+import { CardStack } from "@/components/card-stack";
 import { addDaysISO } from "@/lib/today";
 import type { CurrencyCode } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -482,46 +482,44 @@ export default async function AVencerPage({
 
             <div className="flex min-w-0 flex-col gap-4 md:gap-6 lg:col-span-4">
               {tileCard ? (
-                <CardTile
-                  title={nextBill ? "Próxima fatura" : "Cartão"}
-                  href={`/cartoes?cartao=${tileCard.id}${nextBill ? `&fatura=${nextBill.closing}` : ""}`}
-                  linkLabel="Ver fatura"
-                  name={tileCard.name}
-                  lastFour={tileCard.lastFour}
-                  color={tileCard.color}
-                  caption={
-                    nextBill
-                      ? `${nextBill.status === "open" ? "Aberta" : nextBill.status === "overdue" ? "Vencida" : "Fechada"} · vence ${shortDate(nextBill.date)}`
-                      : `Fatura aberta · vence ${shortDate(tileCard.current.due)}`
-                  }
-                  amount={
-                    <Money
-                      cents={
-                        nextBill
-                          ? nextBill.amountCents
-                          : tileCard.current.totalCents
-                      }
-                      currency={currency}
-                    />
-                  }
-                  usedPct={
-                    tileCard.limitCents
-                      ? Math.min(
-                          100,
-                          (tileCard.debtCents / tileCard.limitCents) * 100,
-                        )
-                      : null
-                  }
-                  footerLeft={
-                    tileCard.limitCents
-                      ? `${Math.round((tileCard.debtCents / tileCard.limitCents) * 100)}% do limite`
-                      : `Fecha ${shortDate(tileCard.current.closing)}`
-                  }
-                  footerRight={
-                    tileCard.limitCents
-                      ? `fecha ${shortDate(tileCard.current.closing)}`
-                      : undefined
-                  }
+                <CardStack
+                  title={nextBill ? "Próxima fatura" : "Cartões"}
+                  currency={currency}
+                  cards={[
+                    tileCard,
+                    ...myCards.filter((c) => c.id !== tileCard.id),
+                  ].map((c) => {
+                    const bill = bills.find(
+                      (b) => b.cardId === c.id && b.amountCents > 0,
+                    );
+                    const statusLabel =
+                      bill?.status === "open"
+                        ? "Aberta"
+                        : bill?.status === "overdue"
+                          ? "Vencida"
+                          : "Fechada";
+                    return {
+                      id: c.id,
+                      name: c.name,
+                      lastFour: c.lastFour,
+                      color: c.color,
+                      caption: bill
+                        ? `${statusLabel} · vence ${shortDate(bill.date)}`
+                        : `Fatura aberta · vence ${shortDate(c.current.due)}`,
+                      amountCents: bill
+                        ? bill.amountCents
+                        : c.current.totalCents,
+                      usedPct: c.limitCents
+                        ? Math.min(100, (c.debtCents / c.limitCents) * 100)
+                        : null,
+                      footerLeft: c.limitCents
+                        ? `${Math.round((c.debtCents / c.limitCents) * 100)}% do limite`
+                        : `Fecha ${shortDate(c.current.closing)}`,
+                      freeCents: c.limitCents
+                        ? c.limitCents - c.debtCents
+                        : null,
+                    };
+                  })}
                 />
               ) : null}
               <section
