@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, Banknote, Tag, TrendingDown, TrendingUp } from "lucide-react";
+import { Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
@@ -9,26 +9,17 @@ import { fetchMonthTransactions } from "@/lib/month-transactions";
 import { accountScope } from "@/lib/visibility";
 import {
   buildReportInsight,
+  categoryDeltas,
   dailySeries,
   excludeTransfers,
-  groupByCategory,
-  groupByCategoryCapped,
   sumByDirection,
 } from "@/lib/reports";
 import { MonthSelector } from "@/components/month-selector";
 import { ReportViewToggle, type ReportView } from "./report-view-toggle";
-import { MonthDonut } from "../mes/month-donut";
+import { CategoryBreakdown } from "./category-breakdown";
 import { PeriodEvolutionChart } from "./period-evolution-chart";
-import { InsightVelunCard, TopCategoriesCard } from "./bottom-cards";
+import { InsightVelunCard } from "./bottom-cards";
 import { Money } from "@/components/money";
-import type { CurrencyCode } from "@/lib/money";
-
-const KPI_TONES = {
-  green: { bg: "#EAFBF2", fg: "#22C55E" },
-  red: { bg: "#FFF1F3", fg: "#F04469" },
-  blue: { bg: "#EEF4FF", fg: "#3B82F6" },
-  purple: { bg: "#F4EEFF", fg: "#8B5CF6" },
-};
 
 function CardSurface({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -38,15 +29,6 @@ function CardSurface({ children, className = "" }: { children: ReactNode; classN
     >
       {children}
     </div>
-  );
-}
-
-// Valor do mês anterior em texto calmo, igual ao Dashboard.
-function PreviousMonth({ label, cents, currency }: { label: string; cents: number; currency: CurrencyCode }) {
-  return (
-    <span className="mt-1.5 block text-[11px] text-(--text-secondary)">
-      Em {label}: <Money cents={cents} currency={currency} />
-    </span>
   );
 }
 
@@ -65,7 +47,6 @@ export default async function RelatoriosPage({
   const prev = shiftMonth(year, monthIndex, -1);
   const prevRange = monthRange(prev.year, prev.monthIndex);
   const next = shiftMonth(year, monthIndex, 1);
-  const prevLabel = `${shortMonthLabel(prev.year, prev.monthIndex)}/${prev.year}`;
 
   const status = view === "a-vencer" ? "pending" : "cleared";
 
@@ -94,21 +75,16 @@ export default async function RelatoriosPage({
   const totalExpensePrev = sumByDirection(previous, "out");
   const balancePrev = totalIncomePrev - totalExpensePrev;
 
-  const expenseRanking = groupByCategory(current, "out");
-  const incomeRanking = groupByCategory(current, "in");
-  const topExpense = expenseRanking[0];
-  const topExpensePrev = groupByCategory(previous, "out")[0];
-
-  const expenseSlices = groupByCategoryCapped(current, "out").map((slice) => ({
-    ...slice,
-    color: (colorMap.get(slice.name) ?? MUTED_CATEGORY_COLOR).fg,
-  }));
-  const incomeSlices = groupByCategoryCapped(current, "in").map((slice) => ({
-    ...slice,
-    color: (colorMap.get(slice.name) ?? MUTED_CATEGORY_COLOR).fg,
-  }));
+  const expenseDeltas = categoryDeltas(current, previous, "out");
+  const incomeDeltas = categoryDeltas(current, previous, "in");
+  const withColor = (d: (typeof expenseDeltas)[number]) => ({
+    ...d,
+    color: (colorMap.get(d.name) ?? MUTED_CATEGORY_COLOR).fg,
+  });
 
   const evolution = dailySeries(current, start, end);
+  const monthName = new Date(year, monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" });
+  const prevName = new Date(prev.year, prev.monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" });
 
   const insight = buildReportInsight({
     income: totalIncome,
@@ -117,30 +93,44 @@ export default async function RelatoriosPage({
     incomePrev: totalIncomePrev,
     expensePrev: totalExpensePrev,
     balancePrev,
-    topExpense,
-    topExpensePrev,
-    prevName: new Date(prev.year, prev.monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" }),
+    expenseDeltas,
+    prevName,
   });
 
   const viewQuery = view === "a-vencer" ? "&view=a-vencer" : "";
   const monthQS = monthParam(year, monthIndex);
-  const expenseTitle = view === "a-vencer" ? "Despesas a vencer por categoria" : "Despesas por categoria";
-  const incomeTitle = view === "a-vencer" ? "Receitas a receber por categoria" : "Receitas por categoria";
   const expenseEmpty = view === "a-vencer" ? "Nenhuma despesa pendente neste mês." : "Nenhuma despesa neste mês.";
   const incomeEmpty = view === "a-vencer" ? "Nenhuma receita pendente neste mês." : "Nenhuma receita neste mês.";
   const isPeriodEmpty = current.length === 0;
+  const hasPrev = totalIncomePrev !== 0 || totalExpensePrev !== 0;
 
-  const topCategoryShare = topExpense && totalExpense > 0 ? Math.round((topExpense.amount_cents / totalExpense) * 100) : 0;
+  // Sem categoria demais e o relatório não diz pra onde foi o dinheiro.
+  const uncategorized = expenseDeltas.find((d) => d.name === "Sem categoria")?.amount_cents ?? 0;
+  const uncategorizedShare = totalExpense > 0 ? Math.round((uncategorized / totalExpense) * 100) : 0;
+  const showUncategorized = uncategorizedShare > 20;
+
+  const heroLabel =
+    view === "a-vencer"
+      ? balance >= 0 ? `Deve sobrar em ${monthName}` : `Deve faltar em ${monthName}`
+      : balance >= 0 ? `Sobrou em ${monthName}` : `Faltou em ${monthName}`;
+  const swing = balance - balancePrev;
+  const heroNote = !hasPrev
+    ? null
+    : balancePrev < 0 && balance >= 0
+      ? <>Em {prevName} faltaram <Money cents={-balancePrev} currency={currency} /> — virou o jogo em <Money cents={swing} currency={currency} />.</>
+      : swing === 0
+        ? <>Igual a {prevName}.</>
+        : <><Money cents={Math.abs(swing)} currency={currency} /> {swing > 0 ? "a mais" : "a menos"} que em {prevName}.</>;
 
   return (
-    <div className="flex flex-col gap-6" style={{ background: "#F6F7FB" }}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-5 md:gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Relatórios</h1>
-          <p className="text-page-subtitle">
+          <p className="text-page-subtitle max-sm:hidden">
             {view === "a-vencer"
-              ? "O que ainda vai vencer ou entrar, por categoria — para projetar os próximos meses."
-              : "Para onde o dinheiro foi e de onde veio, por categoria."}
+              ? "O que ainda vai vencer ou entrar, por categoria."
+              : "Pra onde o dinheiro foi e de onde veio."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -153,70 +143,64 @@ export default async function RelatoriosPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.green.bg, color: KPI_TONES.green.fg }}>
-            <TrendingUp className="h-5 w-5" />
+      {showUncategorized && !isPeriodEmpty ? (
+        <div className="flex flex-col gap-3 rounded-[16px] bg-[#FFF6E5] px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <Tag className="mt-0.5 h-5 w-5 shrink-0 text-[#B54708]" />
+            <p className="text-sm leading-relaxed text-[#7A2E0E]">
+              <b>
+                {uncategorizedShare}% das despesas de {monthName} estão sem categoria (
+                <Money cents={uncategorized} currency={currency} />
+                ).
+              </b>{" "}
+              <span className="max-md:hidden">Enquanto isso, o relatório não consegue dizer pra onde foi a maior parte do dinheiro.</span>
+            </p>
           </div>
-          <div className="min-w-0">
-            <span className="block text-[12px] text-(--text-secondary)">Receitas do período</span>
-            <span className="mt-0.5 block text-[18px] font-extrabold tabular-nums text-(--text-primary)">
-              <Money cents={totalIncome} currency={currency} />
-            </span>
-            <PreviousMonth label={prevLabel} cents={totalIncomePrev} currency={currency} />
-          </div>
-        </CardSurface>
+          <Link
+            href={`/transacoes?month=${monthQS}&category=none`}
+            className="flex h-9 shrink-0 items-center self-start rounded-[11px] bg-[#B54708] px-3.5 text-[13px] font-semibold whitespace-nowrap text-white max-md:ml-8 md:self-auto"
+          >
+            Categorizar agora
+          </Link>
+        </div>
+      ) : null}
 
-        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.red.bg, color: KPI_TONES.red.fg }}>
-            <TrendingDown className="h-5 w-5" />
+      <section className="relative overflow-hidden rounded-[24px] bg-(--primary) p-5 text-white md:px-8 md:py-7">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/velun-mark.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -right-28 h-[360px] w-[420px] object-contain opacity-[0.12] md:-top-28 md:-right-24 md:h-[420px] md:w-[520px]"
+        />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+          <div>
+            <div className="text-sm text-white/80">{heroLabel}</div>
+            <div className="mt-1 text-[34px] leading-tight font-extrabold tracking-[-0.03em] tabular-nums md:text-[44px]">
+              <Money cents={Math.abs(balance)} currency={currency} />
+            </div>
+            {heroNote ? <div className="mt-1 text-[13px] text-white/80 max-md:hidden">{heroNote}</div> : null}
           </div>
-          <div className="min-w-0">
-            <span className="block text-[12px] text-(--text-secondary)">Despesas do período</span>
-            <span className="mt-0.5 block text-[18px] font-extrabold tabular-nums text-(--text-primary)">
-              <Money cents={totalExpense} currency={currency} />
-            </span>
-            <PreviousMonth label={prevLabel} cents={totalExpensePrev} currency={currency} />
+          <div className="grid grid-cols-2 gap-2 md:gap-3 lg:min-w-[380px]">
+            {[
+              { label: view === "a-vencer" ? "Vai entrar" : "Entrou", cents: totalIncome, prevCents: totalIncomePrev },
+              { label: view === "a-vencer" ? "Vai sair" : "Saiu", cents: totalExpense, prevCents: totalExpensePrev },
+            ].map((k) => (
+              <div key={k.label} className="rounded-[12px] bg-white/15 px-3 py-2.5 md:rounded-[16px] md:px-4 md:py-3.5">
+                <div className="text-[11px] text-white/80 md:text-xs">{k.label}</div>
+                <div className="mt-0.5 truncate text-[15px] font-bold tabular-nums md:text-[20px]">
+                  <Money cents={k.cents} currency={currency} />
+                </div>
+                {hasPrev ? (
+                  <div className="text-[11px] text-white/75 max-md:hidden">
+                    {shortMonthLabel(prev.year, prev.monthIndex)}: <Money cents={k.prevCents} currency={currency} />
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
-        </CardSurface>
-
-        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.blue.bg, color: KPI_TONES.blue.fg }}>
-            <Banknote className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="block text-[12px] text-(--text-secondary)">Saldo do período</span>
-            <span
-              className="mt-0.5 block text-[18px] font-extrabold tabular-nums"
-              style={{ color: balance < 0 ? "var(--expense)" : "var(--text-primary)" }}
-            >
-              <Money cents={balance} currency={currency} />
-            </span>
-            <PreviousMonth label={prevLabel} cents={balancePrev} currency={currency} />
-          </div>
-        </CardSurface>
-
-        <CardSurface className="flex flex-col items-start gap-2.5 p-4 sm:min-h-[104px] sm:flex-row sm:items-center sm:gap-3.5 sm:p-[18px]">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-11 sm:w-11 sm:rounded-[14px]" style={{ background: KPI_TONES.purple.bg, color: KPI_TONES.purple.fg }}>
-            <Tag className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="block text-[12px] text-(--text-secondary)">Maior categoria</span>
-            <span className="mt-0.5 block truncate text-[18px] font-extrabold text-(--text-primary)">
-              {topExpense?.name ?? "—"}
-            </span>
-            <span className="mt-1.5 block text-[11px] text-(--text-secondary)">
-              {topExpense ? (
-                <>
-                  <Money cents={topExpense.amount_cents} currency={currency} /> ({topCategoryShare}% das despesas)
-                </>
-              ) : (
-                "Nenhuma despesa ainda"
-              )}
-            </span>
-          </div>
-        </CardSurface>
-      </div>
+        </div>
+      </section>
 
       {isPeriodEmpty ? (
         <CardSurface className="flex flex-col items-center gap-3 px-6 py-14 text-center">
@@ -243,60 +227,21 @@ export default async function RelatoriosPage({
         </CardSurface>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <CardSurface className="p-4">
-              <div className="mb-3.5 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-[16px] font-extrabold text-(--text-primary)">{expenseTitle}</h2>
-                  <p className="mt-0.5 text-[12px] text-(--text-secondary)">
-                    Total de <Money cents={totalExpense} currency={currency} /> no período
-                  </p>
-                </div>
-                <Link
-                  href={`/transacoes?month=${monthQS}&direction=out`}
-                  className="flex h-8 shrink-0 items-center gap-1 rounded-full border px-3 text-[12px] font-bold"
-                  style={{ borderColor: "#DCE2F3", background: "#F8FAFF", color: "var(--primary)" }}
-                >
-                  Ver detalhes <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-              {expenseSlices.length === 0 ? (
-                <p className="text-sm text-(--text-muted)">{expenseEmpty}</p>
-              ) : (
-                <MonthDonut slices={expenseSlices} currency={currency} />
-              )}
-            </CardSurface>
+          <CategoryBreakdown
+            expense={expenseDeltas.map(withColor)}
+            income={incomeDeltas.map(withColor)}
+            prevLabel={prevName}
+            currency={currency}
+            emptyExpense={expenseEmpty}
+            emptyIncome={incomeEmpty}
+          />
 
-            <CardSurface className="p-4">
-              <div className="mb-3.5 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-[16px] font-extrabold text-(--text-primary)">{incomeTitle}</h2>
-                  <p className="mt-0.5 text-[12px] text-(--text-secondary)">
-                    Total de <Money cents={totalIncome} currency={currency} /> no período
-                  </p>
-                </div>
-                <Link
-                  href={`/transacoes?month=${monthQS}&direction=in`}
-                  className="flex h-8 shrink-0 items-center gap-1 rounded-full border px-3 text-[12px] font-bold"
-                  style={{ borderColor: "#DCE2F3", background: "#F8FAFF", color: "var(--primary)" }}
-                >
-                  Ver detalhes <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-              {incomeSlices.length === 0 ? (
-                <p className="text-sm text-(--text-muted)">{incomeEmpty}</p>
-              ) : (
-                <MonthDonut slices={incomeSlices} currency={currency} />
-              )}
-            </CardSurface>
-          </div>
-
-          <CardSurface className="p-4">
+          <CardSurface className="p-4 md:p-6">
             <div className="mb-1 flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3">
               <div>
-                <h2 className="text-[16px] font-extrabold text-(--text-primary)">Evolução do período</h2>
-                <p className="mt-0.5 text-[12px] text-(--text-secondary)">
-                  Receitas e despesas de cada dia, e quanto sobrou até ali, em {monthLabel(year, monthIndex)}.
+                <h2 className="text-card-title">Evolução do mês</h2>
+                <p className="mt-0.5 text-[13px] text-(--text-muted)">
+                  Entradas e saídas de cada dia, e quanto sobrou até ali.
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-(--text-secondary)">
@@ -311,24 +256,16 @@ export default async function RelatoriosPage({
                 </span>
               </div>
             </div>
-            <div
-              className="mt-3 rounded-xl px-1 pt-2"
-              style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #FCFCFE 100%)" }}
-            >
+            <div className="mt-3">
               <PeriodEvolutionChart points={evolution} currency={currency} />
             </div>
           </CardSurface>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <TopCategoriesCard
-              expenseRanking={expenseRanking}
-              incomeRanking={incomeRanking}
-              totalExpense={totalExpense}
-              totalIncome={totalIncome}
-              currency={currency}
-            />
-            <InsightVelunCard insight={insight} currency={currency} />
-          </div>
+          <InsightVelunCard
+            insight={insight}
+            currency={currency}
+            subtitle={hasPrev ? `O que mudou em ${monthName}, comparado com ${prevName}.` : `O resumo de ${monthName}.`}
+          />
         </>
       )}
     </div>
