@@ -43,8 +43,8 @@ export function CardTile({
         src="/velun-mark.png"
         alt=""
         aria-hidden
-        className="object-contain pointer-events-none absolute -top-10 -right-16 h-[300px] w-[320px]"
-        style={{ opacity: color === "ink" ? 0.28 : 0.18 }}
+        className="object-contain pointer-events-none absolute -top-[70px] -right-[120px] h-[330px] w-[472px]"
+        style={{ opacity: color === "ink" ? 0.14 : 0.12 }}
       />
 
       <div className="relative flex items-center justify-between gap-3">
