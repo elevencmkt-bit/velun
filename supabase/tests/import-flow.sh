@@ -363,6 +363,18 @@ check "conta do casal zerada" "$(admin "select opening_balance_cents from accoun
 check "cartão próprio zerado (regra do cartão aceita 0)" "$(admin "select opening_balance_cents from accounts where id='acc00000-0000-0000-0000-0000000000e2'")" "0"
 check "conta pessoal da outra pessoa não é tocada" "$(admin "select opening_balance_cents from accounts where id='acc00000-0000-0000-0000-0000000000e3'")" "9900"
 
+echo "categoria lembrada por estabelecimento:"
+as_user $LEVI "insert into merchant_categories (household_id, member_id, bank_key, direction, category_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'publix', 'out', 'ca700000-0000-0000-0000-00000000000a');" >/dev/null
+check "Levi guarda a categoria do Publix" "$(admin "select count(*) from merchant_categories where member_id='$LEVI' and bank_key='publix'")" "1"
+check "esposa não vê as categorias lembradas dele" "$(as_user $ESPOSA "select count(*) from merchant_categories;")" "0"
+as_user $ESPOSA "insert into merchant_categories (household_id, member_id, bank_key, direction, category_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'target', 'out', 'ca700000-0000-0000-0000-00000000000a');" >/dev/null
+check "esposa não grava no lugar dele" "$(admin "select count(*) from merchant_categories where bank_key='target'")" "0"
+admin "insert into categories (id, household_id, name, kind, color) values ('ca700000-0000-0000-0000-0000000000f1', '44444444-0000-0000-0000-000000000004', 'De outra casa', 'expense', '#000');"
+as_user $LEVI "insert into merchant_categories (household_id, member_id, bank_key, direction, category_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'costco', 'out', 'ca700000-0000-0000-0000-0000000000f1');" >/dev/null
+check "categoria de outra casa não entra" "$(admin "select count(*) from merchant_categories where bank_key='costco'")" "0"
+as_user $LEVI "insert into merchant_categories (household_id, member_id, bank_key, direction, category_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'publix', 'in', 'ca700000-0000-0000-0000-00000000000e');" >/dev/null
+check "mesma loja, direção diferente, lembra separado" "$(admin "select count(*) from merchant_categories where bank_key='publix'")" "2"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CurrencyCode } from "@/lib/money";
 import {
@@ -8,7 +8,7 @@ import {
   type CategoryColorPair,
 } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { Check, Lock } from "lucide-react";
+import { Check, Lock, Sparkles } from "lucide-react";
 import {
   bulkMarkPaid,
   bulkUpdateCategory,
@@ -125,12 +125,32 @@ export function TransactionsTable({
     });
   }
 
+  // Aviso rápido quando a categoria foi junto pra outros lançamentos.
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function announceSpread(n: number, merchant: string | null, categoryId: string | null) {
+    if (n === 0 || !categoryId) return;
+    const cat = categories.find((c) => c.id === categoryId)?.name ?? "essa categoria";
+    const what = n === 1 ? "lançamento" : "lançamentos";
+    setToast(
+      merchant
+        ? `Mais ${n} ${what} de ${merchant} sem categoria ${n === 1 ? "foi" : "foram"} pra ${cat}.`
+        : `Mais ${n} ${what} das mesmas lojas sem categoria ${n === 1 ? "foi" : "foram"} pra ${cat}.`,
+    );
+  }
+
   function applyBulkCategory() {
     const categoryId =
       bulkCategoryId === NO_CATEGORY ? null : bulkCategoryId || null;
     const ids = Array.from(selected);
     startTransition(async () => {
-      await bulkUpdateCategory(ids, categoryId);
+      const { alsoUpdated } = await bulkUpdateCategory(ids, categoryId);
+      announceSpread(alsoUpdated, null, categoryId);
       setSelected(new Set());
       setBulkCategoryId("");
       router.refresh();
@@ -319,7 +339,8 @@ export function TransactionsTable({
                           const categoryId =
                             value === NO_CATEGORY ? null : value;
                           startTransition(async () => {
-                            await updateTransactionCategory(row.id, categoryId);
+                            const { alsoUpdated } = await updateTransactionCategory(row.id, categoryId);
+                            announceSpread(alsoUpdated, row.description, categoryId);
                             router.refresh();
                           });
                         }}
@@ -468,6 +489,15 @@ export function TransactionsTable({
           accounts={accounts}
           categories={categories}
         />
+      ) : null}
+      {toast ? (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-(--text-primary) px-4 py-3 text-sm text-white shadow-lg md:bottom-8"
+        >
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#AEB9FF]" />
+          <span>{toast}</span>
+        </div>
       ) : null}
     </div>
   );

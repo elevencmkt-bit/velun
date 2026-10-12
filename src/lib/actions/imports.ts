@@ -6,6 +6,13 @@ import { getCurrentMember } from "@/lib/current-member";
 import { computeFingerprint, normalizeDescription } from "@/lib/fingerprint";
 import { cleanBankDescription } from "@/lib/import/clean-description";
 import { rememberMerchantName } from "@/lib/merchant-names";
+import {
+  learnedCategoryFor,
+  loadMerchantCategories,
+  merchantKey,
+  rememberMerchantCategory,
+  sameMerchantRows,
+} from "@/lib/merchant-categories";
 import { loadCards } from "@/lib/cards";
 import { todayIn } from "@/lib/today";
 import { matchCardPayments } from "@/lib/import/match-card-payment";
@@ -367,6 +374,20 @@ async function runImportStatement(input: {
     (savedNames ?? []).map((n) => [n.bank_key as string, n.name as string]),
   );
 
+  // Categoria que esta pessoa já deu a cada estabelecimento. Vale mais
+  // que o código do cartão (MCC): foi ela quem escolheu. Só serve se a
+  // categoria ainda existe e é do tipo certo (despesa pra saída).
+  const learned = await loadMerchantCategories(supabase, memberId);
+  const kindById = new Map(
+    [...categoriesByName.values()].map((c) => [c.id, c.kind]),
+  );
+  const learnedFor = (description: string, direction: "in" | "out") => {
+    const id = learnedCategoryFor(learned, description, direction);
+    const kind = id ? kindById.get(id) : undefined;
+    if (!kind) return null;
+    return kind === (direction === "in" ? "income" : "expense") ? id : null;
+  };
+
   const rows = statement.transactions.map((t) => {
     const fingerprint = computeFingerprint({
       accountId,
@@ -375,7 +396,9 @@ async function runImportStatement(input: {
       description: t.description,
     });
     const isDuplicate = existingFingerprints.has(fingerprint);
-    const suggested = suggestCategoryId(t.mcc, categoriesByName, t.direction);
+    const learnedId = learnedFor(t.description, t.direction);
+    const suggested =
+      learnedId ?? suggestCategoryId(t.mcc, categoriesByName, t.direction);
 
     // Duplicata não procura previsão: se essa linha já existe na conta,
     // não é ela que vai quitar previsão nenhuma.
@@ -398,7 +421,12 @@ async function runImportStatement(input: {
       amount_cents: t.amountCents,
       direction: t.direction,
       suggested_category_id: suggested,
-      category_source: suggested ? ("rule" as const) : ("none" as const),
+      // "model": veio do que a pessoa ensinou; "rule": do código do cartão.
+      category_source: learnedId
+        ? ("model" as const)
+        : suggested
+          ? ("rule" as const)
+          : ("none" as const),
       fingerprint,
       dup_status: isDuplicate ? ("duplicate" as const) : ("none" as const),
       // Duplicata entra desmarcada: o padrão não deve ser duplicar.
@@ -691,28 +719,92 @@ async function runDismissForecast(transactionId: string) {
   revalidatePath("/fluxo-de-caixa");
 }
 
-/** Troca a categoria sugerida de uma linha da revisão. */
+/**
+ * Troca a categoria de uma linha da revisão. As outras linhas do mesmo
+ * estabelecimento (e mesma direção) que ainda não foram escolhidas na mão
+ * ganham a mesma categoria, marcadas como automáticas, e a escolha fica
+ * lembrada pras próximas importações. Devolve quantas foram junto.
+ */
 export async function setStagedCategory(
   stagedId: string,
   categoryId: string | null,
-): Promise<ActionResult> {
-  return attempt("Não consegui trocar a categoria.", () =>
-    runSetStagedCategory(stagedId, categoryId),
-  );
+): Promise<ActionResult & { alsoUpdated?: number }> {
+  let alsoUpdated = 0;
+  const result = await attempt("Não consegui trocar a categoria.", async () => {
+    alsoUpdated = await runSetStagedCategory(stagedId, categoryId);
+  });
+  return result.ok ? { ...result, alsoUpdated } : result;
 }
 
 async function runSetStagedCategory(
   stagedId: string,
   categoryId: string | null,
-) {
+): Promise<number> {
+  const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
+
+  const { data: row, error: rowError } = await supabase
+    .from("staged_transactions")
+    .select("id, import_id, description, bank_description, direction")
+    .eq("id", stagedId)
+    .maybeSingle();
+  if (rowError) throw new Error(rowError.message);
+  if (!row) throw new Error("Linha não encontrada.");
+
   const { error } = await supabase
     .from("staged_transactions")
     .update({ suggested_category_id: categoryId, category_source: "manual" })
     .eq("id", stagedId);
-
   if (error) throw new Error(error.message);
+
+  const bank =
+    (row.bank_description as string | null) ?? (row.description as string);
+  const direction = row.direction as "in" | "out";
+
+  await rememberMerchantCategory(supabase, {
+    householdId,
+    memberId,
+    bankDescription: bank,
+    direction,
+    categoryId,
+  });
+
+  // "Sem categoria" só esquece; não apaga o que as outras linhas têm.
+  let updated = 0;
+  if (categoryId && merchantKey(bank)) {
+    const { data: siblings, error: siblingsError } = await supabase
+      .from("staged_transactions")
+      .select("id, description, bank_description, direction, category_source, card_payment_account_id, card_payment_accepted")
+      .eq("import_id", row.import_id);
+    if (siblingsError) throw new Error(siblingsError.message);
+
+    const ids = sameMerchantRows(
+      (siblings ?? []).map((s) => ({
+        id: s.id as string,
+        bankDescription:
+          (s.bank_description as string | null) ?? (s.description as string),
+        direction: s.direction as "in" | "out",
+        // Escolhida na mão, ou pagamento de fatura (vira transferência,
+        // não leva categoria): não mexe.
+        locked:
+          s.category_source === "manual" ||
+          (s.card_payment_account_id != null && s.card_payment_accepted === true),
+      })),
+      { id: stagedId, bankDescription: bank, direction },
+    ).map((s) => s.id);
+
+    if (ids.length > 0) {
+      const { error: updError } = await supabase
+        .from("staged_transactions")
+        .update({ suggested_category_id: categoryId, category_source: "model" })
+        .in("id", ids);
+      if (updError) throw new Error(updError.message);
+      updated = ids.length;
+    }
+  }
+
   revalidatePath("/importar");
+  return updated;
 }
 
 /**

@@ -79,7 +79,7 @@ export default async function ImportarPage() {
     ? await supabase
         .from("staged_transactions")
         .select(
-          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status), card_payment_accepted, card:accounts!staged_transactions_card_payment_account_id_fkey(name)",
+          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, category_source, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status), card_payment_accepted, card:accounts!staged_transactions_card_payment_account_id_fkey(name)",
         )
         .eq("import_id", openImport.id)
         .order("date")
@@ -176,6 +176,7 @@ export default async function ImportarPage() {
           amountCents: s.amount_cents as number,
           direction: s.direction as "in" | "out",
           categoryId: (s.suggested_category_id as string | null) ?? null,
+          categorySource: s.category_source as "manual" | "model" | "rule" | "none",
           isDuplicate: s.dup_status !== "none",
           cardPayment: (() => {
             const card = (Array.isArray(s.card) ? s.card[0] : s.card) as {

@@ -61,9 +61,9 @@ assert.deepEqual(
   s.transactions.map((t) => [t.date, t.direction, t.amountCents, t.description]),
   [
     ["2026-02-02", "in", 200000, "Adicionou dinheiro"],
-    ["2026-02-02", "out", 475, "CAFE*EXEMPLO"],
+    ["2026-02-02", "out", 475, "Compra CAFE*EXEMPLO"],
     ["2026-02-26", "out", 4000, "Saque"],
-    ["2026-02-28", "out", 105040, "MERCADO EXEMPLO"],
+    ["2026-02-28", "out", 105040, "Compra MERCADO EXEMPLO"],
   ],
 );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   Lock,
   Link2Off,
   Pencil,
+  Sparkles,
   Undo2,
   Upload,
 } from "lucide-react";
@@ -74,6 +75,8 @@ type Row = {
   amountCents: number;
   direction: "in" | "out";
   categoryId: string | null;
+  /** De onde veio a categoria: escolhida na mão ou sugerida. */
+  categorySource: "manual" | "model" | "rule" | "none";
   isDuplicate: boolean;
   /** Linha que parece ser pagamento da fatura de um cartão. */
   cardPayment: { cardName: string; accepted: boolean } | null;
@@ -139,8 +142,14 @@ function CategoryCell({
   const selected = options.some((c) => c.id === row.categoryId)
     ? row.categoryId
     : null;
+  // Sugerida (pelo que a pessoa ensinou ou pelo código do cartão): leva
+  // uma marquinha pra bater o olho e conferir. Some quando ela escolhe.
+  const isAuto =
+    selected != null &&
+    (row.categorySource === "model" || row.categorySource === "rule");
 
   return (
+    <div className="flex items-center gap-1.5">
     <Select
       value={selected ?? NO_CATEGORY}
       disabled={disabled}
@@ -158,6 +167,18 @@ function CategoryCell({
         ))}
       </SelectContent>
     </Select>
+    {isAuto ? (
+      <span
+        title="Categoria automática — confira"
+        aria-label="Categoria automática — confira"
+        className="flex h-5 w-5 shrink-0 items-center justify-center text-(--primary)"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+      </span>
+    ) : (
+      <span className="h-5 w-5 shrink-0" aria-hidden="true" />
+    )}
+    </div>
   );
 }
 
@@ -264,7 +285,18 @@ export function ImportWorkspace({
   const [confirmingUndo, setConfirmingUndo] = useState<string | null>(null);
   const router = useRouter();
 
-  function run(fn: () => Promise<ActionResult>) {
+  // Aviso rápido no rodapé ("mais 12 Publix foram pra Mercado").
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  function run<R extends ActionResult>(
+    fn: () => Promise<R>,
+    onOk?: (result: R) => void,
+  ) {
     setError(null);
     setErrorDetail(null);
     startTransition(async () => {
@@ -275,6 +307,7 @@ export function ImportWorkspace({
           setErrorDetail(result.detail ?? null);
           return;
         }
+        onOk?.(result);
         router.refresh();
       } catch (err) {
         // Só chega aqui falha de rede ou do próprio Next — as ações não
@@ -880,7 +913,17 @@ export function ImportWorkspace({
                         categories={categories}
                         disabled={isPending}
                         onChange={(categoryId) =>
-                          run(() => setStagedCategory(row.id, categoryId))
+                          run(
+                            () => setStagedCategory(row.id, categoryId),
+                            (result) => {
+                              const n = result.ok ? (result.alsoUpdated ?? 0) : 0;
+                              if (n === 0 || !categoryId) return;
+                              const cat = categories.find((c) => c.id === categoryId)?.name;
+                              setToast(
+                                `Mais ${n} ${n === 1 ? "lançamento" : "lançamentos"} de ${row.description} ${n === 1 ? "foi" : "foram"} pra ${cat ?? "essa categoria"}. Estão marcados com a estrelinha pra você conferir.`,
+                              );
+                            },
+                          )
                         }
                       />
                     )}
@@ -1026,6 +1069,15 @@ export function ImportWorkspace({
               ))}
             </CardContent>
           </Card>
+        </div>
+      ) : null}
+      {toast ? (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-(--text-primary) px-4 py-3 text-sm text-white shadow-lg md:bottom-8"
+        >
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#AEB9FF]" />
+          <span>{toast}</span>
         </div>
       ) : null}
     </div>
