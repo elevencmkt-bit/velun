@@ -148,6 +148,63 @@ check "depois de confirmar, nova revisão é aceita" "$(novo_review acc00000-000
 check "revisão em outra conta é aceita junto" "$(novo_review acc00000-0000-0000-0000-000000000002 conjunta-out.pdf)" ""
 check "revisões em contas diferentes convivem" "$(admin "select count(distinct account_id)||'/'||count(*) from imports where status='review'")" "2/2"
 
+echo "privacidade de escrita (conta pessoal do Levi ABERTA pra esposa):"
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+insert into accounts (id, household_id, name, type, owner_id, visibility) values
+  ('acc00000-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000001', 'Pessoal aberta do Levi', 'checking', 'aaaaaaaa-0000-0000-0000-00000000000a', 'shared'),
+  ('acc00000-0000-0000-0000-000000000006', '11111111-0000-0000-0000-000000000001', 'Pessoal dela', 'checking', 'bbbbbbbb-0000-0000-0000-00000000000b', 'hidden');
+insert into transactions (id, household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by) values
+  ('e1000000-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000005', '2026-09-10', 5000, 'out', 'Gasto do Levi', 'w1', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  ('e1000000-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000005', '2026-09-11', 7000, 'out', 'Outro gasto do Levi', 'w2', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  ('e1000000-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', '2026-09-12', 3000, 'out', 'Mercado do casal', 'w3', 'aaaaaaaa-0000-0000-0000-00000000000a');
+insert into recurrences (id, household_id, template, frequency, starts_on) values
+  ('dec00000-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000001', '{"account_id":"acc00000-0000-0000-0000-000000000005"}', 'monthly', '2026-09-01');
+insert into net_worth_snapshots (household_id, account_id, date, balance_cents) values
+  ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000005', '2026-09-30', 99900);
+SQL
+as_user $ESPOSA "delete from transactions where id = 'e1000000-0000-0000-0000-000000000001';" >/dev/null
+check "ela não apaga lançamento dele" "$(admin "select count(*) from transactions where id='e1000000-0000-0000-0000-000000000001'")" "1"
+as_user $ESPOSA "update transactions set account_id = 'acc00000-0000-0000-0000-000000000006' where id = 'e1000000-0000-0000-0000-000000000002';" >/dev/null
+check "ela não puxa lançamento dele pra conta dela" "$(admin "select account_id from transactions where id='e1000000-0000-0000-0000-000000000002'")" "acc00000-0000-0000-0000-000000000005"
+as_user $ESPOSA "update transactions set amount_cents = 1 where id = 'e1000000-0000-0000-0000-000000000002';" >/dev/null
+check "ela não altera valor de lançamento dele" "$(admin "select amount_cents from transactions where id='e1000000-0000-0000-0000-000000000002'")" "7000"
+as_user $ESPOSA "update accounts set owner_id = '$ESPOSA' where id = 'acc00000-0000-0000-0000-000000000005';" >/dev/null
+check "ela não vira dona da conta dele" "$(admin "select owner_id from accounts where id='acc00000-0000-0000-0000-000000000005'")" "$LEVI"
+as_user $ESPOSA "update accounts set owner_id = null where id = 'acc00000-0000-0000-0000-000000000005';" >/dev/null
+check "ela não transforma a conta dele em conta do casal" "$(admin "select owner_id from accounts where id='acc00000-0000-0000-0000-000000000005'")" "$LEVI"
+as_user $ESPOSA "update accounts set visibility = 'hidden' where id = 'acc00000-0000-0000-0000-000000000005';" >/dev/null
+check "ela não muda a visibilidade da conta dele" "$(admin "select visibility from accounts where id='acc00000-0000-0000-0000-000000000005'")" "shared"
+as_user $ESPOSA "delete from accounts where id = 'acc00000-0000-0000-0000-000000000005';" >/dev/null
+check "ela não apaga a conta dele" "$(admin "select count(*) from accounts where id='acc00000-0000-0000-0000-000000000005'")" "1"
+as_user $ESPOSA "update recurrences set template = '{\"account_id\":\"acc00000-0000-0000-0000-000000000006\"}' where id = 'dec00000-0000-0000-0000-000000000005';" >/dev/null
+check "ela não puxa recorrência dele" "$(admin "select template->>'account_id' from recurrences where id='dec00000-0000-0000-0000-000000000005'")" "acc00000-0000-0000-0000-000000000005"
+as_user $ESPOSA "delete from net_worth_snapshots where account_id = 'acc00000-0000-0000-0000-000000000005';" >/dev/null
+check "ela não apaga o histórico de saldo dele" "$(admin "select count(*) from net_worth_snapshots where account_id='acc00000-0000-0000-0000-000000000005'")" "1"
+check "…mas continua VENDO tudo da conta aberta dele" "$(as_user $ESPOSA "select count(*) from transactions where account_id='acc00000-0000-0000-0000-000000000005';")" "2"
+
+echo "o que precisa continuar funcionando:"
+as_user $ESPOSA "update transactions set description = 'Mercado do casal (editado por ela)' where id = 'e1000000-0000-0000-0000-000000000003';" >/dev/null
+check "ela edita lançamento da conta do casal" "$(admin "select description from transactions where id='e1000000-0000-0000-0000-000000000003'")" "Mercado do casal (editado por ela)"
+as_user $LEVI "update transactions set amount_cents = 5500 where id = 'e1000000-0000-0000-0000-000000000001';" >/dev/null
+check "Levi edita lançamento da própria conta" "$(admin "select amount_cents from transactions where id='e1000000-0000-0000-0000-000000000001'")" "5500"
+as_user $LEVI "update accounts set visibility = 'balance_only' where id = 'acc00000-0000-0000-0000-000000000005';" >/dev/null
+check "Levi muda a visibilidade da própria conta" "$(admin "select visibility from accounts where id='acc00000-0000-0000-0000-000000000005'")" "balance_only"
+as_user $LEVI "delete from transactions where id = 'e1000000-0000-0000-0000-000000000001';" >/dev/null
+check "Levi apaga lançamento da própria conta" "$(admin "select count(*) from transactions where id='e1000000-0000-0000-0000-000000000001'")" "0"
+as_user $ESPOSA "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000006', '2026-09-20', 8500, 'out', 'Spectrum', 'w4', '$ESPOSA');" >/dev/null
+check "ela lança na própria conta" "$(admin "select count(*) from transactions where description='Spectrum'")" "1"
+
+echo "cadastro do membro:"
+as_user $ESPOSA "update members set display_name = 'Esposa (novo nome)', notifications_seen_at = now() where id = '$ESPOSA';" >/dev/null
+check "ela muda o próprio nome e marca notificações" "$(admin "select display_name||' · '||(notifications_seen_at is not null)::text from members where id='$ESPOSA'")" "Esposa (novo nome) · true"
+admin "update members set removed_at = now() where id = '$ESPOSA'"
+as_user $ESPOSA "update members set removed_at = null where id = '$ESPOSA';" >/dev/null
+check "removida, ela não apaga a própria remoção" "$(admin "select (removed_at is not null)::text from members where id='$ESPOSA'")" "true"
+admin "update members set removed_at = null where id = '$ESPOSA'"
+admin "insert into households (id, name) values ('22222222-0000-0000-0000-000000000002', 'Casa de outra pessoa')"
+as_user $ESPOSA "update members set household_id = '22222222-0000-0000-0000-000000000002' where id = '$ESPOSA';" >/dev/null
+check "ela não troca a própria casa por outra" "$(admin "select household_id from members where id='$ESPOSA'")" "11111111-0000-0000-0000-000000000001"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL

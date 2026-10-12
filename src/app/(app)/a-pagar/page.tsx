@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { accountScope } from "@/lib/visibility";
 import { getCategoryColorMap } from "@/lib/category-colors";
 import { formatCents } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,8 +19,20 @@ function addDaysISO(days: number) {
 }
 
 export default async function AVencerPage() {
-  const { householdId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
+
+  // A vencer é extrato futuro: mesmo nível do extrato. De conta pessoal
+  // do outro, só entra a marcada como "aberta".
+  const scope = await accountScope(
+    supabase,
+    householdId,
+    memberId,
+    "transactions",
+  );
+  const visibleIds =
+    scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
+  const visibleSet = new Set(scope.ids);
   const today = todayISO();
   const horizon = addDaysISO(30);
 
@@ -30,7 +43,12 @@ export default async function AVencerPage() {
     { data: recurrencesRaw },
     colorMap,
   ] = await Promise.all([
-    supabase.from("accounts").select("id, name").eq("household_id", householdId).order("name"),
+    supabase
+      .from("accounts")
+      .select("id, name, owner_id")
+      .eq("household_id", householdId)
+      .in("id", visibleIds)
+      .order("name"),
     supabase
       .from("categories")
       .select("id, name, kind")
@@ -40,12 +58,13 @@ export default async function AVencerPage() {
     supabase
       .from("transactions")
       .select(
-        `id, date, description, amount_cents, direction,
+        `id, date, description, amount_cents, direction, account_id,
          account:accounts(name),
          category:categories(name)`,
       )
       .eq("household_id", householdId)
       .eq("status", "pending")
+      .in("account_id", visibleIds)
       .lte("date", horizon)
       .order("date", { ascending: true }),
     supabase
@@ -56,6 +75,14 @@ export default async function AVencerPage() {
       .order("created_at", { ascending: true }),
     getCategoryColorMap(supabase, householdId),
   ]);
+
+  // Onde quem está vendo pode mexer: conta do casal e as próprias. É
+  // também a lista de contas do formulário de recorrência — o banco
+  // recusaria criar recorrência na conta pessoal do outro.
+  const writable = (accounts ?? []).filter(
+    (a) => a.owner_id === null || a.owner_id === memberId,
+  );
+  const writableIds = new Set(writable.map((a) => a.id as string));
 
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
@@ -69,6 +96,7 @@ export default async function AVencerPage() {
     account_name: single<{ name: string }>(row.account)?.name ?? "—",
     category_name: single<{ name: string }>(row.category)?.name ?? null,
     is_overdue: row.date < today,
+    can_edit: writableIds.has(row.account_id as string),
   }));
 
   const toPay = pendingRows.filter((r) => r.direction === "out");
@@ -76,21 +104,29 @@ export default async function AVencerPage() {
   const totalToPay = toPay.reduce((sum, r) => sum + r.amount_cents, 0);
   const totalToReceive = toReceive.reduce((sum, r) => sum + r.amount_cents, 0);
 
-  const recurrenceRows: RecurrenceRow[] = (recurrencesRaw ?? []).map((row) => {
-    const template = row.template as {
-      direction: "in" | "out";
-      amount_cents: number;
-      description: string;
-    };
-    return {
-      id: row.id,
-      description: template.description,
-      amount_cents: template.amount_cents,
-      direction: template.direction,
-      frequency: row.frequency,
-      day_of_month: row.day_of_month,
-    };
-  });
+  // A conta da recorrência mora no `template` (jsonb), então o filtro de
+  // visibilidade é feito aqui e não na consulta.
+  const recurrenceRows: RecurrenceRow[] = (recurrencesRaw ?? [])
+    .filter((row) =>
+      visibleSet.has((row.template as { account_id: string }).account_id),
+    )
+    .map((row) => {
+      const template = row.template as {
+        account_id: string;
+        direction: "in" | "out";
+        amount_cents: number;
+        description: string;
+      };
+      return {
+        id: row.id,
+        description: template.description,
+        amount_cents: template.amount_cents,
+        direction: template.direction,
+        frequency: row.frequency,
+        day_of_month: row.day_of_month,
+        can_edit: writableIds.has(template.account_id),
+      };
+    });
 
   const recurrencesIn = recurrenceRows.filter((r) => r.direction === "in");
   const recurrencesOut = recurrenceRows.filter((r) => r.direction === "out");
@@ -100,14 +136,19 @@ export default async function AVencerPage() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">A vencer</h1>
-          <p className="text-page-subtitle">Próximos 30 dias, atrasadas em destaque.</p>
+          <p className="text-page-subtitle">
+            Próximos 30 dias, atrasadas em destaque.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-card-title">A pagar</CardTitle>
-              <span className="font-semibold tabular-nums" style={{ color: "var(--expense)" }}>
+              <span
+                className="font-semibold tabular-nums"
+                style={{ color: "var(--expense)" }}
+              >
                 {formatCents(totalToPay, currency)}
               </span>
             </CardHeader>
@@ -124,7 +165,10 @@ export default async function AVencerPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-card-title">A receber</CardTitle>
-              <span className="font-semibold tabular-nums" style={{ color: "var(--income)" }}>
+              <span
+                className="font-semibold tabular-nums"
+                style={{ color: "var(--income)" }}
+              >
                 {formatCents(totalToReceive, currency)}
               </span>
             </CardHeader>
@@ -143,12 +187,20 @@ export default async function AVencerPage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-card-title">Recorrências</h2>
-          <RecurrenceForm accounts={accounts ?? []} categories={categories ?? []} />
+          <RecurrenceForm
+            accounts={writable.map((a) => ({
+              id: a.id as string,
+              name: a.name as string,
+            }))}
+            categories={categories ?? []}
+          />
         </div>
         <div className="grid grid-cols-2 gap-5">
           <Card>
             <CardHeader>
-              <CardTitle className="text-card-title">Entradas recorrentes</CardTitle>
+              <CardTitle className="text-card-title">
+                Entradas recorrentes
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <RecurrencesList
@@ -160,7 +212,9 @@ export default async function AVencerPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-card-title">Saídas recorrentes</CardTitle>
+              <CardTitle className="text-card-title">
+                Saídas recorrentes
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <RecurrencesList

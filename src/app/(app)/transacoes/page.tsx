@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { accountScope, scopeLabel } from "@/lib/visibility";
 import { getCategoryColorMap } from "@/lib/category-colors";
 import { getCategoryIconMap } from "@/lib/category-icons";
 import { monthRange, shiftMonth, monthParam, monthLabel, parseMonthParam } from "@/lib/month";
@@ -25,8 +26,15 @@ export default async function TransacoesPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { householdId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
+
+  // Extrato é o nível máximo de exposição: de conta pessoal do outro, só
+  // entra o que ele marcou como "aberta". "Só o saldo" e "sem
+  // lançamentos" ficam de fora — o banco deixa essas linhas passarem
+  // (o saldo e os totais precisam delas), e quem filtra é esta camada.
+  const scope = await accountScope(supabase, householdId, memberId, "transactions");
+  const visibleIds = scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
   const params = await searchParams;
   const hasCustomRange = Boolean(params.from || params.to);
   const { year, monthIndex } = parseMonthParam(params.month);
@@ -38,8 +46,9 @@ export default async function TransacoesPage({
     await Promise.all([
       supabase
         .from("accounts")
-        .select("id, name")
+        .select("id, name, owner_id")
         .eq("household_id", householdId)
+        .in("id", visibleIds)
         .order("name"),
       supabase
         .from("categories")
@@ -62,6 +71,7 @@ export default async function TransacoesPage({
        creator:members!created_by(display_name)`,
     )
     .eq("household_id", householdId)
+    .in("account_id", visibleIds)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -85,6 +95,13 @@ export default async function TransacoesPage({
   const { data: rawRows, error } = await query;
   if (error) throw new Error(error.message);
 
+  // Em que contas quem está vendo pode mexer: a do casal e as próprias.
+  const writableIds = new Set(
+    (accounts ?? [])
+      .filter((a) => a.owner_id === null || a.owner_id === memberId)
+      .map((a) => a.id as string),
+  );
+
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
 
@@ -107,6 +124,7 @@ export default async function TransacoesPage({
     account_name: single<{ name: string }>(row.account)?.name ?? "—",
     category_name: single<{ name: string }>(row.category)?.name ?? null,
     creator_name: single<{ display_name: string }>(row.creator)?.display_name ?? null,
+    can_edit: writableIds.has(row.account_id),
   }));
 
   const totalIn = rows.filter((r) => r.direction === "in").reduce((sum, r) => sum + r.amount_cents, 0);
@@ -133,7 +151,11 @@ export default async function TransacoesPage({
   return (
     <TransactionsWorkspace
       rows={rows}
-      accounts={accounts ?? []}
+      accounts={(accounts ?? []).map((a) => ({ id: a.id as string, name: a.name as string }))}
+      editableAccounts={(accounts ?? [])
+        .filter((a) => writableIds.has(a.id as string))
+        .map((a) => ({ id: a.id as string, name: a.name as string }))}
+      scopeNote={scopeLabel(scope)}
       categories={categories ?? []}
       members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}
       categoryColors={Object.fromEntries(colorMap)}

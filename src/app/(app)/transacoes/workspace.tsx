@@ -14,6 +14,8 @@ import type { AccountOption, CategoryOption, MemberOption, TransactionRow } from
 export function TransactionsWorkspace({
   rows,
   accounts,
+  editableAccounts,
+  scopeNote,
   categories,
   members,
   categoryColors,
@@ -28,6 +30,10 @@ export function TransactionsWorkspace({
 }: {
   rows: TransactionRow[];
   accounts: AccountOption[];
+  /** Contas em que quem está vendo pode lançar/editar (casal + próprias). */
+  editableAccounts: AccountOption[];
+  /** "1 conta pessoal fora deste total", ou null. Nunca soma em silêncio. */
+  scopeNote: string | null;
   categories: CategoryOption[];
   members: MemberOption[];
   categoryColors: Record<string, CategoryColorPair>;
@@ -74,8 +80,11 @@ export function TransactionsWorkspace({
           <TransactionFilters accounts={accounts} categories={categories} members={members} />
 
           <div className="flex items-center justify-between border-b border-(--border-soft) pb-3">
-            <span className="text-metadata">
-              {rows.length} {rows.length === 1 ? "transação" : "transações"}
+            <span className="flex flex-col">
+              <span className="text-metadata">
+                {rows.length} {rows.length === 1 ? "transação" : "transações"}
+              </span>
+              {scopeNote ? <span className="text-xs text-(--text-muted)">{scopeNote}</span> : null}
             </span>
             <span className="flex items-baseline gap-2">
               <span className="text-metadata">{totalLabel}</span>
@@ -88,7 +97,7 @@ export function TransactionsWorkspace({
           <TransactionsTable
             key={selectionMode ? "selecting" : "browsing"}
             rows={rows}
-            accounts={accounts}
+            accounts={editableAccounts}
             categories={categories}
             categoryColors={categoryColors}
             categoryIcons={categoryIcons}
