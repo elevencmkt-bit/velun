@@ -13,6 +13,8 @@
 // 3. Os valores são todos positivos. Entrada ou saída depende da SEÇÃO
 //    em que a linha está, e a seção atravessa páginas com "(CONTINUED)".
 
+import { findMccInDescription } from "./mcc";
+
 /**
  * Falha esperada de leitura (arquivo errado, PDF escaneado, formato de
  * outro banco). Quem chama devolve a mensagem pro usuário em vez de
@@ -98,25 +100,6 @@ function sectionFor(line: string): Section | null {
   return null;
 }
 
-// O código MCC aparece solto na descrição ("Doordash 5812 Doordash.Com
-// CA 94107"). É um token de exatamente 4 dígitos que não é CEP nem o
-// sufixo do cartão. Pega o primeiro, que na prática é o MCC.
-function extractMcc(description: string): string | null {
-  const tokens = description.split(/\s+/);
-  for (const token of tokens) {
-    if (/^\d{4}$/.test(token) && token !== "3145") return token;
-  }
-  return null;
-}
-
-/**
- * Converte o texto já extraído de um extrato da Regions em lançamentos.
- *
- * Recebe TEXTO, não bytes: a extração do PDF acontece no navegador
- * (src/lib/import/extract-pdf-text.ts). Dois motivos — o leitor de PDF
- * não sobrevive ao empacotamento serverless, e assim o arquivo nunca
- * sai da máquina de quem importa.
- */
 export function parseRegionsStatementText(text: string): ParsedStatement {
 
   const lines = text.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
@@ -201,7 +184,7 @@ export function parseRegionsStatementText(text: string): ParsedStatement {
       description,
       amountCents: Math.abs(amountCents),
       direction: section === "deposits" ? "in" : "out",
-      mcc: extractMcc(description),
+      mcc: findMccInDescription(description),
     });
   }
 

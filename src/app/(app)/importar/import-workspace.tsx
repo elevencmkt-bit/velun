@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Undo2, Upload } from "lucide-react";
 import {
   confirmImport,
   discardImport,
   importStatement,
   setStagedCategory,
   toggleStagedRow,
+  undoImport,
 } from "@/lib/actions/imports";
 import { extractPdfText } from "@/lib/import/extract-pdf-text";
 import { formatCents, type CurrencyCode } from "@/lib/money";
@@ -34,6 +35,14 @@ type OpenImport = {
   periodEnd: string;
   balanceMatches: boolean;
 };
+type HistoryEntry = {
+  id: string;
+  fileName: string;
+  accountName: string;
+  periodStart: string;
+  periodEnd: string;
+  transactionCount: number;
+};
 type Row = {
   id: string;
   date: string;
@@ -57,16 +66,21 @@ export function ImportWorkspace({
   categories,
   openImport,
   rows,
+  history,
   currency,
 }: {
   accounts: Account[];
   categories: Category[];
   openImport: OpenImport | null;
   rows: Row[];
+  history: HistoryEntry[];
   currency: CurrencyCode;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Desfazer apaga lançamentos. Pede confirmação na própria linha em vez
+  // de um dialog: a pergunta fica ao lado do que vai ser apagado.
+  const [confirmingUndo, setConfirmingUndo] = useState<string | null>(null);
   const router = useRouter();
 
   function run(fn: () => Promise<unknown>) {
@@ -180,6 +194,74 @@ export function ImportWorkspace({
             </form>
           </CardContent>
         </Card>
+
+        {history.length > 0 ? (
+          <div className="flex max-w-xl flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-card-title">Importações recentes</h2>
+              <p className="text-sm text-(--text-muted)">
+                Desfazer apaga os lançamentos que a importação criou, inclusive alterações
+                feitas neles depois.
+              </p>
+            </div>
+
+            <Card>
+              <CardContent className="flex flex-col gap-0 p-0">
+                {history.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between gap-4 border-b px-4 py-3 last:border-0"
+                  >
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate text-sm">{entry.fileName}</span>
+                      <span className="text-xs text-(--text-muted)">
+                        {entry.accountName} · {shortDate(entry.periodStart)} a{" "}
+                        {shortDate(entry.periodEnd)} ·{" "}
+                        {entry.transactionCount === 1
+                          ? "1 lançamento"
+                          : `${entry.transactionCount} lançamentos`}
+                      </span>
+                    </div>
+
+                    {confirmingUndo === entry.id ? (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => setConfirmingUndo(null)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => {
+                            setConfirmingUndo(null);
+                            run(() => undoImport(entry.id));
+                          }}
+                        >
+                          Apagar {entry.transactionCount}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={isPending}
+                        onClick={() => setConfirmingUndo(entry.id)}
+                      >
+                        <Undo2 className="mr-2 h-4 w-4" />
+                        Desfazer
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
       </div>
     );
   }

@@ -250,3 +250,39 @@ export async function discardImport(importId: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/importar");
 }
+
+/**
+ * Desfaz uma importação já confirmada: apaga os lançamentos que ela
+ * criou e o registro da importação.
+ *
+ * A ordem importa. `transactions.import_id` é `on delete set null`, não
+ * `cascade`: apagar só a importação deixaria os lançamentos no
+ * histórico sem nenhuma marca de onde vieram — órfãos impossíveis de
+ * desfazer depois. Então os lançamentos vão primeiro.
+ *
+ * Lançamento editado à mão depois de importado também vai embora. É o
+ * preço de ter um desfazer de verdade, e a tela avisa quantos são antes
+ * de perguntar.
+ */
+export async function undoImport(importId: string) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const { error: txError } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("import_id", importId);
+
+  if (txError) throw new Error(txError.message);
+
+  const { error: impError } = await supabase.from("imports").delete().eq("id", importId);
+  if (impError) throw new Error(impError.message);
+
+  revalidatePath("/importar");
+  revalidatePath("/transacoes");
+  revalidatePath("/contas");
+  revalidatePath("/mes");
+  revalidatePath("/relatorios");
+  revalidatePath("/fluxo-de-caixa");
+}

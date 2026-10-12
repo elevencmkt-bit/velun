@@ -12,30 +12,61 @@ export default async function ImportarPage() {
   // tela não deve oferecer o que vai falhar.
   const scope = await accountScope(supabase, householdId, memberId, "transactions");
 
-  const [{ data: accounts }, { data: categories }, { data: pending }] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id, name, owner_id")
-      .eq("household_id", householdId)
-      .eq("is_archived", false)
-      .in("id", scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"])
-      .order("name"),
-    supabase
-      .from("categories")
-      .select("id, name, kind")
-      .eq("household_id", householdId)
-      .eq("is_archived", false)
-      .order("name"),
-    supabase
-      .from("imports")
-      .select("id, file_path, statement_start, statement_end, balance_matches, extracted_sum_cents")
-      .eq("household_id", householdId)
-      .eq("status", "review")
-      .order("created_at", { ascending: false })
-      .limit(1),
-  ]);
+  const [{ data: accounts }, { data: categories }, { data: pending }, { data: history }] =
+    await Promise.all([
+      supabase
+        .from("accounts")
+        .select("id, name, owner_id")
+        .eq("household_id", householdId)
+        .eq("is_archived", false)
+        .in("id", scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"])
+        .order("name"),
+      supabase
+        .from("categories")
+        .select("id, name, kind")
+        .eq("household_id", householdId)
+        .eq("is_archived", false)
+        .order("name"),
+      supabase
+        .from("imports")
+        .select(
+          "id, file_path, statement_start, statement_end, balance_matches, extracted_sum_cents",
+        )
+        .eq("household_id", householdId)
+        .eq("status", "review")
+        .order("created_at", { ascending: false })
+        .limit(1),
+      // Importações já confirmadas, pra poder desfazer. Sem isso, um
+      // extrato importado na conta errada só sai apagando lançamento por
+      // lançamento na mão.
+      supabase
+        .from("imports")
+        .select("id, file_path, statement_start, statement_end, created_at, account:accounts(name)")
+        .eq("household_id", householdId)
+        .eq("status", "confirmed")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
   const openImport = pending?.[0] ?? null;
+
+  // Quantos lançamentos cada importação criou: é o número que o desfazer
+  // precisa mostrar antes de apagar nada.
+  const historyIds = (history ?? []).map((h) => h.id as string);
+  const { data: importedRows } =
+    historyIds.length > 0
+      ? await supabase
+          .from("transactions")
+          .select("import_id")
+          .eq("household_id", householdId)
+          .in("import_id", historyIds)
+      : { data: null };
+
+  const countByImport = new Map<string, number>();
+  for (const row of importedRows ?? []) {
+    const id = row.import_id as string;
+    countByImport.set(id, (countByImport.get(id) ?? 0) + 1);
+  }
 
   const { data: staged } = openImport
     ? await supabase
@@ -80,6 +111,19 @@ export default async function ImportarPage() {
         isDuplicate: s.dup_status !== "none",
         isIncluded: s.is_included as boolean,
       }))}
+      history={(history ?? []).map((h) => {
+        const account = h.account as { name: string } | { name: string }[] | null;
+        return {
+          id: h.id as string,
+          fileName: h.file_path as string,
+          accountName: Array.isArray(account)
+            ? (account[0]?.name ?? "—")
+            : (account?.name ?? "—"),
+          periodStart: h.statement_start as string,
+          periodEnd: h.statement_end as string,
+          transactionCount: countByImport.get(h.id as string) ?? 0,
+        };
+      })}
       currency={currency}
     />
   );
