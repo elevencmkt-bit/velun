@@ -1,8 +1,8 @@
 import Image from "next/image";
 
 // Moldura das telas de entrada (login e convite): de um lado a marca —
-// azul Velun, o V do símbolo, a frase da marca, um pedacinho do app e
-// um casal —; do outro, o formulário. No celular a
+// azul Velun, o V do símbolo, a frase da marca, um pedacinho do app e,
+// ao fundo, um casal —; do outro, o formulário. No celular a
 // marca vira uma faixa curta no topo.
 
 function Motif({ className }: { className?: string }) {
@@ -63,6 +63,17 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
       <aside className="relative overflow-hidden bg-(--primary) text-white lg:flex lg:w-[46%] lg:max-w-[720px] lg:flex-col lg:justify-between lg:p-14">
         <Motif className="pointer-events-none absolute -top-24 -right-28 h-[420px] w-[420px] opacity-[0.14] lg:-top-32 lg:-right-40 lg:h-[680px] lg:w-[680px]" />
 
+        {/* O casal: grande, atrás de tudo, misturado ao azul. */}
+        <Image
+          src="/velun-couple.webp"
+          alt=""
+          aria-hidden
+          width={556}
+          height={900}
+          priority
+          className="pointer-events-none absolute -right-10 bottom-0 hidden h-[88%] w-auto opacity-[0.32] mix-blend-luminosity lg:block"
+        />
+
         <div className="relative flex items-center gap-3 px-6 pt-8 lg:p-0">
           <Image
             src="/velun-icon.png"
@@ -91,18 +102,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* O casal: embaixo à direita, passando um pouco por cima do cartão. */}
-        <Image
-          src="/velun-couple.webp"
-          alt=""
-          aria-hidden
-          width={556}
-          height={900}
-          priority
-          className="pointer-events-none absolute right-0 bottom-0 z-10 hidden h-[min(58%,440px)] w-auto drop-shadow-[0_20px_40px_rgba(10,12,40,0.35)] lg:block xl:right-6"
-        />
-
-        <p className="relative hidden max-w-[52%] text-[12px] text-white/60 lg:block">
+        <p className="relative hidden text-[12px] text-white/60 lg:block">
           Seus extratos são lidos no seu navegador e nunca saem da sua máquina.
         </p>
       </aside>
