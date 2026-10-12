@@ -205,6 +205,28 @@ admin "insert into households (id, name) values ('22222222-0000-0000-0000-000000
 as_user $ESPOSA "update members set household_id = '22222222-0000-0000-0000-000000000002' where id = '$ESPOSA';" >/dev/null
 check "ela não troca a própria casa por outra" "$(admin "select household_id from members where id='$ESPOSA'")" "11111111-0000-0000-0000-000000000001"
 
+echo "mover recorrência:"
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+-- Spectrum: recorrência na conta do casal, com 1 paga e 2 previstas
+insert into recurrences (id, household_id, template, frequency, starts_on) values
+  ('dec00000-0000-0000-0000-0000000000a1', '11111111-0000-0000-0000-000000000001',
+   '{"account_id":"acc00000-0000-0000-0000-000000000002","description":"Spectrum","amount_cents":8500,"direction":"out"}', 'monthly', '2026-09-21');
+insert into transactions (id, household_id, account_id, date, amount_cents, direction, description, status, recurrence_id, fingerprint, created_by) values
+  ('e2000000-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', '2026-09-21', 8500, 'out', 'Spectrum', 'cleared', 'dec00000-0000-0000-0000-0000000000a1', 'sp-1', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  ('e2000000-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', '2026-10-21', 8500, 'out', 'Spectrum', 'pending', 'dec00000-0000-0000-0000-0000000000a1', 'sp-2', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  ('e2000000-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', '2026-11-21', 8500, 'out', 'Spectrum', 'pending', 'dec00000-0000-0000-0000-0000000000a1', 'sp-3', 'aaaaaaaa-0000-0000-0000-00000000000a');
+SQL
+check "Levi não empurra a despesa pra conta pessoal dela" "$(as_user $LEVI "select move_recurrence('dec00000-0000-0000-0000-0000000000a1', 'acc00000-0000-0000-0000-000000000006');" | grep -o 'Você não pode mover')" "Você não pode mover"
+check "…e nada se moveu" "$(admin "select count(*) from transactions where recurrence_id='dec00000-0000-0000-0000-0000000000a1' and account_id='acc00000-0000-0000-0000-000000000002'")" "3"
+check "mesma conta é recusada" "$(as_user $ESPOSA "select move_recurrence('dec00000-0000-0000-0000-0000000000a1', 'acc00000-0000-0000-0000-000000000002');" | grep -o 'já está nessa conta')" "já está nessa conta"
+check "ela puxa a Spectrum pra conta dela" "$(as_user $ESPOSA "select move_recurrence('dec00000-0000-0000-0000-0000000000a1', 'acc00000-0000-0000-0000-000000000006');")" '{"moved": 2}'
+check "…o modelo aponta pra conta dela" "$(admin "select template->>'account_id' from recurrences where id='dec00000-0000-0000-0000-0000000000a1'")" "acc00000-0000-0000-0000-000000000006"
+check "…as duas previstas foram junto" "$(admin "select count(*) from transactions where recurrence_id='dec00000-0000-0000-0000-0000000000a1' and status='pending' and account_id='acc00000-0000-0000-0000-000000000006'")" "2"
+check "…a já paga ficou na conta do casal" "$(admin "select account_id from transactions where id='e2000000-0000-0000-0000-000000000001'")" "acc00000-0000-0000-0000-000000000002"
+check "…impressão digital recalculada pra conta nova" "$(admin "select bool_and(fingerprint = transaction_fingerprint(account_id, date, amount_cents, description))::text from transactions where recurrence_id='dec00000-0000-0000-0000-0000000000a1' and status='pending'")" "true"
+check "…o resto do modelo intacto" "$(admin "select template->>'description'||' · '||(template->>'amount_cents') from recurrences where id='dec00000-0000-0000-0000-0000000000a1'")" "Spectrum · 8500"
+check "conta dela oculta: Levi nem enxerga a recorrência" "$(as_user $LEVI "select move_recurrence('dec00000-0000-0000-0000-0000000000a1', 'acc00000-0000-0000-0000-000000000002');" | grep -o 'não encontrada')" "não encontrada"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
