@@ -302,14 +302,14 @@ export default async function RelatoriosPage({
           </div>
 
           <CardSurface className="p-4">
-            <div className="mb-1 flex items-start justify-between gap-3">
+            <div className="mb-1 flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3">
               <div>
                 <h2 className="text-[16px] font-extrabold text-(--text-primary)">Evolução do período</h2>
                 <p className="mt-0.5 text-[12px] text-(--text-secondary)">
-                  Receitas, despesas e saldo diário em {monthLabel(year, monthIndex)}.
+                  Receitas e despesas de cada dia, e quanto sobrou até ali, em {monthLabel(year, monthIndex)}.
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-4 text-[11px] text-(--text-secondary)">
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-(--text-secondary)">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ background: "#22C55E" }} /> Receitas
                 </span>
@@ -317,7 +317,7 @@ export default async function RelatoriosPage({
                   <span className="h-2 w-2 rounded-full" style={{ background: "#F04469" }} /> Despesas
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ background: "#3B82F6" }} /> Saldo
+                  <span className="h-0.5 w-3 rounded-full" style={{ background: "#3B82F6" }} /> Acumulado
                 </span>
               </div>
             </div>
