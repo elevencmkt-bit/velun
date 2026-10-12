@@ -13,7 +13,6 @@ import {
   excludeTransfers,
   groupByCategory,
   groupByCategoryCapped,
-  percentChange,
   sumByDirection,
 } from "@/lib/reports";
 import { MonthSelector } from "@/components/month-selector";
@@ -22,6 +21,7 @@ import { MonthDonut } from "../mes/month-donut";
 import { PeriodEvolutionChart } from "./period-evolution-chart";
 import { InsightVelunCard, TopCategoriesCard } from "./bottom-cards";
 import { Money } from "@/components/money";
+import type { CurrencyCode } from "@/lib/money";
 
 const KPI_TONES = {
   green: { bg: "#EAFBF2", fg: "#22C55E" },
@@ -41,22 +41,11 @@ function CardSurface({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
-function PercentHelper({
-  current,
-  previous,
-  prevLabel,
-}: {
-  current: number;
-  previous: number;
-  prevLabel: string;
-}) {
-  const change = percentChange(current, previous);
-  if (change === null) return <span className="mt-1.5 block text-[11px] text-(--text-light)">sem mês anterior</span>;
-  const sign = change >= 0 ? "+" : "";
+// Valor do mês anterior em texto calmo, igual ao Dashboard.
+function PreviousMonth({ label, cents, currency }: { label: string; cents: number; currency: CurrencyCode }) {
   return (
     <span className="mt-1.5 block text-[11px] text-(--text-secondary)">
-      {sign}
-      {change.toFixed(0)}% em relação a {prevLabel}
+      Em {label}: <Money cents={cents} currency={currency} />
     </span>
   );
 }
@@ -130,6 +119,7 @@ export default async function RelatoriosPage({
     balancePrev,
     topExpense,
     topExpensePrev,
+    prevName: new Date(prev.year, prev.monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" }),
   });
 
   const viewQuery = view === "a-vencer" ? "&view=a-vencer" : "";
@@ -173,7 +163,7 @@ export default async function RelatoriosPage({
             <span className="mt-0.5 block text-[18px] font-extrabold tabular-nums text-(--text-primary)">
               <Money cents={totalIncome} currency={currency} />
             </span>
-            <PercentHelper current={totalIncome} previous={totalIncomePrev} prevLabel={prevLabel} />
+            <PreviousMonth label={prevLabel} cents={totalIncomePrev} currency={currency} />
           </div>
         </CardSurface>
 
@@ -186,7 +176,7 @@ export default async function RelatoriosPage({
             <span className="mt-0.5 block text-[18px] font-extrabold tabular-nums text-(--text-primary)">
               <Money cents={totalExpense} currency={currency} />
             </span>
-            <PercentHelper current={totalExpense} previous={totalExpensePrev} prevLabel={prevLabel} />
+            <PreviousMonth label={prevLabel} cents={totalExpensePrev} currency={currency} />
           </div>
         </CardSurface>
 
@@ -202,7 +192,7 @@ export default async function RelatoriosPage({
             >
               <Money cents={balance} currency={currency} />
             </span>
-            <PercentHelper current={balance} previous={balancePrev} prevLabel={prevLabel} />
+            <PreviousMonth label={prevLabel} cents={balancePrev} currency={currency} />
           </div>
         </CardSurface>
 
@@ -337,7 +327,7 @@ export default async function RelatoriosPage({
               totalIncome={totalIncome}
               currency={currency}
             />
-            <InsightVelunCard insight={insight} />
+            <InsightVelunCard insight={insight} currency={currency} />
           </div>
         </>
       )}

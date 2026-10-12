@@ -67,11 +67,6 @@ export function groupByCategory(
     .sort((a, b) => b.amount_cents - a.amount_cents);
 }
 
-export function percentChange(current: number, previous: number): number | null {
-  if (previous === 0) return null;
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
-
 export type DailyReportPoint = {
   date: string;
   label: string;
@@ -109,14 +104,19 @@ export function dailySeries(rows: MonthTransaction[], start: string, end: string
   return points;
 }
 
+/** Trecho de frase: texto puro ou um valor em dinheiro (que o "ocultar valores" borra). */
+export type InsightPart = string | { cents: number };
+
 export type ReportInsight = {
-  headline: string;
+  headline: InsightPart[];
   tone: "positive" | "warning";
-  items: { text: string; tone: "positive" | "warning" | "info" }[];
+  items: { parts: InsightPart[]; tone: "positive" | "warning" | "info" }[];
 };
 
-// Leitura automática do período — mesmo espírito do Insight Velun do
-// Fluxo de caixa, aqui comparando o mês atual contra o anterior.
+// Leitura automática do período, comparando com o mês anterior em
+// DINHEIRO, não em porcentagem. Porcentagem engana aqui: sobre um mês
+// fraco qualquer mês normal vira "+1035%", e sobre saldo negativo a conta
+// nem faz sentido ("150% maior" que −$843).
 export function buildReportInsight(input: {
   income: number;
   expense: number;
@@ -126,59 +126,72 @@ export function buildReportInsight(input: {
   balancePrev: number;
   topExpense: CategorySlice | undefined;
   topExpensePrev: CategorySlice | undefined;
+  /** "agosto" */
+  prevName: string;
 }): ReportInsight {
-  const { income, expense, balance, incomePrev, expensePrev, balancePrev, topExpense, topExpensePrev } =
+  const { income, expense, balance, incomePrev, expensePrev, balancePrev, topExpense, topExpensePrev, prevName } =
     input;
 
-  const balanceChange = percentChange(balance, balancePrev);
+  const hasPrev = incomePrev !== 0 || expensePrev !== 0;
   const items: ReportInsight["items"] = [];
 
-  let headline: string;
+  let headline: InsightPart[];
   let tone: ReportInsight["tone"];
-  if (balanceChange === null) {
-    headline = "Ainda não há mês anterior para comparar o saldo.";
+  const diff = balance - balancePrev;
+  if (balance < 0) {
+    headline = ["Neste mês saiu mais do que entrou: faltaram ", { cents: -balance }, ". Vale revisar os gastos do período."];
+    tone = "warning";
+  } else if (!hasPrev) {
+    headline = ["Sobrou ", { cents: balance }, " neste mês."];
     tone = "positive";
-  } else if (balanceChange >= 0) {
-    headline = `Ótimo resultado! Seu saldo foi ${Math.abs(balanceChange).toFixed(0)}% maior que no mês anterior. Continue assim.`;
+  } else if (diff >= 0) {
+    headline = ["Bom mês! Sobrou ", { cents: balance }, ", ", { cents: diff }, ` a mais que em ${prevName}.`];
     tone = "positive";
   } else {
-    headline = `Seu saldo caiu ${Math.abs(balanceChange).toFixed(0)}% em relação ao mês anterior. Vale revisar os gastos do período.`;
+    headline = ["Sobrou ", { cents: balance }, ", ", { cents: -diff }, ` a menos que em ${prevName}.`];
     tone = "warning";
   }
 
-  if (topExpense) {
-    const share = expense > 0 ? Math.round((topExpense.amount_cents / expense) * 100) : 0;
-    items.push({
-      text: `${topExpense.name} ainda é sua maior despesa (${share}%). Considere revisar esses gastos se quiser aumentar sua reserva.`,
-      tone: "warning",
-    });
+  if (topExpense && expense > 0) {
+    const share = Math.round((topExpense.amount_cents / expense) * 100);
+    items.push(
+      topExpense.name === "Sem categoria"
+        ? {
+            parts: [`${share}% das despesas estão sem categoria. Categorizar mostra pra onde o dinheiro vai.`],
+            tone: "info",
+          }
+        : {
+            parts: [`${topExpense.name} foi sua maior despesa: `, { cents: topExpense.amount_cents }, ` (${share}%).`],
+            tone: "info",
+          },
+    );
   }
 
-  const incomeChange = percentChange(income, incomePrev);
-  if (incomeChange !== null) {
-    items.push({
-      text:
-        incomeChange >= 0
-          ? `Suas receitas cresceram ${incomeChange.toFixed(0)}% em relação ao mês anterior.`
-          : `Suas receitas caíram ${Math.abs(incomeChange).toFixed(0)}% em relação ao mês anterior.`,
-      tone: incomeChange >= 0 ? "positive" : "warning",
-    });
+  if (hasPrev) {
+    const incomeDiff = income - incomePrev;
+    if (incomeDiff !== 0) {
+      items.push({
+        parts: ["Entrou ", { cents: Math.abs(incomeDiff) }, ` ${incomeDiff > 0 ? "a mais" : "a menos"} que em ${prevName}.`],
+        tone: incomeDiff > 0 ? "positive" : "warning",
+      });
+    }
+
+    const expenseDiff = expense - expensePrev;
+    if (expenseDiff !== 0) {
+      items.push({
+        parts: [
+          "Você gastou ",
+          { cents: Math.abs(expenseDiff) },
+          ` ${expenseDiff < 0 ? "a menos" : "a mais"} que em ${prevName}.`,
+        ],
+        tone: expenseDiff < 0 ? "positive" : "warning",
+      });
+    }
   }
 
-  const expenseChange = percentChange(expense, expensePrev);
-  if (expenseChange !== null) {
+  if (topExpensePrev && topExpense && topExpensePrev.name !== topExpense.name && topExpensePrev.name !== "Sem categoria") {
     items.push({
-      text:
-        expenseChange < 0
-          ? `Você gastou ${Math.abs(expenseChange).toFixed(0)}% a menos neste período. Uma ótima evolução no seu controle financeiro!`
-          : `Suas despesas subiram ${expenseChange.toFixed(0)}% em relação ao mês anterior.`,
-      tone: expenseChange < 0 ? "positive" : "warning",
-    });
-  }
-
-  if (topExpensePrev && topExpense && topExpensePrev.name !== topExpense.name) {
-    items.push({
-      text: `${topExpensePrev.name} deixou de ser sua principal categoria de despesa neste período.`,
+      parts: [`${topExpensePrev.name} deixou de ser sua principal categoria de despesa.`],
       tone: "info",
     });
   }
