@@ -77,6 +77,21 @@ export async function importStatement(input: {
   fileName: string;
   text: string;
 }): Promise<ImportResult> {
+  try {
+    return await runImportStatement(input);
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Não consegui importar o extrato. ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function runImportStatement(input: {
+  accountId: string;
+  fileName: string;
+  text: string;
+}): Promise<ImportResult> {
   const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
 
@@ -94,6 +109,26 @@ export async function importStatement(input: {
   }
   if (text.length > MAX_TEXT_LENGTH) {
     return { ok: false, error: "Esse extrato é grande demais para importar de uma vez." };
+  }
+
+  // Uma revisão aberta por conta. Duas revisões do mesmo extrato
+  // pareciam uma só na tela — ela mostra a mais recente — e confirmar
+  // uma fazia a outra aparecer idêntica no lugar: o clique parecia não
+  // ter feito nada, o segundo clique confirmava a outra, e o mês ficou
+  // em dobro. O banco também garante isso (migração 0015); aqui é só
+  // pra a mensagem ser clara antes de qualquer trabalho.
+  const { data: openReview } = await supabase
+    .from("imports")
+    .select("file_path")
+    .eq("account_id", accountId)
+    .eq("status", "review")
+    .limit(1);
+
+  if (openReview && openReview.length > 0) {
+    return {
+      ok: false,
+      error: `Já tem um extrato em revisão nessa conta (${openReview[0].file_path}). Confirme ou descarte antes de importar outro.`,
+    };
   }
 
   let statement;
@@ -126,7 +161,17 @@ export async function importStatement(input: {
     .select("id")
     .single();
 
-  if (importError) throw new Error(importError.message);
+  if (importError) {
+    // 23505: a regra de uma revisão por conta barrou — outra importação
+    // chegou entre a checagem acima e esta gravação.
+    if (importError.code === "23505") {
+      return {
+        ok: false,
+        error: "Já tem um extrato em revisão nessa conta. Confirme ou descarte antes de importar outro.",
+      };
+    }
+    throw new Error(importError.message);
+  }
   const importId = created.id as string;
 
   // Categorias do household, por nome, pro casamento com o MCC. `kind`
@@ -226,7 +271,12 @@ export async function importStatement(input: {
   });
 
   const { error: stageError } = await supabase.from("staged_transactions").insert(rows);
-  if (stageError) throw new Error(stageError.message);
+  if (stageError) {
+    // Sem isto sobraria uma revisão vazia — e com a regra de uma revisão
+    // por conta, ela travaria qualquer importação seguinte nessa conta.
+    await supabase.from("imports").delete().eq("id", importId);
+    throw new Error(stageError.message);
+  }
 
   const duplicates = rows.filter((r) => r.dup_status === "duplicate").length;
 
