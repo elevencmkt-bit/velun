@@ -14,7 +14,16 @@ export type CashFlowPoint = {
   date: string;
   label: string;
   balance_cents: number;
+  /** Saldo se os lançamentos atrasados ainda saírem (só quando pedido). */
+  with_overdue_cents?: number;
   events: CashFlowEvent[];
+};
+
+/** Pendentes com data que já passou: ficam fora da projeção. */
+export type OverdueSummary = {
+  count: number;
+  /** Saídas menos entradas atrasadas (positivo = vai faltar dinheiro). */
+  netOutCents: number;
 };
 
 export type UpcomingEvent = {
@@ -54,11 +63,12 @@ export async function getCashFlowProjection(
   scope: AccountScope,
   /** Hoje no fuso da casa (AAAA-MM-DD). */
   todayISO?: string,
+  options: { includeOverdue?: boolean } = {},
 ) {
   const today = todayISO ? new Date(`${todayISO}T00:00:00`) : new Date(new Date().toDateString());
   const horizon = addDays(today, horizonDays);
 
-  const [balances, { data: pending }, { cardIds, bills }] = await Promise.all([
+  const [balances, { data: pending }, { cardIds, bills }, { data: overdueRows }] = await Promise.all([
     getAccountBalances(supabase, householdId, scope),
     supabase
       .from("transactions")
@@ -70,6 +80,15 @@ export async function getCashFlowProjection(
       .lte("date", toISO(horizon))
       .order("date", { ascending: true }),
     cardBillsForScope(supabase, householdId, scope.ids, toISO(today)),
+    // Atrasados: pendentes com data antes de hoje. A projeção começa hoje,
+    // então eles ficariam de fora em silêncio — a tela avisa e deixa incluir.
+    supabase
+      .from("transactions")
+      .select("amount_cents, direction, account_id")
+      .eq("household_id", householdId)
+      .eq("status", "pending")
+      .in("account_id", scope.ids)
+      .lt("date", toISO(today)),
   ]);
 
   // Cartão fica fora do saldo em dinheiro: compra no cartão não tira
@@ -145,6 +164,16 @@ export async function getCashFlowProjection(
     });
   }
 
+  const overdueList = ((overdueRows ?? []) as { amount_cents: number; direction: string; account_id: string }[])
+    .filter((r) => !cardIds.has(r.account_id));
+  const overdue: OverdueSummary = {
+    count: overdueList.length,
+    netOutCents: overdueList.reduce((n, r) => n + (r.direction === "out" ? r.amount_cents : -r.amount_cents), 0),
+  };
+  if (options.includeOverdue && overdue.count > 0) {
+    for (const p of points) p.with_overdue_cents = p.balance_cents - overdue.netOutCents;
+  }
+
   let lowestPoint = points[0];
   for (const p of points) {
     if (p.balance_cents < lowestPoint.balance_cents) lowestPoint = p;
@@ -164,8 +193,26 @@ export async function getCashFlowProjection(
       .map((e) => e.id),
   );
 
+  // Os mesmos números, contando os atrasados como se saíssem hoje.
+  const withOverdue =
+    options.includeOverdue && overdue.count > 0
+      ? (() => {
+          const value = (p: CashFlowPoint) => p.with_overdue_cents ?? p.balance_cents;
+          let low = points[0];
+          for (const p of points) if (value(p) < value(low)) low = p;
+          return {
+            lowestCents: value(low),
+            lowestPoint: low,
+            finalCents: value(finalPoint),
+            negativeDays: points.filter((p) => value(p) < 0).length,
+          };
+        })()
+      : null;
+
   return {
     points,
+    overdue,
+    withOverdue,
     currentTotal,
     lowestPoint,
     finalPoint,
@@ -179,71 +226,55 @@ export async function getCashFlowProjection(
   };
 }
 
-export function buildCashFlowInsight(input: {
+const shortDate = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+
+/**
+ * Uma frase sobre o que vale ficar de olho na projeção — com datas e
+ * nomes de verdade, nada de conselho genérico.
+ */
+export function buildCashFlowNote(input: {
   points: CashFlowPoint[];
-  finalPoint: CashFlowPoint;
-  negativeDays: number;
-  negativeDaysPct: number;
   upcomingEvents: UpcomingEvent[];
-  periodLabel: string;
-}): CashFlowInsight {
-  const { points, finalPoint, negativeDays, negativeDaysPct, upcomingEvents, periodLabel } = input;
-  const bullets: CashFlowInsight["bullets"] = [];
+  value?: (p: CashFlowPoint) => number;
+  formatMoney: (cents: number) => string;
+}): string {
+  const { points, upcomingEvents, formatMoney } = input;
+  const value = input.value ?? ((p: CashFlowPoint) => p.balance_cents);
+  if (points.length === 0) return "";
 
-  const biggestExpense = [...upcomingEvents]
-    .filter((e) => e.direction === "out")
-    .sort((a, b) => b.amount_cents - a.amount_cents)[0];
-  const nextIncome = upcomingEvents.find((e) => e.direction === "in");
+  const firstNeg = points.findIndex((p) => value(p) < 0);
+  const last = points[points.length - 1];
 
-  let headline: string;
-
-  if (negativeDays === 0) {
-    headline = `Seu saldo se mantém positivo durante toda a projeção de ${periodLabel}.`;
-    if (biggestExpense) {
-      bullets.push({
-        text: `Maior saída prevista: ${biggestExpense.description}. Vale conferir se ela já está considerada no seu planejamento.`,
-        tone: "positive",
-      });
-    }
-  } else if (finalPoint.balance_cents >= 0) {
-    const firstNegativeIndex = points.findIndex((p) => p.balance_cents < 0);
-    let recoveryIndex = -1;
-    for (let i = firstNegativeIndex; i < points.length; i++) {
-      if (points[i].balance_cents >= 0) {
-        recoveryIndex = i;
-        break;
-      }
-    }
-    headline =
-      recoveryIndex > 0
-        ? `Seu saldo volta ao positivo em ${recoveryIndex} dia${recoveryIndex === 1 ? "" : "s"}.`
-        : `Seu saldo fica negativo em parte da projeção de ${periodLabel}.`;
-    bullets.push({
-      text: "Considere antecipar recebimentos ou adiar despesas não essenciais nesse intervalo.",
-      tone: "warning",
-    });
-  } else {
-    headline = `Seu saldo termina a projeção negativo, em ${finalPoint.label}.`;
-    bullets.push({
-      text: "O saldo não se recupera dentro do período selecionado — pode ajudar reduzir saídas previstas.",
-      tone: "warning",
-    });
-    if (nextIncome) {
-      bullets.push({
-        text: `Próxima entrada que ajuda o saldo: ${nextIncome.description}, em ${new Date(
-          `${nextIncome.date}T00:00:00`,
-        ).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}.`,
-        tone: "positive",
-      });
-    }
+  if (firstNeg === -1) {
+    const biggest = [...upcomingEvents]
+      .filter((e) => e.direction === "out")
+      .sort((a, b) => b.amount_cents - a.amount_cents)[0];
+    return biggest
+      ? `O saldo fica positivo o período todo. A maior saída prevista é ${biggest.description} (${formatMoney(biggest.amount_cents)}), em ${shortDate(biggest.date)}.`
+      : "O saldo fica positivo o período todo.";
   }
 
-  if (negativeDays > 0) {
-    bullets.push({
-      text: `${negativeDays} dia${negativeDays === 1 ? "" : "s"} no negativo (${negativeDaysPct}% do período).`,
-      tone: "warning",
-    });
+  if (value(last) < 0) {
+    const nextIn = upcomingEvents.find((e) => e.direction === "in" && e.date >= points[firstNeg].date);
+    return `O saldo termina o período no negativo (${formatMoney(value(last))}).${
+      nextIn ? ` A próxima entrada prevista é ${nextIn.description}, em ${shortDate(nextIn.date)}.` : " Não há entradas previstas pra cobrir."
+    }`;
   }
 
-  return { headline, bullets: bullets.slice(0, 3) };
+  // Volta ao positivo: em que dia, com qual entrada, e se cai de novo.
+  let recovery = -1;
+  for (let i = firstNeg; i < points.length; i++) {
+    if (value(points[i]) >= 0) {
+      recovery = i;
+      break;
+    }
+  }
+  const day = points[recovery];
+  const lift = day.events.filter((e) => e.type === "income").sort((a, b) => b.amount_cents - a.amount_cents)[0];
+  const fallsAgain = points.slice(recovery).some((p) => value(p) < 0);
+  const start = firstNeg === 0 ? "O saldo está negativo" : `O saldo fica negativo a partir de ${shortDate(points[firstNeg].date)}`;
+  return `${start} até ${shortDate(day.date)}${lift ? `, quando entra ${lift.label} (${formatMoney(lift.amount_cents)})` : ""}. ${
+    fallsAgain ? "Depois volta a ficar no vermelho em alguns dias — vale olhar o gráfico." : "Depois disso, não volta a ficar no vermelho."
+  }`;
 }

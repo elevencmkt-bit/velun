@@ -1,244 +1,144 @@
-import { CalendarClock, Check, ChartNoAxesColumnIncreasing, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { CurrencyCode } from "@/lib/money";
-import type { CashFlowInsight, UpcomingEvent } from "@/lib/cash-flow";
+import type { UpcomingEvent } from "@/lib/cash-flow";
+import { addDaysISO } from "@/lib/today";
 import { Money } from "@/components/money";
 
-function formatEventDate(date: string) {
-  const d = new Date(`${date}T00:00:00`);
-  return {
-    day: d.toLocaleDateString("pt-BR", { day: "2-digit" }),
-    month: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
-  };
+function shortDate(iso: string) {
+  return new Date(`${iso}T00:00:00`)
+    .toLocaleDateString("pt-BR", { day: "numeric", month: "short" })
+    .replace(".", "");
 }
 
+// Segunda-feira da semana de uma data (AAAA-MM-DD).
+function weekStart(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  const back = (d.getDay() + 6) % 7;
+  return addDaysISO(iso, -back);
+}
+
+function groupLabel(date: string, today: string) {
+  const thisWeek = weekStart(today);
+  const w = weekStart(date);
+  if (w === thisWeek) return "Esta semana";
+  if (w === addDaysISO(thisWeek, 7)) return "Semana que vem";
+  const d = new Date(`${date}T00:00:00`);
+  const t = new Date(`${today}T00:00:00`);
+  if (d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear()) return "Até o fim do mês";
+  const month = d.toLocaleDateString("pt-BR", { month: "long" });
+  return month.charAt(0).toUpperCase() + month.slice(1);
+}
+
+/** Próximos eventos, agrupados por semana (e depois por mês). */
 export function UpcomingEventsCard({
   events,
   currency,
+  today,
+  limit = 10,
 }: {
   events: UpcomingEvent[];
   currency: CurrencyCode;
+  today: string;
+  limit?: number;
 }) {
-  const visible = events.slice(0, 6);
+  const visible = events.slice(0, limit);
+  const groups: { label: string; items: UpcomingEvent[] }[] = [];
+  for (const e of visible) {
+    const label = groupLabel(e.date, today);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(e);
+    else groups.push({ label, items: [e] });
+  }
 
   return (
-    <article
-      className="flex min-h-[230px] flex-col rounded-[20px] p-5"
-      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
-            style={{ background: "var(--primary-light)", color: "var(--primary)" }}
-          >
-            <CalendarClock className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-[14px] font-bold text-(--text-primary)">Próximos eventos</h3>
-            <p className="text-[10.5px] text-(--text-light)">Entradas e saídas relevantes do período.</p>
-          </div>
-        </div>
-        {visible.length > 0 ? (
-          <Link href="/transacoes" className="text-[11px] font-semibold text-(--primary) hover:underline">
-            Ver todos
-          </Link>
-        ) : null}
+    <article className="flex min-w-0 flex-col rounded-[20px] bg-(--bg-surface) p-5 shadow-(--shadow-card) md:p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-card-title">Próximos eventos</h2>
+        <Link href="/a-pagar" className="text-[13px] font-semibold text-(--primary) hover:underline">
+          Ver tudo em A vencer →
+        </Link>
       </div>
 
       {visible.length === 0 ? (
-        <p className="flex flex-1 items-center text-sm text-(--text-muted)">
-          Nenhum lançamento futuro encontrado neste período.
-        </p>
+        <p className="mt-4 text-sm text-(--text-muted)">Nenhum lançamento futuro neste período.</p>
       ) : (
-        <div className="flex flex-col">
-          {visible.map((event, i) => {
-            const { day, month } = formatEventDate(event.date);
-            const isIncome = event.direction === "in";
-            return (
-              <div
-                key={event.id}
-                className="grid min-h-[43px] grid-cols-[42px_1fr_auto] items-center gap-2.5"
-                style={{ borderTop: i === 0 ? "none" : "1px solid var(--border-soft)" }}
-              >
+        groups.map((g) => (
+          <div key={g.label}>
+            <div className="mt-4 mb-1 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase">
+              {g.label}
+            </div>
+            {g.items.map((e) => {
+              const isIncome = e.direction === "in";
+              return (
                 <div
-                  className="flex min-w-[42px] flex-col items-center justify-center rounded-xl border px-1.5 py-2 text-center leading-[1.05]"
-                  style={{ background: "#F7F8FC", borderColor: "#E6EAF2", color: "var(--text-secondary)" }}
+                  key={e.id}
+                  className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) last:border-0"
                 >
-                  <span className="text-[10px] font-bold">{day}</span>
-                  <span className="text-[8px] font-semibold uppercase">{month}</span>
+                  <span className="w-12 shrink-0 text-xs font-semibold text-(--text-muted)">{shortDate(e.date)}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-(--text-primary)">
+                    {e.description}
+                  </span>
+                  <span
+                    className="shrink-0 text-sm font-bold tabular-nums"
+                    style={{ color: isIncome ? "var(--income-dark)" : "var(--text-primary)" }}
+                  >
+                    {isIncome ? "+" : "−"}
+                    <Money cents={e.amount_cents} currency={currency} />
+                  </span>
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[11.5px] font-semibold text-(--text-primary)">{event.description}</p>
-                  <p className="text-[9.5px] text-(--text-light)">{event.category_name ?? (isIncome ? "Entrada" : "Saída")}</p>
-                </div>
-                <span
-                  className="text-[11.5px] font-bold tabular-nums"
-                  style={{ color: isIncome ? "var(--income)" : "var(--expense)" }}
-                >
-                  {isIncome ? "+" : "-"}
-                  <Money cents={event.amount_cents} currency={currency} />
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ))
       )}
     </article>
   );
 }
 
-function ImpactRow({
-  label,
-  sublabel,
-  amount,
-  percent,
-  currency,
-  gradient,
-}: {
-  label: string;
-  sublabel: string;
-  amount: number;
-  percent: number;
-  currency: CurrencyCode;
-  gradient: string;
-}) {
-  return (
-    <div className="my-3 grid grid-cols-[130px_1fr_54px] items-center gap-2.5">
-      <div>
-        <strong className="block text-[11.5px] font-semibold text-(--text-primary)">{label}</strong>
-        <span className="text-[9.5px] text-(--text-light)">{sublabel}</span>
-      </div>
-      <div className="h-[10px] overflow-hidden rounded-full" style={{ background: "#EEF1F6" }}>
-        <div className="h-full rounded-full" style={{ width: `${percent}%`, background: gradient }} />
-      </div>
-      <span className="text-right text-[11px] font-semibold tabular-nums text-(--text-secondary)">
-        <Money cents={amount} currency={currency} />
-      </span>
-    </div>
-  );
-}
-
-export function ImpactsCard({
+/** Quanto entra, sai e sobra no período, e a frase do que ficar de olho. */
+export function PeriodSummaryCard({
+  periodLabel,
   totalIncome,
   totalExpense,
   netResult,
+  note,
   currency,
-  periodLabel,
 }: {
+  periodLabel: string;
   totalIncome: number;
   totalExpense: number;
   netResult: number;
+  note: string;
   currency: CurrencyCode;
-  periodLabel: string;
 }) {
-  const maxImpact = Math.max(totalIncome, totalExpense, Math.abs(netResult), 1);
-
   return (
-    <article
-      className="flex min-h-[230px] flex-col rounded-[20px] p-5"
-      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
-    >
-      <div className="mb-1 flex items-center gap-2.5">
-        <div
-          className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
-          style={{ background: "var(--primary-light)", color: "var(--primary)" }}
-        >
-          <ChartNoAxesColumnIncreasing className="h-4 w-4" />
+    <article className="flex min-w-0 flex-col gap-4 rounded-[20px] bg-(--bg-surface) p-5 shadow-(--shadow-card) md:p-6">
+      <h2 className="text-card-title">Nos próximos {periodLabel}</h2>
+      <div className="flex flex-col gap-3">
+        <div className="flex justify-between text-sm">
+          <span className="text-(--text-muted)">Entra</span>
+          <span className="font-bold tabular-nums text-(--income-dark)">
+            +<Money cents={totalIncome} currency={currency} />
+          </span>
         </div>
-        <div>
-          <h3 className="text-[14px] font-bold text-(--text-primary)">Impactos na projeção</h3>
-          <p className="text-[10.5px] text-(--text-light)">Entradas, saídas e resultado de {periodLabel}.</p>
+        <div className="flex justify-between text-sm">
+          <span className="text-(--text-muted)">Sai</span>
+          <span className="font-bold tabular-nums text-(--text-primary)">
+            −<Money cents={totalExpense} currency={currency} />
+          </span>
         </div>
-      </div>
-
-      <ImpactRow
-        label="Entradas previstas"
-        sublabel="Recebimentos pendentes"
-        amount={totalIncome}
-        percent={Math.round((totalIncome / maxImpact) * 100)}
-        currency={currency}
-        gradient="linear-gradient(90deg,#20C67A,#18B26B)"
-      />
-      <ImpactRow
-        label="Saídas previstas"
-        sublabel="Pagamentos pendentes"
-        amount={totalExpense}
-        percent={Math.round((totalExpense / maxImpact) * 100)}
-        currency={currency}
-        gradient="linear-gradient(90deg,#FF6B81,#F04469)"
-      />
-      <ImpactRow
-        label="Resultado do período"
-        sublabel="Entradas − saídas"
-        amount={netResult}
-        percent={Math.round((Math.abs(netResult) / maxImpact) * 100)}
-        currency={currency}
-        gradient="linear-gradient(90deg,#7C5CFA,#5B6CFF)"
-      />
-
-      <div
-        className="mt-2 rounded-xl border px-4 py-3.5 text-[10.5px] leading-[1.4]"
-        style={{ background: "#F7F8FF", borderColor: "#ECEFFD", color: "var(--text-secondary)" }}
-      >
-        Neste período: entradas de <Money cents={totalIncome} currency={currency} /> e saídas de{" "}
-        <Money cents={totalExpense} currency={currency} />, resultado de <Money cents={netResult} currency={currency} />.
-      </div>
-    </article>
-  );
-}
-
-export function InsightCard({ insight }: { insight: CashFlowInsight }) {
-  return (
-    <article
-      className="flex min-h-[230px] flex-col rounded-[20px] p-5"
-      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
-    >
-      <div className="mb-3 flex items-center gap-2.5">
-        <div
-          className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
-          style={{ background: "var(--primary-light)", color: "var(--primary)" }}
-        >
-          <Sparkles className="h-4 w-4" />
-        </div>
-        <div>
-          <h3 className="text-[14px] font-bold text-(--text-primary)">Insight Velun</h3>
-          <p className="text-[10.5px] text-(--text-light)">Leitura automática da sua projeção.</p>
+        <div className="flex justify-between border-t border-(--border-soft) pt-3 text-[15px]">
+          <span className="font-semibold text-(--text-primary)">{netResult >= 0 ? "Sobra" : "Falta"}</span>
+          <span className="font-bold tabular-nums text-(--text-primary)">
+            {netResult >= 0 ? "+" : "−"}
+            <Money cents={Math.abs(netResult)} currency={currency} />
+          </span>
         </div>
       </div>
-
-      <div
-        className="flex gap-3 rounded-[14px] border p-3.5"
-        style={{ background: "linear-gradient(135deg, #F4F2FF 0%, #F8F7FF 100%)", borderColor: "#EBE7FF" }}
-      >
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-          style={{ background: "#ECE9FF", color: "#6B5BFF" }}
-        >
-          <Sparkles className="h-4 w-4" />
-        </div>
-        <p className="text-[11px] leading-[1.42] font-semibold" style={{ color: "#5158C8" }}>
-          {insight.headline}
-        </p>
-      </div>
-
-      {insight.bullets.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-3">
-          {insight.bullets.map((bullet, i) => (
-            <div key={i} className="flex items-start gap-2.5">
-              <div
-                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full"
-                style={
-                  bullet.tone === "warning"
-                    ? { background: "#FFF4E5", color: "#F59E0B" }
-                    : { background: "#EAFBF2", color: "#16A34A" }
-                }
-              >
-                {bullet.tone === "warning" ? <TriangleAlert className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-              </div>
-              <p className="text-[10.5px] leading-[1.35] text-(--text-secondary)">{bullet.text}</p>
-            </div>
-          ))}
+      {note ? (
+        <div className="mt-auto rounded-[16px] bg-[#F5F6FF] p-4 text-sm leading-relaxed text-(--text-secondary)">
+          <div className="mb-1 text-xs font-bold text-[#4257CB]">O que fica de olho</div>
+          {note}
         </div>
       ) : null}
     </article>
