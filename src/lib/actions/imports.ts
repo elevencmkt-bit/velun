@@ -97,15 +97,20 @@ export async function importStatement(input: {
   if (importError) throw new Error(importError.message);
   const importId = created.id as string;
 
-  // Categorias do household, por nome, pro casamento com o MCC.
+  // Categorias do household, por nome, pro casamento com o MCC. `kind`
+  // vem junto porque a sugestão tem que respeitar a direção da linha:
+  // estorno de cartão traz o mesmo MCC da compra.
   const { data: categories } = await supabase
     .from("categories")
-    .select("id, name")
+    .select("id, name, kind")
     .eq("household_id", householdId)
     .eq("is_archived", false);
 
   const categoriesByName = new Map(
-    (categories ?? []).map((c) => [(c.name as string).toLowerCase(), c.id as string]),
+    (categories ?? []).map((c) => [
+      (c.name as string).toLowerCase(),
+      { id: c.id as string, kind: c.kind as string },
+    ]),
   );
 
   // Fingerprints já existentes nessa conta, pra marcar duplicata. O
@@ -164,7 +169,7 @@ export async function importStatement(input: {
       description: t.description,
     });
     const isDuplicate = existingFingerprints.has(fingerprint);
-    const suggested = suggestCategoryId(t.mcc, categoriesByName);
+    const suggested = suggestCategoryId(t.mcc, categoriesByName, t.direction);
 
     // Duplicata não procura previsão: se essa linha já existe na conta,
     // não é ela que vai quitar previsão nenhuma.
