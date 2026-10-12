@@ -192,6 +192,14 @@ export default async function CartoesPage({
   );
   const futureParcelsCount = futureParcels?.length ?? 0;
 
+  // Fatura de um mês que ainda nem abriu (só tem parcelas ou compras
+  // previstas): mostra só o que é dela. O que ficar em aberto antes entra
+  // nela também, mas isso ainda não aconteceu.
+  const isFuture = statement.closing > selected.current.closing;
+  const shownTotal = isFuture
+    ? Math.max(0, statement.chargesCents - statement.creditsCents)
+    : statement.totalCents;
+
   const toPay =
     statement.status === "open"
       ? Math.max(
@@ -265,7 +273,10 @@ export default async function CartoesPage({
                   >
                     {monthName(s.closing)}
                     <span className="font-medium text-(--text-light)">
-                      · {STATUS_LABELS[s.status].toLowerCase()}
+                      ·{" "}
+                      {s.closing > selected.current.closing
+                        ? "próxima"
+                        : STATUS_LABELS[s.status].toLowerCase()}
                     </span>
                   </Link>
                 );
@@ -360,11 +371,23 @@ export default async function CartoesPage({
               <span className="text-[13px] text-(--text-muted)">
                 Fatura de {monthName(statement.closing).toLowerCase()}
               </span>
-              <Pill status={statement.status} />
+              {isFuture ? (
+                <span className="rounded-full bg-(--bg-subtle) px-2 py-0.5 text-[11px] font-semibold text-(--text-muted)">
+                  Próxima
+                </span>
+              ) : (
+                <Pill status={statement.status} />
+              )}
             </div>
             <div className="mt-1.5 text-[30px] leading-tight font-extrabold tracking-[-0.02em] tabular-nums">
-              <Money cents={statement.totalCents} currency={currency} />
+              <Money cents={shownTotal} currency={currency} />
             </div>
+            {isFuture ? (
+              <div className="mt-1 text-[13px] text-(--text-muted)">
+                Já lançado pra este mês. O que ficar sem pagar antes entra aqui
+                também.
+              </div>
+            ) : null}
             {statement.paidCents > 0 && statement.status !== "open" ? (
               <div className="mt-1 text-[13px] text-(--text-muted)">
                 Pago{" "}
@@ -435,7 +458,10 @@ export default async function CartoesPage({
               depois, na seguinte.
             </p>
 
-            {selected.canEdit && toPay > 0 && statement.status !== "paid" ? (
+            {selected.canEdit &&
+            !isFuture &&
+            toPay > 0 &&
+            statement.status !== "paid" ? (
               <div className="mt-5">
                 <PayBillDialog
                   cardId={selected.id}
