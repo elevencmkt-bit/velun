@@ -1,4 +1,5 @@
-import { Banknote, CreditCard, LineChart, Lock, PiggyBank, Wallet } from "lucide-react";
+import { Lock, Wallet } from "lucide-react";
+import { ACCOUNT_TYPE_ICONS, ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getAccountBalances } from "@/lib/balances";
@@ -9,28 +10,12 @@ import { AccountForm } from "./account-form";
 import { AccountRowActions } from "./account-row-actions";
 import { Money } from "@/components/money";
 
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  checking: "Conta corrente",
-  savings: "Poupança",
-  credit_card: "Cartão de crédito",
-  cash: "Dinheiro vivo",
-  investment: "Investimento",
-};
-
 // Texto curto pro badge da conta pessoal do outro membro. Diz o que ele
 // escolheu mostrar, sem revelar nada além disso.
 const VISIBILITY_BADGE: Record<string, string> = {
   balance_only: "Só o saldo",
   categories_only: "Sem lançamentos",
   shared: "Aberta",
-};
-
-const ACCOUNT_TYPE_ICONS: Record<string, typeof Wallet> = {
-  checking: Wallet,
-  savings: PiggyBank,
-  credit_card: CreditCard,
-  cash: Banknote,
-  investment: LineChart,
 };
 
 export default async function ContasPage() {

@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUp, ArrowDown, ArrowUpCircle, ArrowDownCircle, PiggyBank, Wallet } from "lucide-react";
+import { ArrowRight, ArrowUpCircle, ArrowDownCircle, PiggyBank, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { formatCents } from "@/lib/money";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
 import { getCashFlowProjection } from "@/lib/cash-flow";
 import {
@@ -15,12 +15,9 @@ import {
 } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
 import { accountScope, scopeLabel, type AccountScope } from "@/lib/visibility";
-import {
-  excludeTransfers,
-  groupExpensesByCategory,
-  percentChange,
-  sumByDirection,
-} from "@/lib/reports";
+import { excludeTransfers, groupExpensesByCategory, sumByDirection } from "@/lib/reports";
+import { getAccountBalances } from "@/lib/balances";
+import { ACCOUNT_TYPE_ICONS, ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge } from "@/components/category-badge";
 import { MonthSelector } from "@/components/month-selector";
@@ -70,39 +67,26 @@ async function fetchPendingPreview(
   return data ?? [];
 }
 
-// Badge de tendência. A cor segue se a mudança é favorável para esta
-// métrica, não o sinal cru — Saiu caindo é bom (verde), Entrou/Sobrou
-// caindo é ruim (vermelho).
-function PercentBadge({
-  current,
-  previous,
-  favorable = "up",
+// Comparação com o mês anterior em texto calmo: o valor de lá, não uma
+// porcentagem. "↑1035%" assustava mais do que informava — basta um mês
+// fraco antes pra qualquer mês normal parecer uma explosão.
+function PreviousMonth({
+  label,
+  cents,
+  currency,
 }: {
-  current: number;
-  previous: number;
-  favorable?: "up" | "down";
+  label: string;
+  cents: number;
+  currency: CurrencyCode;
 }) {
-  const change = percentChange(current, previous);
-  if (change === null) {
-    return <span className="text-xs text-(--text-light)">sem dado anterior</span>;
-  }
-  const direction = change >= 0 ? "up" : "down";
-  const isFavorable = direction === favorable;
-  const Icon = direction === "up" ? ArrowUp : ArrowDown;
-
   return (
-    <span
-      className="inline-flex w-fit items-center gap-0.5 rounded-full px-[7px] py-[2px] text-[11px] font-semibold"
-      style={{
-        backgroundColor: isFavorable ? "var(--income-soft)" : "var(--expense-soft)",
-        color: isFavorable ? "var(--income-dark)" : "var(--expense-dark)",
-      }}
-    >
-      <Icon className="h-3 w-3" />
-      {Math.abs(change).toFixed(0)}%
+    <span className="text-xs text-(--text-muted)">
+      Em {label}: <Money cents={cents} currency={currency} />
     </span>
   );
 }
+
+const MAX_DASHBOARD_ACCOUNTS = 5;
 
 function StatCard({
   label,
@@ -149,7 +133,7 @@ export default async function MesPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
-  const { householdId, memberId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency, displayName } = await getCurrentMember();
   const supabase = await createClient();
   const { month } = await searchParams;
   const { year, monthIndex } = parseMonthParam(month);
@@ -179,8 +163,18 @@ export default async function MesPage({
     accountScope(supabase, householdId, memberId, "transactions"),
   ]);
 
-  const [currentRows, prevRows, trendRows, colorMap, cashFlow, pendingPreview, pendingCurrentRows] =
-    await Promise.all([
+  const [
+    currentRows,
+    prevRows,
+    trendRows,
+    colorMap,
+    cashFlow,
+    pendingPreview,
+    pendingCurrentRows,
+    balances,
+    { data: accountRows },
+    { data: memberRows },
+  ] = await Promise.all([
       fetchMonthTransactions(supabase, householdId, start, end, categoriesScope),
       fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, categoriesScope),
       fetchMonthTransactions(supabase, householdId, trendRangeStart, end, categoriesScope),
@@ -188,6 +182,16 @@ export default async function MesPage({
       getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS, balanceScope),
       fetchPendingPreview(supabase, householdId, transactionsScope),
       fetchMonthTransactions(supabase, householdId, start, end, categoriesScope, "pending"),
+      getAccountBalances(supabase, householdId, balanceScope),
+      supabase
+        .from("accounts")
+        .select("id, name, type, owner_id")
+        .eq("household_id", householdId)
+        .eq("is_archived", false)
+        .in("id", balanceScope.ids.length > 0 ? balanceScope.ids : ["00000000-0000-0000-0000-000000000000"])
+        .order("sort_order")
+        .order("name"),
+      supabase.from("members").select("id, display_name").eq("household_id", householdId),
     ]);
 
   const current = excludeTransfers(currentRows);
@@ -202,6 +206,24 @@ export default async function MesPage({
   const entrouPrev = sumByDirection(previous, "in");
   const saiuPrev = sumByDirection(previous, "out");
   const sobrouPrev = entrouPrev - saiuPrev;
+  const prevMonthName = new Date(prev.year, prev.monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" });
+
+  // Contas com saldo, na ordem da tela Contas. De quem é cada uma vai
+  // escrito: "Minha", "Do casal" ou o nome de quem é dona.
+  const memberNames = new Map((memberRows ?? []).map((m) => [m.id as string, m.display_name as string]));
+  const dashboardAccounts = (accountRows ?? []).map((a) => ({
+    id: a.id as string,
+    name: a.name as string,
+    type: a.type as string,
+    owner:
+      a.owner_id === null
+        ? "Do casal"
+        : a.owner_id === memberId
+          ? "Minha"
+          : (memberNames.get(a.owner_id as string) ?? "Pessoal"),
+    balance: balances.get(a.id as string) ?? 0,
+  }));
+  const firstName = displayName?.trim().split(/\s+/)[0] ?? "";
 
   const entrouPendente = sumByDirection(pendingCurrent, "in");
   const saiuPendente = sumByDirection(pendingCurrent, "out");
@@ -258,8 +280,10 @@ export default async function MesPage({
     <div className="flex flex-col gap-6 sm:gap-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-page-title">Dashboard</h1>
-          <p className="text-page-subtitle">Resumo financeiro de {monthLabel(year, monthIndex)}.</p>
+          <h1 className="text-page-title">{firstName ? `Olá, ${firstName}` : "Dashboard"}</h1>
+          <p className="text-page-subtitle">
+            Seu resumo de <span className="lowercase">{monthLabel(year, monthIndex)}</span>.
+          </p>
         </div>
         <MonthSelector
           label={monthLabel(year, monthIndex)}
@@ -285,7 +309,7 @@ export default async function MesPage({
           badgeBg="var(--badge-green-bg)"
           badgeFg="var(--badge-green-fg)"
           valueColor="var(--income)"
-          delta={<PercentBadge current={entrou} previous={entrouPrev} favorable="up" />}
+          delta={<PreviousMonth label={prevMonthName} cents={entrouPrev} currency={currency} />}
         />
         <StatCard
           label="Saiu"
@@ -294,7 +318,7 @@ export default async function MesPage({
           badgeBg="var(--badge-red-bg)"
           badgeFg="var(--badge-red-fg)"
           valueColor="var(--expense)"
-          delta={<PercentBadge current={saiu} previous={saiuPrev} favorable="down" />}
+          delta={<PreviousMonth label={prevMonthName} cents={saiuPrev} currency={currency} />}
         />
         <StatCard
           label="Sobrou"
@@ -303,11 +327,61 @@ export default async function MesPage({
           badgeBg="var(--badge-blue-bg)"
           badgeFg="var(--badge-blue-fg)"
           valueColor={sobrou < 0 ? "var(--expense)" : "var(--income)"}
-          delta={<PercentBadge current={sobrou} previous={sobrouPrev} favorable="up" />}
+          delta={<PreviousMonth label={prevMonthName} cents={sobrouPrev} currency={currency} />}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-card-title">Contas</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col">
+            {dashboardAccounts.length === 0 ? (
+              <p className="text-sm text-(--text-muted)">Nenhuma conta ativa.</p>
+            ) : (
+              <div className="flex flex-col">
+                {dashboardAccounts.slice(0, MAX_DASHBOARD_ACCOUNTS).map((account) => {
+                  const Icon = ACCOUNT_TYPE_ICONS[account.type] ?? Wallet;
+                  return (
+                    <div
+                      key={account.id}
+                      className="flex min-h-[56px] items-center gap-3 border-b border-(--border-soft) last:border-0"
+                    >
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                        style={{ backgroundColor: "var(--badge-purple-bg)" }}
+                      >
+                        <Icon className="h-4 w-4" style={{ color: "var(--badge-purple-fg)" }} />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-sm font-medium text-(--text-primary)">{account.name}</span>
+                        <span className="truncate text-xs text-(--text-muted)">
+                          {account.owner} · {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
+                        </span>
+                      </div>
+                      <span
+                        className="shrink-0 text-sm font-semibold tabular-nums"
+                        style={{ color: account.balance < 0 ? "var(--expense)" : "var(--text-primary)" }}
+                      >
+                        <Money cents={account.balance} currency={currency} />
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <Link
+              href="/contas"
+              className="mt-3 flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
+            >
+              {dashboardAccounts.length > MAX_DASHBOARD_ACCOUNTS
+                ? `Ver todas as ${dashboardAccounts.length} contas`
+                : "Gerenciar contas"}{" "}
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
@@ -317,14 +391,6 @@ export default async function MesPage({
           </CardHeader>
           <CardContent>
             <MonthDonut slices={slices} compact currency={currency} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">Entradas vs saídas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TrendBarChart points={trendPoints} compact currency={currency} />
           </CardContent>
         </Card>
         <Card>
@@ -458,6 +524,16 @@ export default async function MesPage({
           currency={currency}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-card-title">Entradas vs saídas</CardTitle>
+          <p className="text-xs text-(--text-muted)">Últimos {TREND_MONTHS} meses</p>
+        </CardHeader>
+        <CardContent>
+          <TrendBarChart points={trendPoints} compact currency={currency} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
