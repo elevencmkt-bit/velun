@@ -2,15 +2,26 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, Ellipsis, Pencil } from "lucide-react";
-import { archiveAccount, unarchiveAccount } from "@/lib/actions/accounts";
+import { Archive, ArchiveRestore, Ellipsis, Pencil, Trash2 } from "lucide-react";
+import { archiveAccount, deleteAccount, unarchiveAccount } from "@/lib/actions/accounts";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AccountForm } from "./account-form";
 
 type EditableAccount = NonNullable<React.ComponentProps<typeof AccountForm>["account"]>;
@@ -27,6 +38,8 @@ export function AccountRowActions({
   paymentAccounts: { id: string; name: string }[];
 }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -34,6 +47,19 @@ export function AccountRowActions({
     startTransition(async () => {
       if (isArchived) await unarchiveAccount(account.id);
       else await archiveAccount(account.id);
+      router.refresh();
+    });
+  }
+
+  function onDelete() {
+    setDeleteError(null);
+    startTransition(async () => {
+      const result = await deleteAccount(account.id);
+      if (!result.ok) {
+        setDeleteError(result.error);
+        return;
+      }
+      setDeleteOpen(false);
       router.refresh();
     });
   }
@@ -63,8 +89,45 @@ export function AccountRowActions({
             {isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
             {isArchived ? "Reativar" : "Arquivar"}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+            className="text-(--expense-dark) focus:text-(--expense-dark)"
+          >
+            <Trash2 className="h-4 w-4" />
+            Excluir conta
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {account.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A conta some de vez, junto com as recorrências que lançariam nela. Só dá pra excluir conta
+              sem lançamentos. Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError ? <p className="text-sm text-(--expense-dark)">{deleteError}</p> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              onClick={(e) => {
+                // Fica aberto até saber se deu certo, pra mostrar o motivo se não der.
+                e.preventDefault();
+                onDelete();
+              }}
+              className="bg-(--expense) hover:bg-(--expense-dark)"
+            >
+              {isPending ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AccountForm
         account={account}
         paymentAccounts={paymentAccounts}

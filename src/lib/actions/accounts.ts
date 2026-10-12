@@ -181,3 +181,52 @@ export async function unarchiveAccount(accountId: string) {
   revalidatePath("/contas");
   revalidatePath("/cartoes");
 }
+
+export type DeleteAccountResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Exclui uma conta de vez. Só conta sem lançamentos: com histórico, o
+ * caminho é arquivar (o histórico continua contando nos meses em que
+ * aconteceu). O banco só deixa excluir conta do casal ou a própria — a
+ * conta pessoal do outro nem chega aqui.
+ */
+export async function deleteAccount(accountId: string): Promise<DeleteAccountResult> {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const { count, error: countError } = await supabase
+    .from("transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", householdId)
+    .eq("account_id", accountId);
+  if (countError) return { ok: false, error: "Não consegui conferir os lançamentos da conta." };
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `Essa conta tem ${count} ${count === 1 ? "lançamento" : "lançamentos"}. Pra não perder histórico, só dá pra excluir conta vazia — arquive, ou apague os lançamentos antes.`,
+    };
+  }
+
+  // Recorrências que lançariam nessa conta: sem a conta, não têm onde cair.
+  const { error: recError } = await supabase
+    .from("recurrences")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("template->>account_id", accountId);
+  if (recError) return { ok: false, error: "Não consegui apagar as recorrências dessa conta." };
+
+  const { data: deleted, error } = await supabase
+    .from("accounts")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("id", accountId)
+    .select("id");
+  if (error) return { ok: false, error: "Não consegui excluir a conta." };
+  // O banco recusa em silêncio a conta pessoal de outra pessoa.
+  if (!deleted || deleted.length === 0) {
+    return { ok: false, error: "Só quem é dono da conta pode excluí-la." };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
