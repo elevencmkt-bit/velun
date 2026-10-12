@@ -113,10 +113,37 @@ export type ReportInsight = {
   items: { parts: InsightPart[]; tone: "positive" | "warning" | "info" }[];
 };
 
+/** Categoria com o valor do mês e o do mês anterior (null = não existia). */
+export type CategoryDelta = { name: string; amount_cents: number; prev_cents: number | null };
+
+// Cada categoria do mês, com quanto foi no mês anterior — pra lista
+// "vs agosto" do relatório e pras frases do insight.
+export function categoryDeltas(
+  current: MonthTransaction[],
+  previous: MonthTransaction[],
+  direction: "in" | "out",
+): CategoryDelta[] {
+  const prev = new Map(groupByCategory(previous, direction).map((s) => [s.name, s.amount_cents]));
+  return groupByCategory(current, direction).map((s) => ({
+    name: s.name,
+    amount_cents: s.amount_cents,
+    prev_cents: prev.get(s.name) ?? null,
+  }));
+}
+
+const UNCATEGORIZED = "Sem categoria";
+
+function listNames(names: string[]) {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+}
+
 // Leitura automática do período, comparando com o mês anterior em
 // DINHEIRO, não em porcentagem. Porcentagem engana aqui: sobre um mês
 // fraco qualquer mês normal vira "+1035%", e sobre saldo negativo a conta
-// nem faz sentido ("150% maior" que −$843).
+// nem faz sentido ("150% maior" que −$843). Tudo com nome e número de
+// verdade — nada de conselho genérico. "Sem categoria" fica de fora: a
+// tela já avisa disso no topo.
 export function buildReportInsight(input: {
   income: number;
   expense: number;
@@ -124,13 +151,11 @@ export function buildReportInsight(input: {
   incomePrev: number;
   expensePrev: number;
   balancePrev: number;
-  topExpense: CategorySlice | undefined;
-  topExpensePrev: CategorySlice | undefined;
+  expenseDeltas: CategoryDelta[];
   /** "agosto" */
   prevName: string;
 }): ReportInsight {
-  const { income, expense, balance, incomePrev, expensePrev, balancePrev, topExpense, topExpensePrev, prevName } =
-    input;
+  const { income, expense, balance, incomePrev, expensePrev, balancePrev, expenseDeltas, prevName } = input;
 
   const hasPrev = incomePrev !== 0 || expensePrev !== 0;
   const items: ReportInsight["items"] = [];
@@ -139,33 +164,26 @@ export function buildReportInsight(input: {
   let tone: ReportInsight["tone"];
   const diff = balance - balancePrev;
   if (balance < 0) {
-    headline = ["Neste mês saiu mais do que entrou: faltaram ", { cents: -balance }, ". Vale revisar os gastos do período."];
+    headline = ["Neste mês saiu mais do que entrou: faltaram ", { cents: -balance }, "."];
     tone = "warning";
   } else if (!hasPrev) {
     headline = ["Sobrou ", { cents: balance }, " neste mês."];
     tone = "positive";
   } else if (diff >= 0) {
-    headline = ["Bom mês! Sobrou ", { cents: balance }, ", ", { cents: diff }, ` a mais que em ${prevName}.`];
+    headline = [
+      "Bom mês! Sobrou ",
+      { cents: balance },
+      " — ",
+      { cents: diff },
+      ` a mais que em ${prevName}${balancePrev < 0 ? ", quando faltou dinheiro" : ""}.`,
+    ];
     tone = "positive";
   } else {
     headline = ["Sobrou ", { cents: balance }, ", ", { cents: -diff }, ` a menos que em ${prevName}.`];
     tone = "warning";
   }
 
-  if (topExpense && expense > 0) {
-    const share = Math.round((topExpense.amount_cents / expense) * 100);
-    items.push(
-      topExpense.name === "Sem categoria"
-        ? {
-            parts: [`${share}% das despesas estão sem categoria. Categorizar mostra pra onde o dinheiro vai.`],
-            tone: "info",
-          }
-        : {
-            parts: [`${topExpense.name} foi sua maior despesa: `, { cents: topExpense.amount_cents }, ` (${share}%).`],
-            tone: "info",
-          },
-    );
-  }
+  const named = expenseDeltas.filter((d) => d.name !== UNCATEGORIZED);
 
   if (hasPrev) {
     const incomeDiff = income - incomePrev;
@@ -178,20 +196,42 @@ export function buildReportInsight(input: {
 
     const expenseDiff = expense - expensePrev;
     if (expenseDiff !== 0) {
+      // Quem mais puxou a diferença, pra frase dizer o porquê.
+      const movers = named
+        .filter((d) => d.prev_cents !== null && (expenseDiff > 0 ? d.amount_cents > d.prev_cents : d.amount_cents < d.prev_cents))
+        .sort((a, b) => Math.abs(b.amount_cents - (b.prev_cents ?? 0)) - Math.abs(a.amount_cents - (a.prev_cents ?? 0)))
+        .slice(0, 2);
+      const why: InsightPart[] = [];
+      movers.forEach((m, i) => {
+        why.push(`${i === 0 ? " — " : ", "}${m.name} ${expenseDiff > 0 ? "+" : "−"}`);
+        why.push({ cents: Math.abs(m.amount_cents - (m.prev_cents ?? 0)) });
+      });
       items.push({
-        parts: [
-          "Você gastou ",
-          { cents: Math.abs(expenseDiff) },
-          ` ${expenseDiff < 0 ? "a menos" : "a mais"} que em ${prevName}.`,
-        ],
+        parts: ["Saiu ", { cents: Math.abs(expenseDiff) }, ` ${expenseDiff < 0 ? "a menos" : "a mais"}`, ...why, "."],
         tone: expenseDiff < 0 ? "positive" : "warning",
       });
     }
-  }
 
-  if (topExpensePrev && topExpense && topExpensePrev.name !== topExpense.name && topExpensePrev.name !== "Sem categoria") {
+    const same = named.find((d) => d.prev_cents === d.amount_cents && d.amount_cents > 0);
+    if (same) {
+      items.push({ parts: [`${same.name} ficou igual: `, { cents: same.amount_cents }, " nos dois meses."], tone: "info" });
+    }
+
+    const fresh = named.filter((d) => d.prev_cents === null).map((d) => d.name);
+    if (fresh.length > 0) {
+      items.push({
+        parts: [
+          fresh.length === 1
+            ? `${fresh[0]} apareceu pela primeira vez.`
+            : `${listNames(fresh.slice(0, 3))} apareceram pela primeira vez.`,
+        ],
+        tone: "info",
+      });
+    }
+  } else if (named[0] && expense > 0) {
+    const share = Math.round((named[0].amount_cents / expense) * 100);
     items.push({
-      parts: [`${topExpensePrev.name} deixou de ser sua principal categoria de despesa.`],
+      parts: [`${named[0].name} foi sua maior despesa: `, { cents: named[0].amount_cents }, ` (${share}%).`],
       tone: "info",
     });
   }
