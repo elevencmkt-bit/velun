@@ -26,7 +26,9 @@ export default async function ContasPage() {
   const [{ data: accounts }, balances, { data: members }] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, type, institution, is_archived, opening_balance_cents, owner_id, visibility")
+      .select(
+        "id, name, type, institution, is_archived, opening_balance_cents, owner_id, visibility, credit_limit_cents, statement_close_day, payment_due_day, payment_account_id, last_four, card_color",
+      )
       .eq("household_id", householdId)
       .order("sort_order")
       .order("name"),
@@ -41,7 +43,15 @@ export default async function ContasPage() {
   );
 
   const activeAccounts = (accounts ?? []).filter((a) => !a.is_archived);
-  const total = activeAccounts.reduce((sum, a) => sum + (balances.get(a.id) ?? 0), 0);
+  // Saldo total é dinheiro nas contas; o que se deve no cartão aparece no
+  // próprio cartão e entra no saldo quando a fatura é paga.
+  const total = activeAccounts
+    .filter((a) => a.type !== "credit_card")
+    .reduce((sum, a) => sum + (balances.get(a.id) ?? 0), 0);
+  // Quem pode pagar fatura: conta ativa, que não é cartão, do casal ou minha.
+  const paymentAccounts = activeAccounts
+    .filter((a) => a.type !== "credit_card" && (a.owner_id === null || a.owner_id === memberId))
+    .map((a) => ({ id: a.id as string, name: a.name as string }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,7 +60,7 @@ export default async function ContasPage() {
           <h1 className="text-page-title">Contas</h1>
           <p className="text-page-subtitle">Saldo de cada conta, a partir dos lançamentos confirmados.</p>
         </div>
-        <AccountForm />
+        <AccountForm paymentAccounts={paymentAccounts} />
       </div>
 
       {!accounts || accounts.length === 0 ? (
@@ -104,7 +114,14 @@ export default async function ContasPage() {
                               opening_balance_cents: account.opening_balance_cents,
                               owner_id: account.owner_id,
                               visibility: account.visibility,
+                              credit_limit_cents: account.credit_limit_cents,
+                              statement_close_day: account.statement_close_day,
+                              payment_due_day: account.payment_due_day,
+                              payment_account_id: account.payment_account_id,
+                              last_four: account.last_four,
+                              card_color: account.card_color,
                             }}
+                            paymentAccounts={paymentAccounts}
                           />
                           <AccountRowActions accountId={account.id} isArchived={account.is_archived} />
                         </div>
@@ -134,12 +151,21 @@ export default async function ContasPage() {
                         {account.institution ? ` · ${account.institution}` : ""}
                       </div>
                     </div>
-                    <span
-                      className="text-kpi-value"
-                      style={{ color: balance < 0 ? "var(--expense)" : undefined }}
-                    >
-                      <Money cents={balance} currency={currency} />
-                    </span>
+                    {account.type === "credit_card" ? (
+                      <div className="flex flex-col">
+                        <span className="text-xs text-(--text-muted)">Você deve</span>
+                        <span className="text-kpi-value" style={{ color: balance < 0 ? "var(--expense)" : undefined }}>
+                          <Money cents={Math.max(0, -balance)} currency={currency} />
+                        </span>
+                      </div>
+                    ) : (
+                      <span
+                        className="text-kpi-value"
+                        style={{ color: balance < 0 ? "var(--expense)" : undefined }}
+                      >
+                        <Money cents={balance} currency={currency} />
+                      </span>
+                    )}
                   </CardContent>
                 </Card>
               );

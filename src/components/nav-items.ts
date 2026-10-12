@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   CalendarClock,
+  CreditCard,
   LayoutDashboard,
   PieChart,
   Settings,
@@ -19,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/mes", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transacoes", label: "Transações", icon: ArrowLeftRight },
   { href: "/a-pagar", label: "A vencer", icon: CalendarClock },
+  { href: "/cartoes", label: "Cartões", icon: CreditCard },
   { href: "/fluxo-de-caixa", label: "Fluxo de caixa", icon: TrendingUp },
   { href: "/relatorios", label: "Relatórios", icon: PieChart },
   { href: "/contas", label: "Contas", icon: Wallet },

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CARD_COLORS } from "@/lib/credit-card";
 import { Check } from "lucide-react";
 import type { CurrencyCode } from "@/lib/money";
 import { markTransactionPaid } from "@/lib/actions/transactions";
@@ -18,6 +20,8 @@ export type PendingRow = {
   recurring: boolean;
   /** Conta do casal ou própria. Da conta "aberta" do outro, só leitura. */
   can_edit: boolean;
+  /** Fatura de cartão: não é lançamento, abre a fatura em vez de "Pagar". */
+  bill?: { href: string; color: string };
 };
 
 export type Group = {
@@ -114,6 +118,13 @@ function GroupCard({ group, currency }: { group: Group; currency: CurrencyCode }
                   {label}
                 </div>
               </div>
+              {row.bill ? (
+                <div
+                  aria-hidden
+                  className="h-[22px] w-[34px] shrink-0 rounded-[5px]"
+                  style={{ background: (CARD_COLORS[row.bill.color] ?? CARD_COLORS.ink).bg }}
+                />
+              ) : null}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold text-(--text-primary)">{row.description}</p>
                 <p className="truncate text-xs text-(--text-muted)">
@@ -129,7 +140,14 @@ function GroupCard({ group, currency }: { group: Group; currency: CurrencyCode }
                 {out ? "−" : "+"}
                 <Money cents={row.amount_cents} currency={currency} />
               </span>
-              {row.can_edit ? (
+              {row.bill ? (
+                <Link
+                  href={row.bill.href}
+                  className="flex h-9 shrink-0 items-center rounded-xl bg-[#F1F3F7] px-3 text-[13px] font-semibold text-(--text-primary) transition-colors hover:bg-(--primary-light) hover:text-(--primary-hover)"
+                >
+                  Ver fatura
+                </Link>
+              ) : row.can_edit ? (
                 <button
                   type="button"
                   disabled={isPending}
