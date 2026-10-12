@@ -22,8 +22,8 @@ export type StackCard = {
 // frente — a pilha gira, ninguém some.
 
 const BACK_LAYERS = [
-  "translate-x-[10px] -translate-y-[12px] rotate-[3deg] scale-[0.97]",
-  "translate-x-[20px] -translate-y-[24px] rotate-[6deg] scale-[0.94]",
+  "translate-x-[14px] -translate-y-[22px] rotate-[3deg] scale-[0.97]",
+  "translate-x-[26px] -translate-y-[40px] rotate-[6deg] scale-[0.94]",
 ];
 
 export function CardStack({
@@ -44,7 +44,7 @@ export function CardStack({
 
   return (
     <div
-      className={`relative ${cards.length > 1 ? "pt-6 pr-5" : ""} ${className}`}
+      className={`relative ${cards.length > 2 ? "pt-10 pr-7" : cards.length > 1 ? "pt-6 pr-4" : ""} ${className}`}
     >
       <div className="relative grid">
         {[...visible].reverse().map((index) => {
@@ -112,7 +112,7 @@ export function CardStack({
               className={`h-1.5 rounded-full transition-all ${
                 i === front
                   ? "w-5 bg-(--text-primary)"
-                  : "w-1.5 bg-(--border-primary)"
+                  : "w-1.5 bg-[#C9CFDA] hover:bg-(--text-light)"
               }`}
             />
           ))}
