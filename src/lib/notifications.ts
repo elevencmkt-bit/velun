@@ -67,3 +67,46 @@ export async function fetchVisibilityNotifications(
     isNew: seenAt === null || (row.created_at as string) > seenAt,
   }));
 }
+
+/** Pedido aberto pra excluir uma conta do casal — o outro aprova ou recusa. */
+export type DeletionRequest = {
+  id: string;
+  accountId: string;
+  accountName: string;
+  requestedByName: string;
+  /** Pedido feito por quem está vendo (aí ele só pode cancelar). */
+  isMine: boolean;
+  createdAt: string;
+};
+
+export async function fetchDeletionRequests(
+  supabase: SupabaseClient,
+  householdId: string,
+  viewerId: string,
+): Promise<DeletionRequest[]> {
+  const { data, error } = await supabase
+    .from("account_deletion_requests")
+    .select(
+      `id, account_id, requested_by, created_at,
+       account:accounts(name),
+       author:members!account_deletion_requests_requested_by_fkey(display_name)`,
+    )
+    .eq("household_id", householdId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  // Antes da migração 0024 a tabela não existe: sem pedidos, sem erro.
+  if (error) return [];
+
+  const single = <T,>(value: T | T[] | null): T | null =>
+    Array.isArray(value) ? (value[0] ?? null) : value;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    accountId: row.account_id as string,
+    accountName: single<{ name: string }>(row.account)?.name ?? "uma conta",
+    requestedByName: single<{ display_name: string }>(row.author)?.display_name ?? "um membro",
+    isMine: row.requested_by === viewerId,
+    createdAt: row.created_at as string,
+  }));
+}

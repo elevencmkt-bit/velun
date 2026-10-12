@@ -8,7 +8,7 @@ import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { GlobalSearch } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
-import { fetchVisibilityNotifications } from "@/lib/notifications";
+import { fetchDeletionRequests, fetchVisibilityNotifications } from "@/lib/notifications";
 import { UserMenu } from "@/components/user-menu";
 import { HideValuesButton } from "@/components/hide-values-button";
 import { HIDE_VALUES_COOKIE } from "@/lib/hide-values";
@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   const hideValues = (await cookies()).get(HIDE_VALUES_COOKIE)?.value === "1";
 
-  const [{ data: accounts }, { data: categories }, notifications] = await Promise.all([
+  const [{ data: accounts }, { data: categories }, notifications, deletionRequests] = await Promise.all([
     // Só contas em que dá pra lançar: a do casal e as próprias. A conta
     // pessoal do outro pode estar visível, mas o banco recusa lançamento
     // nela — oferecer na lista seria convidar um erro.
@@ -46,6 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       member.memberId,
       member.notificationsSeenAt,
     ),
+    fetchDeletionRequests(supabase, member.householdId, member.memberId),
   ]);
 
   return (
@@ -72,7 +73,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
             </div>
             <HideValuesButton initialHidden={hideValues} />
-            <NotificationBell notifications={notifications} />
+            <NotificationBell
+              notifications={notifications}
+              deletionRequests={deletionRequests.filter((r) => !r.isMine)}
+            />
             <UserMenu
               displayName={member.displayName}
               subtitle="Minha conta"
