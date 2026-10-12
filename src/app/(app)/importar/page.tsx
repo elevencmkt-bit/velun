@@ -30,7 +30,7 @@ export default async function ImportarPage() {
       supabase
         .from("imports")
         .select(
-          "id, file_path, statement_start, statement_end, balance_matches, extracted_sum_cents",
+          "id, account_id, file_path, statement_start, statement_end, balance_matches, extracted_sum_cents",
         )
         .eq("household_id", householdId)
         .eq("status", "review")
@@ -72,9 +72,35 @@ export default async function ImportarPage() {
     ? await supabase
         .from("staged_transactions")
         .select(
-          "id, date, description, amount_cents, direction, suggested_category_id, dup_status, is_included",
+          "id, date, description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description)",
         )
         .eq("import_id", openImport.id)
+        .order("date")
+    : { data: null };
+
+  // Previsões do período que o extrato não confirmou. Sem isso elas
+  // ficam somando no mês ao lado do dinheiro de verdade, e é o caso do
+  // pagamento que saiu em duas transferências ou com valor diferente do
+  // previsto — o cruzamento automático não junta esses de propósito.
+  const matchedIds = new Set(
+    (staged ?? [])
+      .map((s) => {
+        const m = s.match as { id: string } | { id: string }[] | null;
+        return Array.isArray(m) ? m[0]?.id : m?.id;
+      })
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const { data: forecasts } = openImport
+    ? await supabase
+        .from("transactions")
+        .select("id, date, description, amount_cents, direction")
+        .eq("household_id", householdId)
+        .eq("account_id", openImport.account_id as string)
+        .eq("status", "pending")
+        .not("recurrence_id", "is", null)
+        .gte("date", openImport.statement_start as string)
+        .lte("date", openImport.statement_end as string)
         .order("date")
     : { data: null };
 
@@ -101,16 +127,40 @@ export default async function ImportarPage() {
             }
           : null
       }
-      rows={(staged ?? []).map((s) => ({
-        id: s.id as string,
-        date: s.date as string,
-        description: s.description as string,
-        amountCents: s.amount_cents as number,
-        direction: s.direction as "in" | "out",
-        categoryId: (s.suggested_category_id as string | null) ?? null,
-        isDuplicate: s.dup_status !== "none",
-        isIncluded: s.is_included as boolean,
-      }))}
+      rows={(staged ?? []).map((s) => {
+        const m = s.match as
+          | { id: string; date: string; description: string }
+          | { id: string; date: string; description: string }[]
+          | null;
+        const match = Array.isArray(m) ? (m[0] ?? null) : m;
+
+        return {
+          id: s.id as string,
+          date: s.date as string,
+          description: s.description as string,
+          amountCents: s.amount_cents as number,
+          direction: s.direction as "in" | "out",
+          categoryId: (s.suggested_category_id as string | null) ?? null,
+          isDuplicate: s.dup_status !== "none",
+          isIncluded: s.is_included as boolean,
+          match: match
+            ? {
+                description: match.description,
+                date: match.date,
+                accepted: s.merge_accepted as boolean,
+              }
+            : null,
+        };
+      })}
+      forecasts={(forecasts ?? [])
+        .filter((f) => !matchedIds.has(f.id as string))
+        .map((f) => ({
+          id: f.id as string,
+          date: f.date as string,
+          description: f.description as string,
+          amountCents: f.amount_cents as number,
+          direction: f.direction as "in" | "out",
+        }))}
       history={(history ?? []).map((h) => {
         const account = h.account as { name: string } | { name: string }[] | null;
         return {

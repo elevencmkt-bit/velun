@@ -40,6 +40,22 @@ const MCC_TO_CATEGORY: Record<string, string> = {
   "5533": "Transporte", // autopeças
   "7538": "Transporte", // oficina
 
+  // Educação e creche
+  "8351": "Educação", // creche e berçário
+  "8211": "Educação", // escola
+  "8220": "Educação", // faculdade
+  "8249": "Educação", // escola técnica
+  "8299": "Educação", // ensino diverso
+
+  // Trabalho e serviços profissionais
+  "7311": "Trabalho", // agência de publicidade
+  "7399": "Trabalho", // serviços para empresas
+  "7392": "Trabalho", // consultoria
+  "7338": "Trabalho", // gráfica e cópia
+  "8111": "Trabalho", // advocacia
+  "8931": "Trabalho", // contabilidade
+  "5943": "Trabalho", // papelaria e material de escritório
+
   // Saúde
   "5912": "Saúde", // farmácia
   "8011": "Saúde", // consultório médico
@@ -62,6 +78,7 @@ const MCC_TO_CATEGORY: Record<string, string> = {
   "5817": "Assinaturas", // aplicativos
   "5818": "Assinaturas", // bens digitais diversos
   "7372": "Assinaturas", // programação e software
+  "5734": "Assinaturas", // loja de software (SaaS cobra aqui)
 
   // Compras
   "5311": "Compras", // loja de departamento
@@ -70,6 +87,11 @@ const MCC_TO_CATEGORY: Record<string, string> = {
   "5661": "Compras", // calçados
   "5977": "Compras", // cosméticos
   "5732": "Compras", // eletrônicos
+  // 5045 é loja de computador e periférico: cobre tanto compra de
+  // equipamento quanto software vendido por ela. "Compras" é a leitura
+  // honesta do código — software recorrente que caia aqui sai da
+  // revisão com um clique.
+  "5045": "Compras", // informática e periféricos
   "5942": "Compras", // livraria
   "5944": "Compras", // joalheria
   "5964": "Compras", // venda por catálogo
