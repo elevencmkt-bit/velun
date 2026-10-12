@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { NAV_ITEMS, isActive } from "@/components/nav-items";
 
 // Menu lateral do computador. Claro, como no brand book: superfície
-// branca, um fio separando do conteúdo, e o item ativo marcado em azul
+// branca sobre o fundo cinza-claro do app (sem fio separando — o
+// contraste basta), e o item ativo marcado em azul
 // suave — a cor da marca aparece onde está a atenção, não no menu todo.
 // No celular ele some e quem navega é a barra de baixo (MobileNav).
 
@@ -14,8 +15,8 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden h-full w-[240px] shrink-0 flex-col justify-between border-r border-(--border-primary) bg-white md:flex">
-      <div className="flex flex-col gap-7 px-4 pt-6">
+    <aside className="hidden h-full w-[248px] shrink-0 flex-col justify-between bg-white md:flex">
+      <div className="flex flex-col gap-7 px-4 pt-7">
         <Link href="/mes" className="flex items-center gap-2.5 px-2" aria-label="Velun — início">
           <Image src="/velun-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-[9px]" />
           <span className="text-[19px] font-bold tracking-[-0.02em] text-(--text-primary)">velun</span>
@@ -30,7 +31,7 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-10 items-center gap-3 rounded-[9px] px-3 text-[14px] transition-colors ${
+                className={`flex h-11 items-center gap-3 rounded-xl px-3.5 text-[14px] transition-colors ${
                   active
                     ? "bg-(--primary-light) font-semibold text-(--primary)"
                     : "font-medium text-(--text-secondary) hover:bg-(--bg-subtle) hover:text-(--text-primary)"
@@ -45,7 +46,7 @@ export function Sidebar() {
       </div>
 
       <div className="p-4">
-        <div className="flex flex-col gap-1 rounded-xl bg-(--primary-soft) p-4">
+        <div className="flex flex-col gap-1 rounded-2xl bg-(--primary-soft) p-4">
           <span className="text-[13px] font-semibold text-(--text-primary)">Juntos, cada um com o seu</span>
           <span className="text-xs leading-relaxed text-(--text-muted)">
             Conta do casal, os dois veem. Conta sua, você escolhe o que o outro vê.

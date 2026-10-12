@@ -76,7 +76,8 @@ export default async function TransacoesPage({
     .order("created_at", { ascending: false });
 
   if (params.account) query = query.eq("account_id", params.account);
-  if (params.category) query = query.eq("category_id", params.category);
+  if (params.category === "none") query = query.is("category_id", null);
+  else if (params.category) query = query.eq("category_id", params.category);
   if (params.member) query = query.eq("created_by", params.member);
   if (params.origin === "manual") query = query.is("import_id", null);
   if (params.origin === "imported") query = query.not("import_id", "is", null);

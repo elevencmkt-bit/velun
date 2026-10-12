@@ -28,8 +28,8 @@ export default function AppLoading() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="flex min-h-[104px] items-center gap-4 rounded-2xl border p-5"
-            style={{ borderColor: "var(--border-primary)" }}
+            className="flex min-h-[104px] items-center gap-4 rounded-[20px] p-5"
+            style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
           >
             <Pulse className="h-11 w-11 shrink-0 rounded-[14px]" />
             <div className="flex flex-1 flex-col gap-2">
@@ -40,7 +40,7 @@ export default function AppLoading() {
         ))}
       </div>
 
-      <div className="rounded-2xl border p-6" style={{ borderColor: "var(--border-primary)" }}>
+      <div className="rounded-[20px] p-6" style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}>
         <Pulse className="mb-5 h-5 w-48" />
         <div className="flex flex-col gap-3">
           {Array.from({ length: 6 }).map((_, i) => (

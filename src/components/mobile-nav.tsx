@@ -53,7 +53,7 @@ export function MobileNav() {
             className="absolute inset-0 bg-black/30"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 pt-3 pb-[calc(76px+env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(17,19,24,0.12)]">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 pt-3 pb-[calc(96px+env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(17,19,24,0.12)]">
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="text-[15px] font-semibold text-(--text-primary)">Mais</span>
               <button
@@ -93,17 +93,17 @@ export function MobileNav() {
 
       <nav
         aria-label="Navegação"
-        className="fixed inset-x-0 bottom-0 z-50 flex h-[calc(64px+env(safe-area-inset-bottom))] items-start border-t border-(--border-primary) bg-white/95 pt-2 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 flex h-[68px] items-center rounded-[22px] bg-white/95 px-1.5 shadow-[0_10px_30px_rgba(16,24,40,0.12)] backdrop-blur md:hidden"
       >
         {tab(primary[0].href, "Início", primary[0].icon)}
         {tab(primary[1].href, "Transações", primary[1].icon)}
 
-        <div className="flex flex-1 items-start justify-center">
+        <div className="flex flex-1 items-center justify-center">
           <button
             type="button"
             aria-label="Novo lançamento"
             onClick={() => window.dispatchEvent(new Event(NEW_TRANSACTION_EVENT))}
-            className="-mt-1 flex h-12 w-12 items-center justify-center rounded-full bg-(--primary) text-white shadow-[0_6px_16px_rgba(83,109,254,0.35)] active:scale-95"
+            className="flex h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-(--primary) text-white shadow-[0_8px_18px_rgba(83,109,254,0.35)] active:scale-95"
           >
             <Plus size={24} strokeWidth={2.4} />
           </button>

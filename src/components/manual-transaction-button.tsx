@@ -132,7 +132,7 @@ export function ManualTransactionButton({
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" title="Atalho: n">
+        <Button title="Atalho: n" className="h-11 rounded-[14px] px-4.5 text-[14px] font-semibold">
           + Lançamento
         </Button>
       </DialogTrigger>

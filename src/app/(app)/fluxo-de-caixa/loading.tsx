@@ -14,8 +14,8 @@ export default function FluxoDeCaixaLoading() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="flex min-h-[116px] items-center gap-4 rounded-2xl border p-5"
-            style={{ borderColor: "var(--border-primary)" }}
+            className="flex min-h-[116px] items-center gap-4 rounded-[20px] p-5"
+            style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
           >
             <Pulse className="h-12 w-12 shrink-0 rounded-[14px]" />
             <div className="flex flex-1 flex-col gap-2">
@@ -26,7 +26,7 @@ export default function FluxoDeCaixaLoading() {
         ))}
       </div>
 
-      <div className="rounded-2xl border p-6" style={{ borderColor: "var(--border-primary)" }}>
+      <div className="rounded-[20px] p-6" style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}>
         <Pulse className="mb-4 h-5 w-64" />
         <Pulse className="h-[330px] w-full" />
       </div>
@@ -35,8 +35,8 @@ export default function FluxoDeCaixaLoading() {
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="min-h-[230px] rounded-2xl border p-5"
-            style={{ borderColor: "var(--border-primary)" }}
+            className="min-h-[230px] rounded-[20px] p-5"
+            style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
           >
             <Pulse className="mb-4 h-8 w-40" />
             <Pulse className="mb-2 h-4 w-full" />

@@ -1,122 +1,168 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
-import { getCategoryColorMap } from "@/lib/category-colors";
+import { getCashFlowProjection } from "@/lib/cash-flow";
+import type { CurrencyCode } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RecurrenceForm } from "./recurrence-form";
-import { PendingList, type PendingRow } from "./pending-list";
-import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
 import { Money } from "@/components/money";
+import { RecurrenceForm } from "./recurrence-form";
+import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
+import { UpcomingGroups, type Group, type PendingRow } from "./upcoming-groups";
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+const HORIZON_DAYS = 30;
 
-function addDaysISO(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
+type View = "tudo" | "pagar" | "receber" | "recorrencias";
+const TABS: { key: View; label: string }[] = [
+  { key: "tudo", label: "Tudo" },
+  { key: "pagar", label: "A pagar" },
+  { key: "receber", label: "A receber" },
+  { key: "recorrencias", label: "Recorrências" },
+];
+
+function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-export default async function AVencerPage() {
+function addDays(base: Date, days: number) {
+  return new Date(base.getTime() + days * 86_400_000);
+}
+
+function shortDate(date: string) {
+  return new Date(`${date}T00:00:00`)
+    .toLocaleDateString("pt-BR", { day: "numeric", month: "short" })
+    .replace(" de ", " ")
+    .replace(".", "");
+}
+
+function Signed({ cents, currency }: { cents: number; currency: CurrencyCode }) {
+  return (
+    <>
+      {cents < 0 ? "−" : ""}
+      <Money cents={Math.abs(cents)} currency={currency} />
+    </>
+  );
+}
+
+// Quanto uma recorrência pesa por mês, pra somar semanal, mensal e anual
+// numa conta só.
+const PER_MONTH: Record<string, number> = { weekly: 52 / 12, monthly: 1, yearly: 1 / 12 };
+
+export default async function AVencerPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
   const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
+  const { ver } = await searchParams;
+  const view: View = TABS.some((t) => t.key === ver) ? (ver as View) : "tudo";
 
   // A vencer é extrato futuro: mesmo nível do extrato. De conta pessoal
-  // do outro, só entra a marcada como "aberta".
-  const scope = await accountScope(
-    supabase,
-    householdId,
-    memberId,
-    "transactions",
-  );
-  const visibleIds =
-    scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
-  const visibleSet = new Set(scope.ids);
-  const today = todayISO();
-  const horizon = addDaysISO(30);
-
-  const [
-    { data: accounts },
-    { data: categories },
-    { data: pendingRaw },
-    { data: recurrencesRaw },
-    colorMap,
-  ] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id, name, owner_id, is_archived")
-      .eq("household_id", householdId)
-      .in("id", visibleIds)
-      .order("name"),
-    supabase
-      .from("categories")
-      .select("id, name, kind")
-      .eq("household_id", householdId)
-      .eq("is_archived", false)
-      .order("name"),
-    supabase
-      .from("transactions")
-      .select(
-        `id, date, description, amount_cents, direction, account_id,
-         account:accounts(name),
-         category:categories(name)`,
-      )
-      .eq("household_id", householdId)
-      .eq("status", "pending")
-      .in("account_id", visibleIds)
-      .lte("date", horizon)
-      .order("date", { ascending: true }),
-    supabase
-      .from("recurrences")
-      .select("id, template, frequency, day_of_month")
-      .eq("household_id", householdId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true }),
-    getCategoryColorMap(supabase, householdId),
+  // do outro, só entra a marcada como "aberta". O saldo segue o nível de
+  // saldo, como no Dashboard.
+  const [scope, balanceScope] = await Promise.all([
+    accountScope(supabase, householdId, memberId, "transactions"),
+    accountScope(supabase, householdId, memberId, "balance"),
   ]);
+  const visibleIds = scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
+  const visibleSet = new Set(scope.ids);
 
-  // Onde quem está vendo pode mexer: conta do casal e as próprias. É
-  // também a lista de contas do formulário de recorrência — o banco
-  // recusaria criar recorrência na conta pessoal do outro.
+  const now = new Date();
+  const today = isoDate(now);
+  const weekEnd = isoDate(addDays(now, 6));
+  const horizon = isoDate(addDays(now, HORIZON_DAYS));
+
+  const [{ data: accounts }, { data: categories }, { data: pendingRaw }, { data: recurrencesRaw }, cashFlow] =
+    await Promise.all([
+      supabase
+        .from("accounts")
+        .select("id, name, owner_id, is_archived")
+        .eq("household_id", householdId)
+        .in("id", visibleIds)
+        .order("name"),
+      supabase
+        .from("categories")
+        .select("id, name, kind")
+        .eq("household_id", householdId)
+        .eq("is_archived", false)
+        .order("name"),
+      supabase
+        .from("transactions")
+        .select(
+          `id, date, description, amount_cents, direction, account_id, recurrence_id, transfer_group_id,
+           account:accounts(name),
+           category:categories(name)`,
+        )
+        .eq("household_id", householdId)
+        .eq("status", "pending")
+        .in("account_id", visibleIds)
+        .lte("date", horizon)
+        .order("date", { ascending: true }),
+      supabase
+        .from("recurrences")
+        .select("id, template, frequency, day_of_month")
+        .eq("household_id", householdId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true }),
+      getCashFlowProjection(supabase, householdId, HORIZON_DAYS, balanceScope),
+    ]);
+
+  // Onde quem está vendo pode mexer: conta do casal e as próprias.
   const mine = (accounts ?? []).filter((a) => a.owner_id === null || a.owner_id === memberId);
   const writableIds = new Set(mine.map((a) => a.id as string));
-  // Destino de recorrência nova ou movida: só conta ativa.
   const writable = mine.filter((a) => !a.is_archived);
-  const accountNames = new Map(
-    (accounts ?? []).map((a) => [a.id as string, a.name as string]),
+  const accountNames = new Map((accounts ?? []).map((a) => [a.id as string, a.name as string]));
+  const moveTargets = writable.map((a) => ({ id: a.id as string, name: a.name as string }));
+
+  const single = <T,>(value: T | T[] | null): T | null => (Array.isArray(value) ? (value[0] ?? null) : value);
+
+  const allPending: PendingRow[] = (pendingRaw ?? [])
+    .filter((row) => !row.transfer_group_id)
+    .map((row) => ({
+      id: row.id as string,
+      date: row.date as string,
+      description: row.description as string,
+      amount_cents: row.amount_cents as number,
+      direction: row.direction as "in" | "out",
+      account_name: single<{ name: string }>(row.account)?.name ?? "—",
+      category_name: single<{ name: string }>(row.category)?.name ?? null,
+      recurring: row.recurrence_id !== null,
+      can_edit: writableIds.has(row.account_id as string),
+    }));
+
+  const totalOut = allPending.filter((r) => r.direction === "out").reduce((s, r) => s + r.amount_cents, 0);
+  const totalIn = allPending.filter((r) => r.direction === "in").reduce((s, r) => s + r.amount_cents, 0);
+  const overdueCount = allPending.filter((r) => r.date < today).length;
+
+  const shown = allPending.filter((r) =>
+    view === "pagar" ? r.direction === "out" : view === "receber" ? r.direction === "in" : true,
   );
-  const moveTargets = writable.map((a) => ({
-    id: a.id as string,
-    name: a.name as string,
-  }));
+  const groups: Group[] = [
+    {
+      key: "overdue",
+      title: "Atrasadas",
+      subtitle: "Já pagou? Marque aqui, ou importe o extrato que o Velun quita sozinho.",
+      rows: shown.filter((r) => r.date < today),
+    },
+    { key: "week", title: "Esta semana", rows: shown.filter((r) => r.date >= today && r.date <= weekEnd) },
+    { key: "later", title: "Mais adiante", rows: shown.filter((r) => r.date > weekEnd) },
+  ];
 
-  const single = <T,>(value: T | T[] | null): T | null =>
-    Array.isArray(value) ? (value[0] ?? null) : value;
+  // Faixa dos próximos 30 dias: uma barrinha por dia, do tamanho do que
+  // sai ou entra naquele dia. Mostra num relance onde o mês aperta.
+  const days = Array.from({ length: HORIZON_DAYS }, (_, i) => isoDate(addDays(now, i)));
+  const perDay = new Map<string, { out: number; in: number }>();
+  for (const r of allPending) {
+    if (r.date < today) continue;
+    const entry = perDay.get(r.date) ?? { out: 0, in: 0 };
+    if (r.direction === "out") entry.out += r.amount_cents;
+    else entry.in += r.amount_cents;
+    perDay.set(r.date, entry);
+  }
+  const dayMax = Math.max(1, ...Array.from(perDay.values()).flatMap((d) => [d.out, d.in]));
 
-  const pendingRows: PendingRow[] = (pendingRaw ?? []).map((row) => ({
-    id: row.id,
-    date: row.date,
-    description: row.description,
-    amount_cents: row.amount_cents,
-    direction: row.direction,
-    account_name: single<{ name: string }>(row.account)?.name ?? "—",
-    category_name: single<{ name: string }>(row.category)?.name ?? null,
-    is_overdue: row.date < today,
-    can_edit: writableIds.has(row.account_id as string),
-  }));
-
-  const toPay = pendingRows.filter((r) => r.direction === "out");
-  const toReceive = pendingRows.filter((r) => r.direction === "in");
-  const totalToPay = toPay.reduce((sum, r) => sum + r.amount_cents, 0);
-  const totalToReceive = toReceive.reduce((sum, r) => sum + r.amount_cents, 0);
-
-  // A conta da recorrência mora no `template` (jsonb), então o filtro de
+  // Recorrências: a conta mora no `template` (jsonb), então o filtro de
   // visibilidade é feito aqui e não na consulta.
   const recurrenceRows: RecurrenceRow[] = (recurrencesRaw ?? [])
-    .filter((row) =>
-      visibleSet.has((row.template as { account_id: string }).account_id),
-    )
+    .filter((row) => visibleSet.has((row.template as { account_id: string }).account_id))
     .map((row) => {
       const template = row.template as {
         account_id: string;
@@ -136,107 +182,209 @@ export default async function AVencerPage() {
         can_edit: writableIds.has(template.account_id),
       };
     });
-
   const recurrencesIn = recurrenceRows.filter((r) => r.direction === "in");
   const recurrencesOut = recurrenceRows.filter((r) => r.direction === "out");
+  const monthlyOf = (rows: RecurrenceRow[]) =>
+    Math.round(rows.reduce((s, r) => s + r.amount_cents * (PER_MONTH[r.frequency] ?? 1), 0));
+
+  const lowest = cashFlow.lowestPoint;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-6 md:gap-7">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-1.5">
           <h1 className="text-page-title">A vencer</h1>
-          <p className="text-page-subtitle">
-            Próximos 30 dias, atrasadas em destaque.
-          </p>
+          <p className="text-page-subtitle">O que sai e o que entra nos próximos {HORIZON_DAYS} dias.</p>
         </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-card-title">A pagar</CardTitle>
-              <span
-                className="font-semibold tabular-nums"
-                style={{ color: "var(--expense)" }}
+        <nav aria-label="Filtro" className="flex max-w-full gap-0.5 overflow-x-auto rounded-[14px] bg-white p-1 [scrollbar-width:none] max-lg:self-start sm:gap-1">
+          {TABS.map((tab) => {
+            const active = tab.key === view;
+            return (
+              <Link
+                key={tab.key}
+                href={tab.key === "tudo" ? "/a-pagar" : `/a-pagar?ver=${tab.key}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex h-9 shrink-0 items-center rounded-[11px] px-3 text-[13px] font-semibold transition-colors sm:px-4 sm:text-[14px] ${
+                  active ? "bg-(--text-primary) text-white" : "text-(--text-muted) hover:text-(--text-primary)"
+                }`}
               >
-                <Money cents={totalToPay} currency={currency} />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <PendingList
-                rows={toPay}
-                categoryColors={Object.fromEntries(colorMap)}
-                kind="pay"
-                currency={currency}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-card-title">A receber</CardTitle>
-              <span
-                className="font-semibold tabular-nums"
-                style={{ color: "var(--income)" }}
-              >
-                <Money cents={totalToReceive} currency={currency} />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <PendingList
-                rows={toReceive}
-                categoryColors={Object.fromEntries(colorMap)}
-                kind="receive"
-                currency={currency}
-              />
-            </CardContent>
-          </Card>
-        </div>
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-card-title">Recorrências</h2>
-          <RecurrenceForm
-            accounts={writable.map((a) => ({
-              id: a.id as string,
-              name: a.name as string,
-            }))}
-            categories={categories ?? []}
-          />
+      {view === "recorrencias" ? (
+        <div className="flex flex-col gap-4 md:gap-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-(--text-muted)">O que se repete sozinho. Cada um vira previsão em A vencer.</p>
+            <RecurrenceForm
+              accounts={writable.map((a) => ({ id: a.id as string, name: a.name as string }))}
+              categories={categories ?? []}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-card-title">Entradas recorrentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RecurrencesList
+                  accounts={moveTargets}
+                  rows={recurrencesIn}
+                  currency={currency}
+                  emptyMessage="Nenhuma entrada recorrente cadastrada."
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-card-title">Saídas recorrentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RecurrencesList
+                  accounts={moveTargets}
+                  rows={recurrencesOut}
+                  currency={currency}
+                  emptyMessage="Nenhuma saída recorrente cadastrada."
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-card-title">
-                Entradas recorrentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RecurrencesList
-                accounts={moveTargets}
-                rows={recurrencesIn}
-                currency={currency}
-                emptyMessage="Nenhuma entrada recorrente cadastrada."
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-card-title">
-                Saídas recorrentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RecurrencesList
-                accounts={moveTargets}
-                rows={recurrencesOut}
-                currency={currency}
-                emptyMessage="Nenhuma saída recorrente cadastrada."
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      ) : (
+        <>
+          <section className="rounded-[20px] bg-white p-5 md:p-7" style={{ boxShadow: "var(--shadow-card)" }}>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+              <div>
+                <div className="text-[13px] font-medium text-(--text-muted)">Vai sair</div>
+                <div className="mt-1 text-[21px] font-bold tabular-nums text-(--expense-dark) md:text-[26px]">
+                  −<Money cents={totalOut} currency={currency} />
+                </div>
+              </div>
+              <div>
+                <div className="text-[13px] font-medium text-(--text-muted)">Vai entrar</div>
+                <div className="mt-1 text-[21px] font-bold tabular-nums text-(--income-dark) md:text-[26px]">
+                  +<Money cents={totalIn} currency={currency} />
+                </div>
+              </div>
+              <div>
+                <div className="text-[13px] font-medium text-(--text-muted)">Saldo hoje</div>
+                <div className="mt-1 text-[21px] font-bold tabular-nums md:text-[26px]">
+                  <Signed cents={cashFlow.currentTotal} currency={currency} />
+                </div>
+              </div>
+              <div>
+                <div className="text-[13px] font-medium text-(--text-muted)">
+                  Saldo em {shortDate(cashFlow.finalPoint.date)}
+                </div>
+                <div className="mt-1 text-[21px] font-bold tabular-nums md:text-[26px]">
+                  <Signed cents={cashFlow.finalPoint.balance_cents} currency={currency} />
+                </div>
+                {overdueCount > 0 ? (
+                  <div className="text-[11px] text-(--text-light)">sem contar as atrasadas</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-6 md:mt-7">
+              <div className="grid h-20 items-end gap-[3px] md:h-24 md:gap-1" style={{ gridTemplateColumns: `repeat(${HORIZON_DAYS}, minmax(0, 1fr))` }}>
+                {days.map((date) => {
+                  const d = perDay.get(date);
+                  const out = d?.out ?? 0;
+                  const inc = d?.in ?? 0;
+                  // Só a data no balão: o valor apareceria mesmo com
+                  // "ocultar valores" ligado.
+                  const title = shortDate(date);
+                  return (
+                    <div key={date} className="flex h-full items-end gap-px" title={title}>
+                      {out === 0 && inc === 0 ? (
+                        <div className="h-2 w-full rounded-[5px] bg-(--bg-subtle)" />
+                      ) : (
+                        <>
+                          {out > 0 ? (
+                            <div
+                              className="w-full rounded-[5px]"
+                              style={{ height: `${Math.max(12, (out / dayMax) * 100)}%`, background: "var(--expense)" }}
+                            />
+                          ) : null}
+                          {inc > 0 ? (
+                            <div
+                              className="w-full rounded-[5px]"
+                              style={{ height: `${Math.max(12, (inc / dayMax) * 100)}%`, background: "var(--income)" }}
+                            />
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2.5 flex justify-between text-[12px] text-(--text-light)">
+                <span className="font-semibold text-(--text-primary)">Hoje, {shortDate(days[0])}</span>
+                <span className="max-sm:hidden">{shortDate(days[7])}</span>
+                <span className="max-sm:hidden">{shortDate(days[14])}</span>
+                <span>{shortDate(days[21])}</span>
+                <span>{shortDate(days[HORIZON_DAYS - 1])}</span>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
+            <div className="min-w-0 lg:col-span-8">
+              <UpcomingGroups groups={groups} currency={currency} />
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4 md:gap-6 lg:col-span-4">
+              <section className="rounded-[20px] bg-white p-5 md:p-6" style={{ boxShadow: "var(--shadow-card)" }}>
+                <h2 className="text-card-title">Recorrências</h2>
+                <p className="mt-1 mb-4 text-[13px] text-(--text-muted)">O que se repete sozinho.</p>
+                <div className="flex gap-3">
+                  <div className="flex-1 rounded-[14px] bg-(--income-soft) p-3.5">
+                    <div className="text-xs font-semibold text-(--income-dark)">
+                      {recurrencesIn.length} {recurrencesIn.length === 1 ? "entrada" : "entradas"}
+                    </div>
+                    <div className="mt-1 text-[17px] font-bold tabular-nums text-(--income-dark)">
+                      <Money cents={monthlyOf(recurrencesIn)} currency={currency} />
+                      <span className="text-[12px] font-semibold">/mês</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 rounded-[14px] bg-(--expense-soft) p-3.5">
+                    <div className="text-xs font-semibold text-(--expense-dark)">
+                      {recurrencesOut.length} {recurrencesOut.length === 1 ? "saída" : "saídas"}
+                    </div>
+                    <div className="mt-1 text-[17px] font-bold tabular-nums text-(--expense-dark)">
+                      <Money cents={monthlyOf(recurrencesOut)} currency={currency} />
+                      <span className="text-[12px] font-semibold">/mês</span>
+                    </div>
+                  </div>
+                </div>
+                <Link
+                  href="/a-pagar?ver=recorrencias"
+                  className="mt-4 flex items-center gap-1 text-[13px] font-semibold text-(--primary) hover:text-(--primary-hover)"
+                >
+                  Gerenciar recorrências <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </section>
+
+              {lowest.balance_cents < 0 ? (
+                <section className="rounded-[20px] bg-(--primary-soft) p-5 md:p-6">
+                  <div className="text-[14px] font-bold text-(--primary-hover)">
+                    {lowest.date === today ? "Saldo negativo hoje" : `Atenção a ${shortDate(lowest.date)}`}
+                  </div>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-(--text-secondary)">
+                    O saldo mais baixo dos próximos {HORIZON_DAYS} dias é{" "}
+                    <Signed cents={lowest.balance_cents} currency={currency} />
+                    {lowest.date === today ? ", hoje" : `, em ${shortDate(lowest.date)}`}. Vale ver se dá pra adiantar
+                    uma entrada ou segurar um pagamento.
+                  </p>
+                </section>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
