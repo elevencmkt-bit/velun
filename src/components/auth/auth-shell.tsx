@@ -1,8 +1,8 @@
 import Image from "next/image";
 
 // Moldura das telas de entrada (login e convite): de um lado a marca —
-// azul Velun, as duas linhas que se encontram do símbolo, a frase da
-// marca e um pedacinho do app —; do outro, o formulário. No celular a
+// azul Velun, o V do símbolo, a frase da marca, um pedacinho do app e
+// um casal —; do outro, o formulário. No celular a
 // marca vira uma faixa curta no topo.
 
 function Motif({ className }: { className?: string }) {
@@ -91,7 +91,18 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <p className="relative hidden text-[12px] text-white/60 lg:block">
+        {/* O casal: embaixo à direita, passando um pouco por cima do cartão. */}
+        <Image
+          src="/velun-couple.webp"
+          alt=""
+          aria-hidden
+          width={556}
+          height={900}
+          priority
+          className="pointer-events-none absolute right-0 bottom-0 z-10 hidden h-[min(58%,440px)] w-auto drop-shadow-[0_20px_40px_rgba(10,12,40,0.35)] lg:block xl:right-6"
+        />
+
+        <p className="relative hidden max-w-[52%] text-[12px] text-white/60 lg:block">
           Seus extratos são lidos no seu navegador e nunca saem da sua máquina.
         </p>
       </aside>
