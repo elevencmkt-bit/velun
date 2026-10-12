@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-dvh overflow-hidden bg-(--paper) text-(--ink)">
       <Sidebar />
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-(--border-primary) bg-white/90 px-4 backdrop-blur md:h-[68px] md:px-7">
           {/* No celular o menu lateral some: o logo ocupa o lugar da busca. */}
           <Link href="/mes" className="flex items-center gap-2 md:hidden" aria-label="Velun — início">

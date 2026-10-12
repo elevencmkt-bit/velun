@@ -52,8 +52,8 @@ export function TransactionFilters({
   const advancedCount = ADVANCED_KEYS.filter((key) => searchParams.get(key)).length;
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="relative min-w-[240px] flex-1">
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="relative basis-full sm:min-w-[240px] sm:flex-1 sm:basis-auto">
         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-(--text-muted)" />
         <Input
           placeholder="Filtrar por descrição, categoria ou conta..."
@@ -67,7 +67,7 @@ export function TransactionFilters({
         defaultValue={searchParams.get("account") ?? ALL}
         onValueChange={(v) => setParam("account", v)}
       >
-        <SelectTrigger className="w-44">
+        <SelectTrigger className="min-w-0 flex-1 sm:w-44 sm:flex-none">
           <Landmark className="h-3.5 w-3.5 text-(--text-muted)" />
           <SelectValue placeholder="Todas as contas" />
         </SelectTrigger>
@@ -85,7 +85,7 @@ export function TransactionFilters({
         defaultValue={searchParams.get("category") ?? ALL}
         onValueChange={(v) => setParam("category", v)}
       >
-        <SelectTrigger className="w-48">
+        <SelectTrigger className="min-w-0 flex-1 sm:w-48 sm:flex-none">
           <Tag className="h-3.5 w-3.5 text-(--text-muted)" />
           <SelectValue placeholder="Todas as categorias" />
         </SelectTrigger>

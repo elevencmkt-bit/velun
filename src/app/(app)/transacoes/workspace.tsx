@@ -75,8 +75,10 @@ export function TransactionsWorkspace({
         </div>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col gap-5 pt-6">
+      {/* No celular a lista vai de borda a borda, como no Organizze: sem a
+          moldura do cartão, que ali só come largura. */}
+      <Card className="max-md:-mx-4 max-md:rounded-none max-md:border-x-0 max-md:shadow-none max-md:[--card-spacing:--spacing(4)]">
+        <CardContent className="flex flex-col gap-4 pt-4 md:gap-5 md:pt-6">
           <TransactionFilters accounts={accounts} categories={categories} members={members} />
 
           <div className="flex items-center justify-between border-b border-(--border-soft) pb-3">
