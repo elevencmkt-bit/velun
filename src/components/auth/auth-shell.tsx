@@ -7,20 +7,12 @@ import Image from "next/image";
 
 function Motif({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 360 360" fill="none" aria-hidden className={className}>
-      <path
-        d="M20 20 C140 120 180 200 180 340"
-        stroke="#FFFFFF"
-        strokeWidth={22}
-        strokeLinecap="round"
-      />
-      <path
-        d="M340 20 C220 120 180 200 180 340"
-        stroke="#FFFFFF"
-        strokeWidth={22}
-        strokeLinecap="round"
-      />
-    </svg>
+    <img
+      src="/velun-mark.png"
+      alt=""
+      aria-hidden
+      className={`object-contain ${className ?? ""}`}
+    />
   );
 }
 
@@ -46,24 +38,12 @@ function Preview() {
         </div>
       </div>
       <div className="absolute top-[110px] left-[120px] h-[150px] w-[250px] rotate-[-4deg] overflow-hidden rounded-[18px] bg-[#151821] p-4 text-white shadow-[0_24px_60px_rgba(10,12,30,0.35)]">
-        <svg
-          viewBox="0 0 220 200"
-          fill="none"
-          className="absolute -top-8 -right-12 h-[200px] w-[220px] opacity-30"
-        >
-          <path
-            d="M10 10 C80 70 110 120 110 200"
-            stroke="#6C83FF"
-            strokeWidth={14}
-            strokeLinecap="round"
-          />
-          <path
-            d="M210 10 C140 70 110 120 110 200"
-            stroke="#6C83FF"
-            strokeWidth={14}
-            strokeLinecap="round"
-          />
-        </svg>
+        <img
+          src="/velun-mark.png"
+          alt=""
+          aria-hidden
+          className="object-contain absolute -top-8 -right-12 h-[200px] w-[220px] opacity-30"
+        />
         <div className="relative text-[13px] font-semibold">
           Cartão do casal
         </div>
@@ -84,15 +64,13 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <Motif className="pointer-events-none absolute -top-24 -right-28 h-[420px] w-[420px] opacity-[0.14] lg:-top-32 lg:-right-40 lg:h-[680px] lg:w-[680px]" />
 
         <div className="relative flex items-center gap-3 px-6 pt-8 lg:p-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-[0_6px_16px_rgba(20,28,90,0.25)]">
-            <Image
-              src="/velun-icon.png"
-              alt=""
-              width={32}
-              height={32}
-              className="h-8 w-8 rounded-lg"
-            />
-          </div>
+          <Image
+            src="/velun-icon.png"
+            alt=""
+            width={44}
+            height={44}
+            className="h-11 w-11 rounded-[13px] shadow-[0_6px_16px_rgba(20,28,90,0.30)]"
+          />
           <span className="text-[22px] font-extrabold tracking-[-0.03em]">
             velun
           </span>

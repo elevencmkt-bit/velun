@@ -28,26 +28,13 @@ export function CardArt({
       className={`relative flex flex-col overflow-hidden rounded-[18px] ${small ? "h-[150px] p-4" : "h-[188px] p-5"}`}
       style={{ background: c.bg, color: c.fg }}
     >
-      <svg
-        viewBox="0 0 220 200"
-        fill="none"
+      <img
+        src="/velun-mark.png"
+        alt=""
         aria-hidden
-        className="pointer-events-none absolute -top-8 -right-12 h-[230px] w-[250px]"
+        className="object-contain pointer-events-none absolute -top-8 -right-12 h-[230px] w-[250px]"
         style={{ opacity: color === "ink" ? 0.28 : 0.2 }}
-      >
-        <path
-          d="M10 10 C80 70 110 120 110 200"
-          stroke={c.motif}
-          strokeWidth={14}
-          strokeLinecap="round"
-        />
-        <path
-          d="M210 10 C140 70 110 120 110 200"
-          stroke={c.motif}
-          strokeWidth={14}
-          strokeLinecap="round"
-        />
-      </svg>
+      />
       <div className="relative flex items-start justify-between gap-2">
         <span className="truncate text-[14px] font-semibold">{name}</span>
         {owner ? (

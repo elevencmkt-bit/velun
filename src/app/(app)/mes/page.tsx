@@ -145,20 +145,12 @@ function Sparkline({ points }: { points: CashFlowPoint[] }) {
 /** As duas linhas que se encontram do símbolo da marca, como estampa. */
 function BrandMotif({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 360 360" fill="none" aria-hidden className={className}>
-      <path
-        d="M20 20 C140 120 180 200 180 340"
-        stroke="#FFFFFF"
-        strokeWidth={22}
-        strokeLinecap="round"
-      />
-      <path
-        d="M340 20 C220 120 180 200 180 340"
-        stroke="#FFFFFF"
-        strokeWidth={22}
-        strokeLinecap="round"
-      />
-    </svg>
+    <img
+      src="/velun-mark.png"
+      alt=""
+      aria-hidden
+      className={`object-contain ${className ?? ""}`}
+    />
   );
 }
 
