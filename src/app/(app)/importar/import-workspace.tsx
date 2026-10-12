@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Undo2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Link2, Link2Off, Undo2, Upload } from "lucide-react";
 import {
   confirmImport,
   discardImport,
+  dismissForecast,
   importStatement,
   setStagedCategory,
+  setStagedMerge,
   toggleStagedRow,
   undoImport,
 } from "@/lib/actions/imports";
@@ -52,6 +54,15 @@ type Row = {
   categoryId: string | null;
   isDuplicate: boolean;
   isIncluded: boolean;
+  /** Previsão que esta linha parece quitar, quando o cruzamento achou uma. */
+  match: { description: string; date: string; accepted: boolean } | null;
+};
+type Forecast = {
+  id: string;
+  date: string;
+  description: string;
+  amountCents: number;
+  direction: "in" | "out";
 };
 
 const NO_CATEGORY = "__none__";
@@ -66,6 +77,7 @@ export function ImportWorkspace({
   categories,
   openImport,
   rows,
+  forecasts,
   history,
   currency,
 }: {
@@ -73,6 +85,7 @@ export function ImportWorkspace({
   categories: Category[];
   openImport: OpenImport | null;
   rows: Row[];
+  forecasts: Forecast[];
   history: HistoryEntry[];
   currency: CurrencyCode;
 }) {
@@ -141,6 +154,7 @@ export function ImportWorkspace({
     0,
   );
   const duplicates = rows.filter((r) => r.isDuplicate).length;
+  const merges = rows.filter((r) => r.match && r.match.accepted).length;
 
   if (!openImport) {
     return (
@@ -325,6 +339,15 @@ export function ImportWorkspace({
         </p>
       ) : null}
 
+      {merges > 0 ? (
+        <p className="text-sm text-(--text-muted)">
+          {merges === 1
+            ? "1 lançamento parece quitar uma previsão sua e vai substituí-la, em vez de somar."
+            : `${merges} lançamentos parecem quitar previsões suas e vão substituí-las, em vez de somar.`}{" "}
+          Confira linha por linha abaixo.
+        </p>
+      ) : null}
+
       {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
 
       <Card>
@@ -358,9 +381,59 @@ export function ImportWorkspace({
                   </td>
                   <td className="px-2 py-2 text-(--text-muted)">{shortDate(row.date)}</td>
                   <td className="px-2 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate">{row.description}</span>
-                      {row.isDuplicate ? <Badge variant="secondary">Já existe</Badge> : null}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{row.description}</span>
+                        {row.isDuplicate ? <Badge variant="secondary">Já existe</Badge> : null}
+                      </div>
+
+                      {/* O cruzamento com a previsão é a pergunta mais
+                          importante da revisão: errar aqui conta o mesmo
+                          dinheiro duas vezes no mês. Fica embaixo da
+                          descrição, não numa coluna, porque precisa de
+                          frase. */}
+                      {row.match ? (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {row.match.accepted ? (
+                            <>
+                              <Link2
+                                className="h-3.5 w-3.5 shrink-0"
+                                style={{ color: "var(--income)" }}
+                              />
+                              <span className="text-(--text-muted)">
+                                Quita{" "}
+                                <span className="text-(--text-primary)">
+                                  {row.match.description}
+                                </span>{" "}
+                                de {shortDate(row.match.date)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={isPending}
+                                onClick={() => run(() => setStagedMerge(row.id, false))}
+                              >
+                                Separar
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Link2Off className="h-3.5 w-3.5 shrink-0 text-(--text-muted)" />
+                              <span className="text-(--text-muted)">
+                                Entra separado de {row.match.description}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                disabled={isPending}
+                                onClick={() => run(() => setStagedMerge(row.id, true))}
+                              >
+                                Juntar
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-2 py-2">
@@ -407,6 +480,62 @@ export function ImportWorkspace({
       <p className="text-sm text-(--text-muted)">
         Marcados somam {formatCents(includedTotal, currency)} no período.
       </p>
+
+      {/* Previsão que o extrato não confirmou. O cruzamento automático só
+          junta valor exato com data colada, de propósito — pagamento que
+          saiu em duas transferências, ou com valor diferente do previsto,
+          cai aqui pra quem revisa decidir. Deixar passar é o que faz o mês
+          contar o mesmo dinheiro duas vezes. */}
+      {forecasts.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-card-title">Previsões que o extrato não confirmou</h2>
+            <p className="text-sm text-(--text-muted)">
+              Estavam previstas nessa conta no período, e nenhum lançamento do extrato bate com
+              elas. Se o pagamento saiu de outra forma — valor diferente, ou dividido em duas
+              transferências — apague a previsão, senão o mês conta o mesmo dinheiro duas vezes.
+            </p>
+          </div>
+
+          <Card>
+            <CardContent className="flex flex-col gap-0 p-0">
+              {forecasts.map((forecast) => (
+                <div
+                  key={forecast.id}
+                  className="flex items-center justify-between gap-4 border-b px-4 py-2.5 last:border-0"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="w-12 shrink-0 text-xs text-(--text-muted)">
+                      {shortDate(forecast.date)}
+                    </span>
+                    <span className="truncate text-sm">{forecast.description}</span>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span
+                      className="text-sm tabular-nums"
+                      style={{
+                        color: forecast.direction === "in" ? "var(--income)" : "var(--expense)",
+                      }}
+                    >
+                      {forecast.direction === "in" ? "+" : "-"}
+                      {formatCents(forecast.amountCents, currency)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => run(() => dismissForecast(forecast.id))}
+                    >
+                      Apagar previsão
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
