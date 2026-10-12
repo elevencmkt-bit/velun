@@ -112,12 +112,41 @@ check "esposa não descarta a importação dele" "$(admin "select count(*) from 
 check "Levi: vê as duas importações" "$(as_user $LEVI "select string_agg(file_path, ',' order by file_path) from imports;")" "conjunta.pdf,extrato-pessoal.pdf"
 check "Levi: vê o saldo e as duas metas" "$(as_user $LEVI "select count(*) from net_worth_snapshots;")/$(as_user $LEVI "select count(*) from goals;")" "1/2"
 
+echo "juntar com lançamento já confirmado:"
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+insert into transactions (id, household_id, account_id, category_id, date, amount_cents, direction, description, notes, status, fingerprint, created_by) values
+  ('e0000000-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002',
+   'ca700000-0000-0000-0000-00000000000a', '2026-09-17', 3049, 'out', 'Netflix', null, 'cleared', 'fp-netflix-manual', 'aaaaaaaa-0000-0000-0000-00000000000a');
+insert into imports (id, household_id, account_id, file_path, file_type, status, created_by) values
+  ('10000000-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', 'conjunta-set.pdf', 'pdf', 'confirmed', 'aaaaaaaa-0000-0000-0000-00000000000a');
+-- conta conjunta só pode ter uma revisão: a anterior (conjunta.pdf) é confirmada antes
+update imports set status = 'confirmed' where id = '10000000-0000-0000-0000-000000000004';
+update imports set status = 'review' where id = '10000000-0000-0000-0000-000000000005';
+insert into staged_transactions (import_id, date, description, amount_cents, direction, fingerprint, match_transaction_id, merge_accepted, is_included) values
+  ('10000000-0000-0000-0000-000000000005', '2026-09-18', 'PIN Purchase Netflix.Com 4899 Los Gatos', 3049, 'out', 'fp-netflix-banco', 'e0000000-0000-0000-0000-000000000001', false, true);
+SQL
+check "desmarcado: entra separado, o seu fica intacto" "$(as_user $LEVI "select confirm_import('10000000-0000-0000-0000-000000000005');")" '{"merged": 0, "inserted": 1}'
+check "…dois lançamentos de Netflix (o seu + o do banco)" "$(admin "select count(*) from transactions where amount_cents = 3049")" "2"
+as_user $LEVI "select undo_import('10000000-0000-0000-0000-000000000005');" >/dev/null
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+insert into imports (id, household_id, account_id, file_path, file_type, status, created_by) values
+  ('10000000-0000-0000-0000-000000000006', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', 'conjunta-set.pdf', 'pdf', 'review', 'aaaaaaaa-0000-0000-0000-00000000000a');
+insert into staged_transactions (import_id, date, description, amount_cents, direction, fingerprint, match_transaction_id, merge_accepted, is_included) values
+  ('10000000-0000-0000-0000-000000000006', '2026-09-18', 'PIN Purchase Netflix.Com 4899 Los Gatos', 3049, 'out', 'fp-netflix-banco', 'e0000000-0000-0000-0000-000000000001', true, true);
+SQL
+check "marcado pra juntar: substitui" "$(as_user $LEVI "select confirm_import('10000000-0000-0000-0000-000000000006');")" '{"merged": 1, "inserted": 0}'
+check "…um Netflix só, com o seu nome e a data do banco" "$(admin "select count(*)||' · '||max(description)||' · '||max(date) from transactions where amount_cents = 3049")" "1 · Netflix · 2026-09-18"
+check "…categoria que você escolheu mantida" "$(admin "select (category_id = 'ca700000-0000-0000-0000-00000000000a')::text from transactions where id='e0000000-0000-0000-0000-000000000001'")" "true"
+as_user $LEVI "select undo_import('10000000-0000-0000-0000-000000000006');" >/dev/null
+check "desfazer devolve como CONFIRMADO, não previsão" "$(admin "select status||' · '||date||' · '||fingerprint from transactions where id='e0000000-0000-0000-0000-000000000001'")" "cleared · 2026-09-17 · fp-netflix-manual"
+
 echo "uma revisão por conta:"
 novo_review() { psql -h $D -p 54329 -U postgres -tA -q -c "insert into imports (household_id, account_id, file_path, file_type, status, created_by) values ('11111111-0000-0000-0000-000000000001', '$1', '$2', 'pdf', 'review', 'aaaaaaaa-0000-0000-0000-00000000000a');" 2>&1 | grep -o 'imports_one_review_per_account' | head -1; }
 check "segunda revisão na mesma conta é barrada" "$(novo_review acc00000-0000-0000-0000-000000000001 duplicado.pdf)" "imports_one_review_per_account"
 admin "update imports set status='confirmed' where id='10000000-0000-0000-0000-000000000003'"
 check "depois de confirmar, nova revisão é aceita" "$(novo_review acc00000-0000-0000-0000-000000000001 outubro.pdf)" ""
-check "revisões em contas diferentes convivem" "$(admin "select count(*) from imports where status='review'")" "2"
+check "revisão em outra conta é aceita junto" "$(novo_review acc00000-0000-0000-0000-000000000002 conjunta-out.pdf)" ""
+check "revisões em contas diferentes convivem" "$(admin "select count(distinct account_id)||'/'||count(*) from imports where status='review'")" "2/2"
 
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1

@@ -55,8 +55,24 @@ type Row = {
   categoryId: string | null;
   isDuplicate: boolean;
   isIncluded: boolean;
-  /** Previsão que esta linha parece quitar, quando o cruzamento achou uma. */
-  match: { description: string; date: string; accepted: boolean } | null;
+  /**
+   * Lançamento seu que esta linha parece ser: uma previsão (vem marcada
+   * pra juntar) ou um lançamento já confirmado (vem desmarcado).
+   */
+  match: {
+    description: string;
+    date: string;
+    accepted: boolean;
+    kind: "forecast" | "confirmed";
+  } | null;
+};
+type Double = {
+  id: string;
+  date: string;
+  description: string;
+  amountCents: number;
+  direction: "in" | "out";
+  statementDates: string[];
 };
 type Forecast = {
   id: string;
@@ -126,6 +142,7 @@ export function ImportWorkspace({
   openImport,
   rows,
   forecasts,
+  doubles,
   history,
   currency,
 }: {
@@ -134,6 +151,7 @@ export function ImportWorkspace({
   openImport: OpenImport | null;
   rows: Row[];
   forecasts: Forecast[];
+  doubles: Double[];
   history: HistoryEntry[];
   currency: CurrencyCode;
 }) {
@@ -411,8 +429,8 @@ export function ImportWorkspace({
       {merges > 0 ? (
         <p className="text-sm text-(--text-muted)">
           {merges === 1
-            ? "1 lançamento parece quitar uma previsão sua e vai substituí-la, em vez de somar."
-            : `${merges} lançamentos parecem quitar previsões suas e vão substituí-las, em vez de somar.`}{" "}
+            ? "1 lançamento do extrato vai substituir um lançamento seu, em vez de somar."
+            : `${merges} lançamentos do extrato vão substituir lançamentos seus, em vez de somar.`}{" "}
           Confira linha por linha abaixo.
         </p>
       ) : null}
@@ -470,7 +488,7 @@ export function ImportWorkspace({
                                 style={{ color: "var(--income)" }}
                               />
                               <span className="text-(--text-muted)">
-                                Quita{" "}
+                                {row.match.kind === "forecast" ? "Quita" : "Substitui seu lançamento"}{" "}
                                 <span className="text-(--text-primary)">
                                   {row.match.description}
                                 </span>{" "}
@@ -489,7 +507,17 @@ export function ImportWorkspace({
                             <>
                               <Link2Off className="h-3.5 w-3.5 shrink-0 text-(--text-muted)" />
                               <span className="text-(--text-muted)">
-                                Entra separado de {row.match.description}
+                                {row.match.kind === "forecast" ? (
+                                  <>Entra separado de {row.match.description}</>
+                                ) : (
+                                  <>
+                                    Parece ser o mesmo que seu lançamento{" "}
+                                    <span className="text-(--text-primary)">
+                                      {row.match.description}
+                                    </span>{" "}
+                                    de {shortDate(row.match.date)}
+                                  </>
+                                )}
                               </span>
                               <Button
                                 variant="ghost"
@@ -530,6 +558,54 @@ export function ImportWorkspace({
       <p className="text-sm text-(--text-muted)">
         Marcados somam {formatCents(includedTotal, currency)} no período.
       </p>
+
+      {/* Lançamento confirmado à mão que divide valor com linhas do
+          extrato mas não deu pra casar com uma só. Sem botão: qualquer
+          junção seria palpite, e apagar lançamento confirmado é decisão
+          de quem o lançou. */}
+      {doubles.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-card-title">Lançamentos seus que podem estar em dobro</h2>
+            <p className="text-sm text-(--text-muted)">
+              Você já tinha lançado estes, e o extrato tem lançamentos do mesmo valor. Pode ser o
+              mesmo dinheiro com outro nome — ou não. Confira em Transações depois de confirmar.
+            </p>
+          </div>
+
+          <Card>
+            <CardContent className="flex flex-col gap-0 p-0">
+              {doubles.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between gap-4 border-b px-4 py-2.5 last:border-0"
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="w-12 shrink-0 text-xs text-(--text-muted)">
+                        {shortDate(d.date)}
+                      </span>
+                      <span className="truncate text-sm">{d.description}</span>
+                    </div>
+                    <span className="pl-15 text-xs text-(--text-muted)">
+                      {d.statementDates.length === 1
+                        ? `No extrato: ${shortDate(d.statementDates[0])}`
+                        : `No extrato, ${d.statementDates.length} vezes: ${d.statementDates.map(shortDate).join(", ")}`}
+                    </span>
+                  </div>
+                  <span
+                    className="shrink-0 text-sm tabular-nums"
+                    style={{ color: d.direction === "in" ? "var(--income)" : "var(--expense)" }}
+                  >
+                    {d.direction === "in" ? "+" : "-"}
+                    {formatCents(d.amountCents, currency)}
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       {/* Previsão que o extrato não confirmou. O cruzamento automático só
           junta valor exato com data colada, de propósito — pagamento que

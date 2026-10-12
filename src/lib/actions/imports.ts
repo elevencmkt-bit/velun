@@ -8,6 +8,8 @@ import { parseRegionsStatementText, StatementParseError } from "@/lib/import/reg
 import { verifyStatement } from "@/lib/import/verify";
 import { suggestCategoryId } from "@/lib/import/mcc";
 import { matchForecast, type ForecastCandidate } from "@/lib/import/match-forecast";
+import { matchConfirmed } from "@/lib/import/match-confirmed";
+import { fetchConfirmedCandidates } from "@/lib/import/confirmed-candidates";
 
 const MAX_TEXT_LENGTH = 2 * 1024 * 1024;
 
@@ -269,6 +271,26 @@ async function runImportStatement(input: {
       merge_accepted: true,
     };
   });
+
+  // Segundo cruzamento: lançamentos que o usuário já CONFIRMOU à mão.
+  // Só nas linhas que sobraram livres — não duplicata, não previsão.
+  // Par único vira sugestão DESMARCADA: lançamento confirmado é algo que
+  // o usuário afirmou, e juntar só acontece se ele pedir.
+  const confirmed = await fetchConfirmedCandidates(supabase, householdId, accountId, statement);
+  const pairs = matchConfirmed(
+    rows.map((r) => ({
+      date: r.date,
+      amountCents: r.amount_cents,
+      direction: r.direction,
+      fingerprint: r.fingerprint,
+      free: r.dup_status === "none" && r.match_transaction_id === null,
+    })),
+    confirmed,
+  );
+  for (const [index, transactionId] of pairs) {
+    rows[index].match_transaction_id = transactionId;
+    rows[index].merge_accepted = false;
+  }
 
   const { error: stageError } = await supabase.from("staged_transactions").insert(rows);
   if (stageError) {

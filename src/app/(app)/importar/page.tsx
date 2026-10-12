@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
+import { fetchConfirmedCandidates } from "@/lib/import/confirmed-candidates";
+import { possibleDoubles } from "@/lib/import/match-confirmed";
 import { ImportWorkspace } from "./import-workspace";
 
 export default async function ImportarPage() {
@@ -72,7 +74,7 @@ export default async function ImportarPage() {
     ? await supabase
         .from("staged_transactions")
         .select(
-          "id, date, description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description)",
+          "id, date, description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status)",
         )
         .eq("import_id", openImport.id)
         .order("date")
@@ -104,6 +106,26 @@ export default async function ImportarPage() {
         .order("date")
     : { data: null };
 
+  // Lançamentos confirmados à mão que dividem valor com alguma linha do
+  // extrato mas não viraram par único — o valor se repete, ou as datas
+  // estão longe. Não dá pra apontar qual linha é qual, então é só aviso.
+  const doubles = openImport
+    ? possibleDoubles(
+        (staged ?? []).map((s) => ({
+          date: s.date as string,
+          amountCents: s.amount_cents as number,
+          direction: s.direction as "in" | "out",
+          fingerprint: s.fingerprint as string,
+          free: true,
+        })),
+        await fetchConfirmedCandidates(supabase, householdId, openImport.account_id as string, {
+          periodStart: openImport.statement_start as string,
+          periodEnd: openImport.statement_end as string,
+        }),
+        matchedIds,
+      )
+    : [];
+
   return (
     <ImportWorkspace
       accounts={(accounts ?? []).map((a) => ({
@@ -129,8 +151,8 @@ export default async function ImportarPage() {
       }
       rows={(staged ?? []).map((s) => {
         const m = s.match as
-          | { id: string; date: string; description: string }
-          | { id: string; date: string; description: string }[]
+          | { id: string; date: string; description: string; status: string }
+          | { id: string; date: string; description: string; status: string }[]
           | null;
         const match = Array.isArray(m) ? (m[0] ?? null) : m;
 
@@ -148,10 +170,22 @@ export default async function ImportarPage() {
                 description: match.description,
                 date: match.date,
                 accepted: s.merge_accepted as boolean,
+                // Previsão (pendente) ou lançamento já confirmado: muda a
+                // frase e o padrão — previsão vem marcada pra juntar,
+                // confirmado vem desmarcado.
+                kind: match.status === "pending" ? ("forecast" as const) : ("confirmed" as const),
               }
             : null,
         };
       })}
+      doubles={doubles.map((d) => ({
+        id: d.candidate.id,
+        date: d.candidate.date,
+        description: d.candidate.description,
+        amountCents: d.candidate.amountCents,
+        direction: d.candidate.direction,
+        statementDates: d.statementDates,
+      }))}
       forecasts={(forecasts ?? [])
         .filter((f) => !matchedIds.has(f.id as string))
         .map((f) => ({
