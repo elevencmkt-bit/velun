@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { parseToCents } from "@/lib/money";
 import { computeFingerprint } from "@/lib/fingerprint";
+import { clampedDate } from "@/lib/credit-card";
 import { rememberMerchantName } from "@/lib/merchant-names";
 import { createRecurrenceFromAnchor } from "@/lib/materialize-occurrences";
 import type { RecurrenceFrequency } from "@/lib/recurrence";
@@ -16,12 +17,17 @@ function parseRecurrenceInput(
 ): { frequency: RecurrenceFrequency; endsOn: string | null } | null {
   if (formData.get("make_recurring") !== "on") return null;
 
-  const frequency = String(formData.get("recurrence_frequency") ?? "") as RecurrenceFrequency;
+  const frequency = String(
+    formData.get("recurrence_frequency") ?? "",
+  ) as RecurrenceFrequency;
   if (!["monthly", "weekly", "yearly"].includes(frequency)) {
     throw new Error("Frequência de recorrência inválida.");
   }
 
-  return { frequency, endsOn: String(formData.get("recurrence_ends_on") ?? "") || null };
+  return {
+    frequency,
+    endsOn: String(formData.get("recurrence_ends_on") ?? "") || null,
+  };
 }
 
 export async function createTransaction(formData: FormData) {
@@ -39,7 +45,8 @@ export async function createTransaction(formData: FormData) {
   const amountInput = String(formData.get("amount") ?? "");
 
   if (!accountId) throw new Error("Conta é obrigatória.");
-  if (direction !== "in" && direction !== "out") throw new Error("Direção inválida.");
+  if (direction !== "in" && direction !== "out")
+    throw new Error("Direção inválida.");
   if (!date) throw new Error("Data é obrigatória.");
   if (!description) throw new Error("Descrição é obrigatória.");
 
@@ -50,13 +57,72 @@ export async function createTransaction(formData: FormData) {
   // impede o insert, mas aqui dá um erro legível em vez de 403 mudo.
   const { data: account } = await supabase
     .from("accounts")
-    .select("id")
+    .select("id, type")
     .eq("id", accountId)
     .eq("household_id", householdId)
     .maybeSingle();
   if (!account) throw new Error("Conta não encontrada neste household.");
 
-  const fingerprint = computeFingerprint({ accountId, date, amountCents, description });
+  // Compra parcelada no cartão: vira N lançamentos, um por mês, cada um
+  // na fatura do seu mês. Centavos que sobram da divisão vão na primeira.
+  const installments = Number(formData.get("installments") ?? "1");
+  if (
+    account.type === "credit_card" &&
+    direction === "out" &&
+    Number.isInteger(installments) &&
+    installments > 1
+  ) {
+    if (installments > 48) throw new Error("No máximo 48 parcelas.");
+    const base = Math.floor(amountCents / installments);
+    const groupId = crypto.randomUUID();
+    const [y, m, d] = date.split("-").map(Number);
+    const rows = Array.from({ length: installments }, (_, i) => {
+      const parcelDate = clampedDate(y, m - 1 + i, d);
+      const parcelCents =
+        i === 0 ? amountCents - base * (installments - 1) : base;
+      return {
+        household_id: householdId,
+        account_id: accountId,
+        category_id: categoryId,
+        date: parcelDate,
+        amount_cents: parcelCents,
+        direction,
+        description,
+        notes,
+        status: "cleared" as const,
+        fingerprint: computeFingerprint({
+          accountId,
+          date: parcelDate,
+          amountCents: parcelCents,
+          description: `${description} ${i + 1}/${installments}`,
+        }),
+        created_by: memberId,
+        installment_group_id: groupId,
+        installment_number: i + 1,
+        installment_total: installments,
+      };
+    });
+    const { error: instError } = await supabase
+      .from("transactions")
+      .insert(rows);
+    if (instError) throw new Error(instError.message);
+    for (const path of [
+      "/transacoes",
+      "/contas",
+      "/mes",
+      "/a-pagar",
+      "/cartoes",
+    ])
+      revalidatePath(path);
+    return;
+  }
+
+  const fingerprint = computeFingerprint({
+    accountId,
+    date,
+    amountCents,
+    description,
+  });
   const recurrenceInput = parseRecurrenceInput(formData);
 
   const { data: inserted, error } = await supabase
@@ -108,7 +174,10 @@ export async function createTransaction(formData: FormData) {
   revalidatePath("/a-pagar");
 }
 
-export async function updateTransaction(transactionId: string, formData: FormData) {
+export async function updateTransaction(
+  transactionId: string,
+  formData: FormData,
+) {
   const { memberId, householdId } = await getCurrentMember();
   const supabase = await createClient();
 
@@ -123,7 +192,8 @@ export async function updateTransaction(transactionId: string, formData: FormDat
   const amountInput = String(formData.get("amount") ?? "");
 
   if (!accountId) throw new Error("Conta é obrigatória.");
-  if (direction !== "in" && direction !== "out") throw new Error("Direção inválida.");
+  if (direction !== "in" && direction !== "out")
+    throw new Error("Direção inválida.");
   if (!date) throw new Error("Data é obrigatória.");
   if (!description) throw new Error("Descrição é obrigatória.");
 
@@ -177,7 +247,12 @@ export async function updateTransaction(transactionId: string, formData: FormDat
   // Renomeou um lançamento do banco: a próxima importação já traz esse
   // nome pro mesmo estabelecimento.
   if (bankDescription && description !== current?.description) {
-    await rememberMerchantName(supabase, { householdId, memberId, bankDescription, name: description });
+    await rememberMerchantName(supabase, {
+      householdId,
+      memberId,
+      bankDescription,
+      name: description,
+    });
   }
 
   if (recurrenceInput && !current?.recurrence_id) {
@@ -223,7 +298,10 @@ export async function deleteTransferGroup(transferGroupId: string) {
   revalidatePath("/mes");
 }
 
-export async function updateTransactionCategory(transactionId: string, categoryId: string | null) {
+export async function updateTransactionCategory(
+  transactionId: string,
+  categoryId: string | null,
+) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("transactions")
@@ -235,7 +313,10 @@ export async function updateTransactionCategory(transactionId: string, categoryI
   revalidatePath("/transacoes");
 }
 
-export async function bulkUpdateCategory(transactionIds: string[], categoryId: string | null) {
+export async function bulkUpdateCategory(
+  transactionIds: string[],
+  categoryId: string | null,
+) {
   if (transactionIds.length === 0) return;
 
   const supabase = await createClient();
@@ -304,11 +385,13 @@ export async function createTransfer(formData: FormData) {
   const fromAccountId = String(formData.get("from_account_id") ?? "");
   const toAccountId = String(formData.get("to_account_id") ?? "");
   const date = String(formData.get("date") ?? "");
-  const description = String(formData.get("description") ?? "").trim() || "Transferência";
+  const description =
+    String(formData.get("description") ?? "").trim() || "Transferência";
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const amountInput = String(formData.get("amount") ?? "");
 
-  if (!fromAccountId || !toAccountId) throw new Error("Selecione as duas contas.");
+  if (!fromAccountId || !toAccountId)
+    throw new Error("Selecione as duas contas.");
   if (fromAccountId === toAccountId) {
     throw new Error("Conta de origem e destino não podem ser a mesma.");
   }

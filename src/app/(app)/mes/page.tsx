@@ -34,7 +34,7 @@ import { Money } from "@/components/money";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
 import { cardBills, loadCards } from "@/lib/cards";
-import { CardTile } from "@/components/card-tile";
+import { CardStack } from "@/components/card-stack";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
@@ -529,38 +529,23 @@ export default async function MesPage({
         {/* Cartão de crédito: o primeiro cartão desenhado, com a fatura
             aberta. Sem cartão, o espaço mostra o saldo dos próximos 30 dias. */}
         {cards.length > 0 ? (
-          <CardTile
+          <CardStack
             className="lg:col-span-4"
             title={cards.length === 1 ? "Cartão" : `Cartões · ${cards.length}`}
-            href={`/cartoes?cartao=${cards[0].id}`}
-            linkLabel="Faturas"
-            name={cards[0].name}
-            lastFour={cards[0].lastFour}
-            color={cards[0].color}
-            caption={`Fatura aberta · vence ${shortDate(cards[0].current.due)}`}
-            amount={
-              <Money cents={cards[0].current.totalCents} currency={currency} />
-            }
-            usedPct={
-              cards[0].limitCents
-                ? Math.min(
-                    100,
-                    (cards[0].debtCents / cards[0].limitCents) * 100,
-                  )
-                : null
-            }
-            footerLeft={`Fecha ${shortDate(cards[0].current.closing)}`}
-            footerRight={
-              cards[0].limitCents ? (
-                <>
-                  <Signed
-                    cents={cards[0].limitCents - cards[0].debtCents}
-                    currency={currency}
-                  />{" "}
-                  livres
-                </>
-              ) : undefined
-            }
+            currency={currency}
+            cards={cards.map((c) => ({
+              id: c.id,
+              name: c.name,
+              lastFour: c.lastFour,
+              color: c.color,
+              caption: `Fatura aberta · vence ${shortDate(c.current.due)}`,
+              amountCents: c.current.totalCents,
+              usedPct: c.limitCents
+                ? Math.min(100, (c.debtCents / c.limitCents) * 100)
+                : null,
+              footerLeft: `Fecha ${shortDate(c.current.closing)}`,
+              freeCents: c.limitCents ? c.limitCents - c.debtCents : null,
+            }))}
           />
         ) : (
           <Card className="lg:col-span-4">

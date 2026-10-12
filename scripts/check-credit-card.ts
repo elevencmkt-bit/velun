@@ -49,5 +49,10 @@ eq("cartão sem movimento: uma fatura aberta zerada", buildStatements([], s, "20
 eq("compra prevista no mês seguinte cria a fatura seguinte", buildStatements([buy("f", "2026-11-03", 999)], s, "2026-10-12").length, 2);
 eq("saldo inicial negativo é dívida antiga", buildStatements([], { ...s, openingBalanceCents: -5000 }, "2026-10-12")[0].totalCents, 5000);
 
+const parcel = (id: string, date: string, cents: number): CardTransaction => ({ id, date, amount_cents: cents, direction: "out", transfer_group_id: null, installment_group_id: "g1" });
+eq("parcelas futuras já ocupam o limite", currentDebt([parcel("1", "2026-10-10", 1000), parcel("2", "2026-11-10", 1000), parcel("3", "2026-12-10", 1000)], s, "2026-10-12"), 3000);
+eq("…mas cada uma só entra na fatura do seu mês", buildStatements([parcel("1", "2026-10-10", 1000), parcel("2", "2026-11-10", 1000)], s, "2026-10-12").map((x) => x.chargesCents), [1000, 1000]);
+eq("compra comum com data futura não ocupa o limite hoje", currentDebt([buy("f", "2026-11-03", 999)], s, "2026-10-12"), 0);
+
 console.log(fail ? `\n${fail} FALHA(S)` : "\nTUDO PASSOU");
 if (fail) process.exit(1);

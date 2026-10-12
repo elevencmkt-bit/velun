@@ -13,41 +13,47 @@ export default async function ImportarPage() {
   // quando ela é "aberta" (dá pra ver, não dá pra mexer). A tela não deve
   // oferecer o que vai falhar.
 
-  const [{ data: accounts }, { data: categories }, { data: pending }, { data: history }] =
-    await Promise.all([
-      supabase
-        .from("accounts")
-        .select("id, name, owner_id")
-        .eq("household_id", householdId)
-        .eq("is_archived", false)
-        .or(`owner_id.is.null,owner_id.eq.${memberId}`)
-        .order("name"),
-      supabase
-        .from("categories")
-        .select("id, name, kind")
-        .eq("household_id", householdId)
-        .eq("is_archived", false)
-        .order("name"),
-      supabase
-        .from("imports")
-        .select(
-          "id, account_id, file_path, statement_start, statement_end, balance_matches, extracted_sum_cents",
-        )
-        .eq("household_id", householdId)
-        .eq("status", "review")
-        .order("created_at", { ascending: false })
-        .limit(1),
-      // Importações já confirmadas, pra poder desfazer. Sem isso, um
-      // extrato importado na conta errada só sai apagando lançamento por
-      // lançamento na mão.
-      supabase
-        .from("imports")
-        .select("id, file_path, statement_start, statement_end, created_at, account:accounts(name)")
-        .eq("household_id", householdId)
-        .eq("status", "confirmed")
-        .order("created_at", { ascending: false })
-        .limit(5),
-    ]);
+  const [
+    { data: accounts },
+    { data: categories },
+    { data: pending },
+    { data: history },
+  ] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id, name, owner_id")
+      .eq("household_id", householdId)
+      .eq("is_archived", false)
+      .or(`owner_id.is.null,owner_id.eq.${memberId}`)
+      .order("name"),
+    supabase
+      .from("categories")
+      .select("id, name, kind")
+      .eq("household_id", householdId)
+      .eq("is_archived", false)
+      .order("name"),
+    supabase
+      .from("imports")
+      .select(
+        "id, account_id, file_path, statement_start, statement_end, balance_matches, extracted_sum_cents",
+      )
+      .eq("household_id", householdId)
+      .eq("status", "review")
+      .order("created_at", { ascending: false })
+      .limit(1),
+    // Importações já confirmadas, pra poder desfazer. Sem isso, um
+    // extrato importado na conta errada só sai apagando lançamento por
+    // lançamento na mão.
+    supabase
+      .from("imports")
+      .select(
+        "id, file_path, statement_start, statement_end, created_at, account:accounts(name)",
+      )
+      .eq("household_id", householdId)
+      .eq("status", "confirmed")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
 
   const openImport = pending?.[0] ?? null;
 
@@ -73,7 +79,7 @@ export default async function ImportarPage() {
     ? await supabase
         .from("staged_transactions")
         .select(
-          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status)",
+          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status), card_payment_accepted, card:accounts!staged_transactions_card_payment_account_id_fkey(name)",
         )
         .eq("import_id", openImport.id)
         .order("date")
@@ -117,10 +123,15 @@ export default async function ImportarPage() {
           fingerprint: s.fingerprint as string,
           free: true,
         })),
-        await fetchConfirmedCandidates(supabase, householdId, openImport.account_id as string, {
-          periodStart: openImport.statement_start as string,
-          periodEnd: openImport.statement_end as string,
-        }),
+        await fetchConfirmedCandidates(
+          supabase,
+          householdId,
+          openImport.account_id as string,
+          {
+            periodStart: openImport.statement_start as string,
+            periodEnd: openImport.statement_end as string,
+          },
+        ),
         matchedIds,
       )
     : [];
@@ -164,6 +175,17 @@ export default async function ImportarPage() {
           direction: s.direction as "in" | "out",
           categoryId: (s.suggested_category_id as string | null) ?? null,
           isDuplicate: s.dup_status !== "none",
+          cardPayment: (() => {
+            const card = (Array.isArray(s.card) ? s.card[0] : s.card) as {
+              name: string;
+            } | null;
+            return card
+              ? {
+                  cardName: card.name,
+                  accepted: s.card_payment_accepted as boolean,
+                }
+              : null;
+          })(),
           isIncluded: s.is_included as boolean,
           match: match
             ? {
@@ -173,7 +195,10 @@ export default async function ImportarPage() {
                 // Previsão (pendente) ou lançamento já confirmado: muda a
                 // frase e o padrão — previsão vem marcada pra juntar,
                 // confirmado vem desmarcado.
-                kind: match.status === "pending" ? ("forecast" as const) : ("confirmed" as const),
+                kind:
+                  match.status === "pending"
+                    ? ("forecast" as const)
+                    : ("confirmed" as const),
               }
             : null,
         };
@@ -196,7 +221,8 @@ export default async function ImportarPage() {
           direction: f.direction as "in" | "out",
         }))}
       history={(history ?? []).map((h) => {
-        const account = h.account as { name: string } | { name: string }[] | null;
+        const account = h.account as
+          { name: string } | { name: string }[] | null;
         return {
           id: h.id as string,
           fileName: h.file_path as string,

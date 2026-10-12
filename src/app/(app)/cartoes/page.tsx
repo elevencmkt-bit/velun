@@ -160,7 +160,7 @@ export default async function CartoesPage({
     ? await supabase
         .from("transactions")
         .select(
-          "id, date, description, amount_cents, direction, status, transfer_group_id, category:categories(name)",
+          "id, date, description, amount_cents, direction, status, transfer_group_id, installment_number, installment_total, category:categories(name)",
         )
         .eq("household_id", householdId)
         .eq("account_id", selected.id)
@@ -175,6 +175,30 @@ export default async function CartoesPage({
   const payments = (purchaseRows ?? []).filter(
     (r) => r.transfer_group_id && r.direction === "in",
   );
+
+  // Parcelas que ainda vão cair nas próximas faturas deste cartão.
+  const { data: futureParcels } = selected.canSeeTransactions
+    ? await supabase
+        .from("transactions")
+        .select("amount_cents")
+        .eq("household_id", householdId)
+        .eq("account_id", selected.id)
+        .not("installment_group_id", "is", null)
+        .gt("date", selected.current.closing)
+    : { data: null };
+  const futureParcelsCents = (futureParcels ?? []).reduce(
+    (sum, r) => sum + (r.amount_cents as number),
+    0,
+  );
+  const futureParcelsCount = futureParcels?.length ?? 0;
+
+  // Fatura de um mês que ainda nem abriu (só tem parcelas ou compras
+  // previstas): mostra só o que é dela. O que ficar em aberto antes entra
+  // nela também, mas isso ainda não aconteceu.
+  const isFuture = statement.closing > selected.current.closing;
+  const shownTotal = isFuture
+    ? Math.max(0, statement.chargesCents - statement.creditsCents)
+    : statement.totalCents;
 
   const toPay =
     statement.status === "open"
@@ -249,7 +273,10 @@ export default async function CartoesPage({
                   >
                     {monthName(s.closing)}
                     <span className="font-medium text-(--text-light)">
-                      · {STATUS_LABELS[s.status].toLowerCase()}
+                      ·{" "}
+                      {s.closing > selected.current.closing
+                        ? "próxima"
+                        : STATUS_LABELS[s.status].toLowerCase()}
                     </span>
                   </Link>
                 );
@@ -296,6 +323,11 @@ export default async function CartoesPage({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">
                         {out ? row.description : `Estorno · ${row.description}`}
+                        {row.installment_total ? (
+                          <span className="ml-2 rounded-full bg-(--primary-light) px-2 py-0.5 text-[11px] font-semibold text-(--primary-hover)">
+                            {row.installment_number} de {row.installment_total}
+                          </span>
+                        ) : null}
                       </p>
                       <p className="truncate text-xs text-(--text-muted)">
                         {shortDate(row.date as string)} ·{" "}
@@ -339,11 +371,23 @@ export default async function CartoesPage({
               <span className="text-[13px] text-(--text-muted)">
                 Fatura de {monthName(statement.closing).toLowerCase()}
               </span>
-              <Pill status={statement.status} />
+              {isFuture ? (
+                <span className="rounded-full bg-(--bg-subtle) px-2 py-0.5 text-[11px] font-semibold text-(--text-muted)">
+                  Próxima
+                </span>
+              ) : (
+                <Pill status={statement.status} />
+              )}
             </div>
             <div className="mt-1.5 text-[30px] leading-tight font-extrabold tracking-[-0.02em] tabular-nums">
-              <Money cents={statement.totalCents} currency={currency} />
+              <Money cents={shownTotal} currency={currency} />
             </div>
+            {isFuture ? (
+              <div className="mt-1 text-[13px] text-(--text-muted)">
+                Já lançado pra este mês. O que ficar sem pagar antes entra aqui
+                também.
+              </div>
+            ) : null}
             {statement.paidCents > 0 && statement.status !== "open" ? (
               <div className="mt-1 text-[13px] text-(--text-muted)">
                 Pago{" "}
@@ -414,7 +458,10 @@ export default async function CartoesPage({
               depois, na seguinte.
             </p>
 
-            {selected.canEdit && toPay > 0 && statement.status !== "paid" ? (
+            {selected.canEdit &&
+            !isFuture &&
+            toPay > 0 &&
+            statement.status !== "paid" ? (
               <div className="mt-5">
                 <PayBillDialog
                   cardId={selected.id}
@@ -431,6 +478,20 @@ export default async function CartoesPage({
               </div>
             ) : null}
           </section>
+
+          {futureParcelsCount > 0 ? (
+            <section className="rounded-[20px] bg-(--primary-soft) p-5 md:p-6">
+              <div className="text-[14px] font-bold text-(--primary-hover)">
+                Parcelas que ainda vêm
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-(--text-secondary)">
+                <Money cents={futureParcelsCents} currency={currency} /> em{" "}
+                {futureParcelsCount}{" "}
+                {futureParcelsCount === 1 ? "parcela" : "parcelas"} nas próximas
+                faturas. Já contam no limite usado.
+              </p>
+            </section>
+          ) : null}
 
           {selected.canEdit ? (
             <p className="px-1 text-xs leading-relaxed text-(--text-muted)">

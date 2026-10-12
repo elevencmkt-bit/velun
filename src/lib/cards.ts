@@ -77,7 +77,7 @@ export async function loadCards(
       supabase
         .from("transactions")
         .select(
-          "id, account_id, date, amount_cents, direction, transfer_group_id",
+          "id, account_id, date, amount_cents, direction, transfer_group_id, installment_group_id",
         )
         .eq("household_id", householdId)
         .in("account_id", ids)
