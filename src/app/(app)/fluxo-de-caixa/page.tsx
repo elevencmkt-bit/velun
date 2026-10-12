@@ -168,11 +168,10 @@ export default async function FluxoDeCaixaPage({
         {kpis.map((kpi) => (
           <div
             key={kpi.key}
-            className="flex flex-col items-start gap-2.5 rounded-2xl border p-4 sm:min-h-[116px] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
+            className="flex flex-col items-start gap-2.5 rounded-[20px] p-4 sm:min-h-[116px] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
             style={{
               background: "#FFFFFF",
-              borderColor: "#E8ECF4",
-              boxShadow: "0 6px 20px rgba(20,28,60,.04)",
+              boxShadow: "var(--shadow-card)",
             }}
           >
             <div
@@ -196,11 +195,10 @@ export default async function FluxoDeCaixaPage({
       </div>
 
       <div
-        className="rounded-[18px] border p-6"
+        className="rounded-[20px] p-6"
         style={{
           background: "#FFFFFF",
-          borderColor: "#E8ECF4",
-          boxShadow: "0 8px 24px rgba(20,28,60,.04)",
+          boxShadow: "var(--shadow-card)",
         }}
       >
         <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row">

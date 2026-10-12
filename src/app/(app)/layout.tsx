@@ -56,7 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <Sidebar />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-(--border-primary) bg-white/90 px-4 backdrop-blur md:h-[68px] md:px-7">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 px-4 md:h-[76px] md:px-10">
           {/* No celular o menu lateral some: o logo ocupa o lugar da busca. */}
           <Link href="/mes" className="flex items-center gap-2 md:hidden" aria-label="Velun — início">
             <Image src="/velun-icon.png" alt="" width={28} height={28} className="h-7 w-7 rounded-[8px]" />
@@ -81,7 +81,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             />
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 pt-5 pb-[calc(88px+env(safe-area-inset-bottom))] md:px-7 md:pt-6 md:pb-8">
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-[calc(104px+env(safe-area-inset-bottom))] md:px-10 md:pt-4 md:pb-12">
           <div className="mx-auto max-w-[1600px]">{children}</div>
         </main>
       </div>

@@ -42,7 +42,7 @@ export function NotificationBell({
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
-          className="relative flex h-9 w-9 items-center justify-center rounded-lg text-(--text-muted) transition-colors hover:bg-[--border-soft] hover:text-(--text-primary)"
+          className="relative flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-(--text-muted) transition-colors hover:text-(--text-primary) md:h-11 md:w-11"
           aria-label={
             unreadCount > 0
               ? `Notificações, ${unreadCount} não lidas`

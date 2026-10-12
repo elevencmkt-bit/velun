@@ -26,7 +26,7 @@ export function UserMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2.5 rounded-lg px-1.5 py-1 outline-none transition-colors hover:bg-[--border-soft]">
+        <button className="flex items-center gap-2.5 rounded-[14px] px-1.5 py-1 outline-none transition-colors hover:bg-white">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

@@ -36,8 +36,8 @@ export function TopCategoriesCard({
 
   return (
     <article
-      className="flex flex-col rounded-2xl border p-5"
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+      className="flex flex-col rounded-[20px] p-5"
+      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
     >
       <div className="mb-1 flex items-center justify-between gap-3">
         <div>
@@ -129,8 +129,8 @@ export function InsightVelunCard({ insight, currency }: { insight: ReportInsight
   const warning = insight.tone === "warning";
   return (
     <article
-      className="flex flex-col rounded-2xl border p-5"
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+      className="flex flex-col rounded-[20px] p-5"
+      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
     >
       <div className="mb-1 flex items-center gap-2.5">
         <div

@@ -1,47 +1,56 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpCircle, ArrowDownCircle, PiggyBank, Wallet } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
-import { getCashFlowProjection } from "@/lib/cash-flow";
-import {
-  monthRange,
-  shiftMonth,
-  monthParam,
-  monthLabel,
-  shortMonthLabel,
-  parseMonthParam,
-} from "@/lib/month";
+import { getCategoryIcon, getCategoryIconMap } from "@/lib/category-icons";
+import { getCashFlowProjection, type CashFlowPoint } from "@/lib/cash-flow";
+import { monthRange, shiftMonth, monthParam, monthLabel, shortMonthLabel, parseMonthParam } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
 import { accountScope, scopeLabel, type AccountScope } from "@/lib/visibility";
-import { excludeTransfers, groupExpensesByCategory, sumByDirection } from "@/lib/reports";
+import { excludeTransfers, groupByCategory, sumByDirection } from "@/lib/reports";
 import { getAccountBalances } from "@/lib/balances";
 import { ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
 import { AccountAvatar } from "@/components/account-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CategoryBadge } from "@/components/category-badge";
 import { MonthSelector } from "@/components/month-selector";
-import { MonthDonut } from "./month-donut";
+import { Money } from "@/components/money";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
-import { ForecastCard } from "./forecast-card";
-import { Money } from "@/components/money";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
-const RECENT_TRANSACTIONS_LIMIT = 6;
-const PENDING_PREVIEW_LIMIT = 4;
+const RECENT_TRANSACTIONS_LIMIT = 5;
+const UPCOMING_LIMIT = 3;
+const MAX_DASHBOARD_ACCOUNTS = 5;
+const WHERE_LIMIT = 4;
 
-// "21 set" — curto o bastante pra nunca quebrar em duas linhas.
-function shortDate(date: string) {
-  return new Date(`${date}T00:00:00`)
-    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
-    .replace(" de ", " ")
-    .replace(".", "");
+// Cores das barrinhas de "Para onde foi", na ordem do ranking. Fixas (não
+// a cor da categoria): a lista é curta e o que importa é a proporção.
+const WHERE_COLORS = ["#536DFE", "#FF8A5C", "#A78BFA", "#27C499"];
+
+const OUT = "var(--expense-dark)";
+const IN = "var(--income-dark)";
+
+function isoDate(d: Date) {
+  return d.toISOString().slice(0, 10);
 }
 
-type PendingPreviewRow = {
+function dayAndMonth(date: string) {
+  const d = new Date(`${date}T00:00:00`);
+  return {
+    day: String(d.getDate()).padStart(2, "0"),
+    month: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase(),
+  };
+}
+
+function shortDate(date: string) {
+  const { day, month } = dayAndMonth(date);
+  return `${Number(day)} ${month.toLowerCase()}`;
+}
+
+type PendingRow = {
   id: string;
   date: string;
   description: string;
@@ -49,92 +58,109 @@ type PendingPreviewRow = {
   direction: "in" | "out";
 };
 
-async function fetchPendingPreview(
+async function fetchPending(
   supabase: Awaited<ReturnType<typeof createClient>>,
   householdId: string,
   scope: AccountScope,
-): Promise<PendingPreviewRow[]> {
+  until: string,
+): Promise<PendingRow[]> {
   if (scope.ids.length === 0) return [];
-
   const { data, error } = await supabase
     .from("transactions")
-    .select("id, date, description, amount_cents, direction")
+    .select("id, date, description, amount_cents, direction, transfer_group_id")
     .eq("household_id", householdId)
     .eq("status", "pending")
     .in("account_id", scope.ids)
-    .order("date", { ascending: true })
-    .limit(PENDING_PREVIEW_LIMIT);
-
+    .lte("date", until)
+    .order("date", { ascending: true });
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []).filter((r) => !r.transfer_group_id) as PendingRow[];
 }
 
-// Comparação com o mês anterior em texto calmo: o valor de lá, não uma
-// porcentagem. "↑1035%" assustava mais do que informava — basta um mês
-// fraco antes pra qualquer mês normal parecer uma explosão.
-function PreviousMonth({
-  label,
+function sumCents(rows: PendingRow[]) {
+  return rows.reduce((s, r) => s + r.amount_cents, 0);
+}
+
+/** Linha do saldo dos próximos 30 dias, no bloco azul. */
+function Sparkline({ points }: { points: CashFlowPoint[] }) {
+  if (points.length < 2) return null;
+  const values = points.map((p) => p.balance_cents);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const path = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * 400;
+      const y = 62 - ((v - min) / span) * 54;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox="0 0 400 70" preserveAspectRatio="none" aria-hidden className="h-14 w-full">
+      <path
+        d={path}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={2.5}
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+/** As duas linhas que se encontram do símbolo da marca, como estampa. */
+function BrandMotif({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 360 360" fill="none" aria-hidden className={className}>
+      <path d="M20 20 C140 120 180 200 180 340" stroke="#FFFFFF" strokeWidth={22} strokeLinecap="round" />
+      <path d="M340 20 C220 120 180 200 180 340" stroke="#FFFFFF" strokeWidth={22} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SectionLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-(--primary) hover:text-(--primary-hover)"
+    >
+      {children}
+      <ArrowRight className="h-3.5 w-3.5" />
+    </Link>
+  );
+}
+
+function Amount({
   cents,
+  direction,
   currency,
 }: {
-  label: string;
   cents: number;
+  direction: "in" | "out";
   currency: CurrencyCode;
 }) {
   return (
-    <span className="text-xs text-(--text-muted)">
-      Em {label}: <Money cents={cents} currency={currency} />
+    <span
+      className="shrink-0 text-right text-[14px] font-semibold tabular-nums"
+      style={{ color: direction === "out" ? OUT : IN }}
+    >
+      {direction === "out" ? "−" : "+"}
+      <Money cents={cents} currency={currency} />
     </span>
   );
 }
 
-const MAX_DASHBOARD_ACCOUNTS = 5;
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  badgeBg,
-  badgeFg,
-  valueColor,
-  delta,
-}: {
-  label: string;
-  value: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  badgeBg: string;
-  badgeFg: string;
-  valueColor: string;
-  delta: React.ReactNode;
-}) {
+function Signed({ cents, currency }: { cents: number; currency: CurrencyCode }) {
   return (
-    <Card>
-      {/* Celular: dois indicadores por linha, então o ícone sobe e o
-          valor ganha a largura toda do cartão. */}
-      <CardContent className="flex min-h-[112px] flex-col items-start gap-3 sm:min-h-[128px] sm:flex-row sm:items-center sm:gap-5">
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl"
-          style={{ backgroundColor: badgeBg }}
-        >
-          <Icon className="h-5 w-5 sm:h-8 sm:w-8" style={{ color: badgeFg }} />
-        </div>
-        <div className="flex min-w-0 flex-col gap-1 sm:gap-1.5">
-          <span className="text-kpi-label">{label}</span>
-          <span className="money text-kpi-value" style={{ color: valueColor }}>
-            {value}
-          </span>
-          {delta}
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      {cents < 0 ? "−" : ""}
+      <Money cents={Math.abs(cents)} currency={currency} />
+    </>
   );
 }
 
-export default async function MesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ month?: string }>;
-}) {
+export default async function MesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { householdId, memberId, currency, displayName } = await getCurrentMember();
   const supabase = await createClient();
   const { month } = await searchParams;
@@ -148,17 +174,33 @@ export default async function MesPage({
   const trendStart = shiftMonth(year, monthIndex, -(TREND_MONTHS - 1));
   const trendRangeStart = monthRange(trendStart.year, trendStart.monthIndex).start;
 
-  const { data: accounts } = await supabase
-    .from("accounts")
-    .select("id")
-    .eq("household_id", householdId)
-    .limit(1);
-  const householdIsEmpty = !accounts || accounts.length === 0;
+  const now = new Date();
+  const today = isoDate(now);
+  const weekEnd = isoDate(new Date(now.getTime() + 6 * 86_400_000));
+  const horizon = isoDate(new Date(now.getTime() + CASH_FLOW_PREVIEW_DAYS * 86_400_000));
+  const firstName = displayName?.trim().split(/\s+/)[0] ?? "";
 
-  // Três escopos nesta tela. Os totais e o donut agregam por categoria, o
-  // saldo/fluxo aceita até `balance_only`, e o extrato só mostra conta
-  // `shared`. Como transactionsScope é subconjunto de categoriesScope, as
-  // transações recentes saem de `current` filtrado — sem segunda query.
+  const { data: anyAccount } = await supabase.from("accounts").select("id").eq("household_id", householdId).limit(1);
+  if (!anyAccount || anyAccount.length === 0) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-page-title">{firstName ? `Olá, ${firstName}` : "Início"}</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-card-title">Nada por aqui ainda</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-(--text-secondary)">
+            Cadastre uma conta em <span className="font-medium">Contas</span> ou lance algo em{" "}
+            <span className="font-medium">Transações</span> para começar.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Três escopos: totais e categorias agregam (`categories`), saldo e
+  // fluxo aceitam `balance_only`, e lançamento a lançamento só conta
+  // `shared`.
   const [categoriesScope, balanceScope, transactionsScope] = await Promise.all([
     accountScope(supabase, householdId, memberId, "categories"),
     accountScope(supabase, householdId, memberId, "balance"),
@@ -170,50 +212,75 @@ export default async function MesPage({
     prevRows,
     trendRows,
     colorMap,
+    iconMap,
     cashFlow,
-    pendingPreview,
-    pendingCurrentRows,
+    pending,
     balances,
     { data: accountRows },
     { data: memberRows },
   ] = await Promise.all([
-      fetchMonthTransactions(supabase, householdId, start, end, categoriesScope),
-      fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, categoriesScope),
-      fetchMonthTransactions(supabase, householdId, trendRangeStart, end, categoriesScope),
-      getCategoryColorMap(supabase, householdId),
-      getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS, balanceScope),
-      fetchPendingPreview(supabase, householdId, transactionsScope),
-      fetchMonthTransactions(supabase, householdId, start, end, categoriesScope, "pending"),
-      getAccountBalances(supabase, householdId, balanceScope),
-      supabase
-        .from("accounts")
-        .select("id, name, type, owner_id, institution")
-        .eq("household_id", householdId)
-        .eq("is_archived", false)
-        .in("id", balanceScope.ids.length > 0 ? balanceScope.ids : ["00000000-0000-0000-0000-000000000000"])
-        .order("sort_order")
-        .order("name"),
-      supabase.from("members").select("id, display_name").eq("household_id", householdId),
-    ]);
+    fetchMonthTransactions(supabase, householdId, start, end, categoriesScope),
+    fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, categoriesScope),
+    fetchMonthTransactions(supabase, householdId, trendRangeStart, end, categoriesScope),
+    getCategoryColorMap(supabase, householdId),
+    getCategoryIconMap(supabase, householdId),
+    getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS, balanceScope),
+    fetchPending(supabase, householdId, transactionsScope, horizon),
+    getAccountBalances(supabase, householdId, balanceScope),
+    supabase
+      .from("accounts")
+      .select("id, name, type, owner_id, institution")
+      .eq("household_id", householdId)
+      .eq("is_archived", false)
+      .in("id", balanceScope.ids.length > 0 ? balanceScope.ids : ["00000000-0000-0000-0000-000000000000"])
+      .order("sort_order")
+      .order("name"),
+    supabase.from("members").select("id, display_name").eq("household_id", householdId),
+  ]);
 
   const current = excludeTransfers(currentRows);
   const previous = excludeTransfers(prevRows);
   const trend = excludeTransfers(trendRows);
-  const pendingCurrent = excludeTransfers(pendingCurrentRows);
 
   const entrou = sumByDirection(current, "in");
   const saiu = sumByDirection(current, "out");
   const sobrou = entrou - saiu;
+  const sobrouPrev = sumByDirection(previous, "in") - sumByDirection(previous, "out");
+  const sobrouDiff = sobrou - sobrouPrev;
 
-  const entrouPrev = sumByDirection(previous, "in");
-  const saiuPrev = sumByDirection(previous, "out");
-  const sobrouPrev = entrouPrev - saiuPrev;
+  const monthName = new Date(year, monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" });
+  const MonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
   const prevMonthName = new Date(prev.year, prev.monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" });
+  const selected = monthParam(year, monthIndex);
+  const thisMonth = monthParam(now.getFullYear(), now.getMonth());
 
-  // Contas com saldo, na ordem da tela Contas. De quem é cada uma vai
-  // escrito: "Minha", "Do casal" ou o nome de quem é dona.
+  // Uma frase que diz como o mês foi, em vez de só "Dashboard".
+  const headline =
+    selected > thisMonth ? (
+      <>Previsão de {monthName}.</>
+    ) : selected === thisMonth ? (
+      sobrou >= 0 ? (
+        <>
+          Até agora em {monthName}, sobraram <Money cents={sobrou} currency={currency} />.
+        </>
+      ) : (
+        <>
+          Até agora em {monthName}, saiu <Money cents={-sobrou} currency={currency} /> a mais do que entrou.
+        </>
+      )
+    ) : sobrou >= 0 ? (
+      <>
+        {MonthName} fechou no azul. Sobraram <Money cents={sobrou} currency={currency} />.
+      </>
+    ) : (
+      <>
+        {MonthName} fechou no vermelho. Faltaram <Money cents={-sobrou} currency={currency} />.
+      </>
+    );
+
+  // Contas com saldo, na ordem da tela Contas.
   const memberNames = new Map((memberRows ?? []).map((m) => [m.id as string, m.display_name as string]));
-  const dashboardAccounts = (accountRows ?? []).map((a) => ({
+  const accounts = (accountRows ?? []).map((a) => ({
     id: a.id as string,
     name: a.name as string,
     type: a.type as string,
@@ -226,28 +293,25 @@ export default async function MesPage({
           : (memberNames.get(a.owner_id as string) ?? "Pessoal"),
     balance: balances.get(a.id as string) ?? 0,
   }));
-  const firstName = displayName?.trim().split(/\s+/)[0] ?? "";
 
-  const entrouPendente = sumByDirection(pendingCurrent, "in");
-  const saiuPendente = sumByDirection(pendingCurrent, "out");
-  const entrouPrevisto = entrou + entrouPendente;
-  const saiuPrevisto = saiu + saiuPendente;
-  const sobrouPrevisto = entrouPrevisto - saiuPrevisto;
+  // Vencimentos: o que já passou, o que cai nesta semana e o que entra.
+  const overdueOut = sumCents(pending.filter((p) => p.date < today && p.direction === "out"));
+  const weekOut = sumCents(pending.filter((p) => p.date >= today && p.date <= weekEnd && p.direction === "out"));
+  const toReceive = sumCents(pending.filter((p) => p.direction === "in"));
+  const upcoming = pending.filter((p) => p.date >= today).slice(0, UPCOMING_LIMIT);
 
-  const slices = groupExpensesByCategory(current).map((slice) => ({
-    ...slice,
-    color: (colorMap.get(slice.name) ?? MUTED_CATEGORY_COLOR).fg,
-  }));
+  // Para onde foi: as maiores categorias de verdade; "Sem categoria" vira
+  // um lembrete embaixo, não uma barra que engole as outras.
+  const expenseRanking = groupByCategory(current, "out");
+  const uncategorized = expenseRanking.find((s) => s.name === "Sem categoria")?.amount_cents ?? 0;
+  const where = expenseRanking.filter((s) => s.name !== "Sem categoria").slice(0, WHERE_LIMIT);
+  const whereMax = where[0]?.amount_cents ?? 1;
 
   const visibleIds = new Set(transactionsScope.ids);
-  const recentTransactions = current
+  const recent = current
     .filter((row) => visibleIds.has(row.account_id))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, RECENT_TRANSACTIONS_LIMIT);
-
-  // Rótulo de escopo: quando a soma é parcial, o card diz quantas contas
-  // ficaram de fora — nunca qual nem quanto.
-  const totalsScopeLabel = scopeLabel(categoriesScope);
 
   const trendPoints: TrendPoint[] = [];
   for (let i = TREND_MONTHS - 1; i >= 0; i--) {
@@ -261,32 +325,19 @@ export default async function MesPage({
     });
   }
 
-  if (householdIsEmpty) {
-    return (
-      <div className="flex flex-col gap-6">
-        <h1 className="text-page-title">Dashboard</h1>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">Nada por aqui ainda</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-(--text-secondary)">
-            Nenhuma conta ainda. Cadastre uma conta em{" "}
-            <span className="font-medium">Contas</span> ou lance algo em{" "}
-            <span className="font-medium">Transações</span> para começar.
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const totalsScopeLabel = scopeLabel(categoriesScope);
+  const barMax = Math.max(Math.abs(sobrou), Math.abs(sobrouPrev), 1);
+  const sobrouBars = [
+    { label: shortMonthLabel(prev.year, prev.monthIndex), value: sobrouPrev, current: false },
+    { label: shortMonthLabel(year, monthIndex), value: sobrou, current: true },
+  ];
 
   return (
-    <div className="flex flex-col gap-6 sm:gap-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-page-title">{firstName ? `Olá, ${firstName}` : "Dashboard"}</h1>
-          <p className="text-page-subtitle">
-            Seu resumo de <span className="lowercase">{monthLabel(year, monthIndex)}</span>.
-          </p>
+    <div className="flex flex-col gap-6 md:gap-7">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-page-title">{firstName ? `Olá, ${firstName}` : "Início"}</h1>
+          <p className="text-page-subtitle">{headline}</p>
         </div>
         <MonthSelector
           label={monthLabel(year, monthIndex)}
@@ -295,242 +346,269 @@ export default async function MesPage({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
-        <StatCard
-          label="Saldo total"
-          value={formatCents(cashFlow.currentTotal, currency)}
-          icon={Wallet}
-          badgeBg="var(--badge-blue-bg)"
-          badgeFg="var(--badge-blue-fg)"
-          valueColor={cashFlow.currentTotal < 0 ? "var(--expense)" : "var(--text-primary)"}
-          delta={<span className="text-xs text-(--text-light)">Todas as contas, hoje</span>}
-        />
-        <StatCard
-          label="Entrou"
-          value={formatCents(entrou, currency)}
-          icon={ArrowUpCircle}
-          badgeBg="var(--badge-green-bg)"
-          badgeFg="var(--badge-green-fg)"
-          valueColor="var(--income)"
-          delta={<PreviousMonth label={prevMonthName} cents={entrouPrev} currency={currency} />}
-        />
-        <StatCard
-          label="Saiu"
-          value={formatCents(saiu, currency)}
-          icon={ArrowDownCircle}
-          badgeBg="var(--badge-red-bg)"
-          badgeFg="var(--badge-red-fg)"
-          valueColor="var(--expense)"
-          delta={<PreviousMonth label={prevMonthName} cents={saiuPrev} currency={currency} />}
-        />
-        <StatCard
-          label="Sobrou"
-          value={formatCents(sobrou, currency)}
-          icon={PiggyBank}
-          badgeBg="var(--badge-blue-bg)"
-          badgeFg="var(--badge-blue-fg)"
-          valueColor={sobrou < 0 ? "var(--expense)" : "var(--income)"}
-          delta={<PreviousMonth label={prevMonthName} cents={sobrouPrev} currency={currency} />}
-        />
-      </div>
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
+        {/* Saldo: o único bloco colorido da tela. */}
+        <section className="relative flex min-h-[236px] flex-col overflow-hidden rounded-[24px] bg-(--primary) p-6 text-white md:p-7 lg:col-span-5">
+          <BrandMotif className="pointer-events-none absolute -top-20 -right-24 h-[340px] w-[340px] opacity-[0.16]" />
+          <span className="text-[14px] font-medium text-white/85">Saldo total · hoje</span>
+          <span className="mt-2 text-[34px] leading-tight font-extrabold tracking-[-0.03em] tabular-nums md:text-[40px]">
+            <Signed cents={cashFlow.currentTotal} currency={currency} />
+          </span>
+          <span className="mt-1 text-[13px] text-white/80">
+            {accounts.length} {accounts.length === 1 ? "conta" : "contas"} · em {CASH_FLOW_PREVIEW_DAYS} dias:{" "}
+            <Signed cents={cashFlow.finalPoint.balance_cents} currency={currency} />
+          </span>
+          <div className="mt-auto pt-4">
+            <Sparkline points={cashFlow.points} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-semibold">
+              ↑ Entrou <Money cents={entrou} currency={currency} />
+            </span>
+            <span className="rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-semibold">
+              ↓ Saiu <Money cents={saiu} currency={currency} />
+            </span>
+          </div>
+        </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-5">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">Contas</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col">
-            {dashboardAccounts.length === 0 ? (
-              <p className="text-sm text-(--text-muted)">Nenhuma conta ativa.</p>
-            ) : (
+        {/* Lugar dos cartões de crédito quando eles chegarem; por ora, o
+            saldo dos próximos 30 dias. */}
+        <Card className="lg:col-span-4">
+          <CardContent className="flex h-full flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-card-title">Próximos {CASH_FLOW_PREVIEW_DAYS} dias</h2>
+              <SectionLink href="/fluxo-de-caixa">Detalhes</SectionLink>
+            </div>
+            <div className="flex items-end justify-between text-sm">
               <div className="flex flex-col">
-                {dashboardAccounts.slice(0, MAX_DASHBOARD_ACCOUNTS).map((account) => {
-                  return (
-                    <div
-                      key={account.id}
-                      className="flex min-h-[56px] items-center gap-3 border-b border-(--border-soft) last:border-0"
-                    >
-                      <AccountAvatar institution={account.institution} type={account.type} />
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-sm font-medium text-(--text-primary)">{account.name}</span>
-                        <span className="truncate text-xs text-(--text-muted)">
-                          {account.owner} · {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
-                        </span>
-                      </div>
-                      <span
-                        className="shrink-0 text-sm font-semibold tabular-nums"
-                        style={{ color: account.balance < 0 ? "var(--expense)" : "var(--text-primary)" }}
-                      >
-                        <Money cents={account.balance} currency={currency} />
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <Link
-              href="/contas"
-              className="mt-3 flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
-            >
-              {dashboardAccounts.length > MAX_DASHBOARD_ACCOUNTS
-                ? `Ver todas as ${dashboardAccounts.length} contas`
-                : "Gerenciar contas"}{" "}
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">Despesas por categoria</CardTitle>
-            {totalsScopeLabel ? (
-              <p className="text-xs text-(--text-muted)">{totalsScopeLabel}</p>
-            ) : null}
-          </CardHeader>
-          <CardContent>
-            <MonthDonut slices={slices} compact currency={currency} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">Fluxo de caixa</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex flex-col">
-                <span className="text-kpi-label">Saldo atual</span>
-                <span className="font-semibold tabular-nums text-(--text-primary)">
-                  <Money cents={cashFlow.currentTotal} currency={currency} />
+                <span className="text-xs text-(--text-muted)">Hoje</span>
+                <span className="font-semibold tabular-nums">
+                  <Signed cents={cashFlow.currentTotal} currency={currency} />
                 </span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-kpi-label">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
-                <span className="font-semibold tabular-nums text-(--text-primary)">
-                  <Money cents={cashFlow.finalPoint.balance_cents} currency={currency} />
+                <span className="text-xs text-(--text-muted)">Em {shortDate(cashFlow.finalPoint.date)}</span>
+                <span className="font-semibold tabular-nums">
+                  <Signed cents={cashFlow.finalPoint.balance_cents} currency={currency} />
                 </span>
               </div>
             </div>
-            <CashFlowChart points={cashFlow.points} compact currency={currency} />
-            <Link
-              href="/fluxo-de-caixa"
-              className="flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
-            >
-              Ver detalhes <ArrowRight className="h-3 w-3" />
-            </Link>
+            <div className="mt-auto">
+              <CashFlowChart points={cashFlow.points} compact currency={currency} />
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.9fr_0.9fr] lg:gap-5">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">Transações recentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentTransactions.length === 0 ? (
-              <p className="text-sm text-(--text-muted)">Nenhuma transação neste mês.</p>
-            ) : (
-              <div className="flex flex-col">
-                {recentTransactions.map((row) => (
+        <Card className="lg:col-span-3">
+          <CardContent className="flex h-full flex-col">
+            <h2 className="text-card-title">Sobrou</h2>
+            <span
+              className="mt-3 text-[30px] leading-tight font-extrabold tracking-[-0.02em] tabular-nums"
+              style={{ color: sobrou < 0 ? OUT : IN }}
+            >
+              <Signed cents={sobrou} currency={currency} />
+            </span>
+            <span className="mt-1 text-[13px] text-(--text-muted)">
+              <Money cents={Math.abs(sobrouDiff)} currency={currency} /> {sobrouDiff >= 0 ? "a mais" : "a menos"} que
+              em {prevMonthName}
+            </span>
+            <div className="mt-auto flex h-24 items-end gap-3.5 pt-5">
+              {sobrouBars.map((bar) => (
+                <div key={bar.label} className="flex flex-1 flex-col items-center gap-1.5">
                   <div
-                    key={row.id}
-                    className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+                    className="w-full rounded-[10px]"
+                    style={{
+                      height: `${Math.max(8, (Math.abs(bar.value) / barMax) * 64)}px`,
+                      background:
+                        bar.value < 0 ? "var(--expense-soft)" : bar.current ? "var(--income)" : "var(--income-soft)",
+                    }}
+                  />
+                  <span
+                    className={`text-xs ${bar.current ? "font-semibold text-(--text-primary)" : "text-(--text-muted)"}`}
                   >
-                    <span className="text-metadata w-12 shrink-0 whitespace-nowrap">{shortDate(row.date)}</span>
-                    <span className="text-table-body w-40 flex-1 truncate text-(--text-primary)">
-                      {row.description}
+                    {bar.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-4">
+          <CardContent className="flex h-full flex-col">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <h2 className="text-card-title">Contas</h2>
+              <SectionLink href="/contas">Gerenciar</SectionLink>
+            </div>
+            {accounts.length === 0 ? (
+              <p className="text-sm text-(--text-muted)">Nenhuma conta ativa.</p>
+            ) : (
+              accounts.slice(0, MAX_DASHBOARD_ACCOUNTS).map((account) => (
+                <div key={account.id} className="flex min-h-[60px] items-center gap-3">
+                  <AccountAvatar institution={account.institution} type={account.type} size={40} />
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-semibold text-(--text-primary)">{account.name}</span>
+                    <span className="truncate text-xs text-(--text-muted)">
+                      {account.owner} · {ACCOUNT_TYPE_LABELS[account.type] ?? account.type}
                     </span>
-                    <CategoryBadge
-                      name={row.category_name ?? ""}
-                      color={colorMap.get(row.category_name ?? "")}
+                  </div>
+                  <span
+                    className="shrink-0 text-sm font-semibold tabular-nums"
+                    style={{ color: account.balance < 0 ? OUT : "var(--text-primary)" }}
+                  >
+                    <Signed cents={account.balance} currency={currency} />
+                  </span>
+                </div>
+              ))
+            )}
+            {accounts.length > MAX_DASHBOARD_ACCOUNTS ? (
+              <div className="mt-2">
+                <SectionLink href="/contas">Ver as {accounts.length} contas</SectionLink>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-5">
+          <CardContent className="flex h-full flex-col">
+            <div className="mb-3.5 flex items-center justify-between gap-2">
+              <h2 className="text-card-title">Próximos vencimentos</h2>
+              <SectionLink href="/a-pagar">Ver tudo</SectionLink>
+            </div>
+            <div className="mb-2 grid grid-cols-3 gap-2">
+              <div className="rounded-[14px] bg-(--expense-soft) px-3 py-2.5">
+                <div className="text-xs font-semibold text-(--expense-dark)">Atrasadas</div>
+                <div className="mt-0.5 text-[15px] font-bold tabular-nums text-(--expense-dark) md:text-[17px]">
+                  <Money cents={overdueOut} currency={currency} />
+                </div>
+              </div>
+              <div className="rounded-[14px] bg-(--primary-soft) px-3 py-2.5">
+                <div className="text-xs font-semibold text-(--primary-hover)">Esta semana</div>
+                <div className="mt-0.5 text-[15px] font-bold tabular-nums text-(--primary-hover) md:text-[17px]">
+                  <Money cents={weekOut} currency={currency} />
+                </div>
+              </div>
+              <div className="rounded-[14px] bg-(--income-soft) px-3 py-2.5">
+                <div className="text-xs font-semibold text-(--income-dark)">A receber</div>
+                <div className="mt-0.5 text-[15px] font-bold tabular-nums text-(--income-dark) md:text-[17px]">
+                  <Money cents={toReceive} currency={currency} />
+                </div>
+              </div>
+            </div>
+            {upcoming.length === 0 ? (
+              <p className="py-3 text-sm text-(--text-muted)">
+                Nada vencendo nos próximos {CASH_FLOW_PREVIEW_DAYS} dias.
+              </p>
+            ) : (
+              upcoming.map((row) => {
+                const { day, month: mon } = dayAndMonth(row.date);
+                return (
+                  <div key={row.id} className="flex min-h-[58px] items-center gap-3">
+                    <div className="w-11 shrink-0 text-center">
+                      <div className="text-[17px] leading-none font-extrabold">{day}</div>
+                      <div className="text-[11px] font-semibold text-(--text-light)">{mon}</div>
+                    </div>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">{row.description}</span>
+                    <Amount cents={row.amount_cents} direction={row.direction} currency={currency} />
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardContent className="flex h-full flex-col">
+            <h2 className="text-card-title">Para onde foi</h2>
+            {totalsScopeLabel ? <p className="text-xs text-(--text-muted)">{totalsScopeLabel}</p> : null}
+            <div className="mt-4 flex flex-col gap-3.5">
+              {where.length === 0 && uncategorized === 0 ? (
+                <p className="text-sm text-(--text-muted)">Nenhuma despesa confirmada neste mês.</p>
+              ) : null}
+              {where.map((slice, i) => (
+                <div key={slice.name}>
+                  <div className="flex justify-between gap-2 text-[13px]">
+                    <span className="truncate">{slice.name}</span>
+                    <span className="font-semibold tabular-nums">
+                      <Money cents={slice.amount_cents} currency={currency} />
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-(--bg-subtle)">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(4, (slice.amount_cents / whereMax) * 100)}%`,
+                        background: WHERE_COLORS[i % WHERE_COLORS.length],
+                      }}
                     />
-                    <span
-                      className="ml-auto text-right font-semibold tabular-nums"
-                      style={{
-                        color:
-                          row.direction === "out"
-                            ? "var(--table-amount-out)"
-                            : "var(--table-amount-in)",
-                      }}
-                    >
-                      {row.direction === "out" ? "-" : "+"}
-                      <Money cents={row.amount_cents} currency={currency} />
-                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-            <Link
-              href="/transacoes"
-              className="mt-3 flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
-            >
-              Ver todas <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-card-title">A vencer</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {pendingPreview.length === 0 ? (
-              <p className="text-sm text-(--text-muted)">Nenhuma pendência.</p>
-            ) : (
-              <div className="flex flex-col">
-                {pendingPreview.map((row) => (
-                  <div
-                    key={row.id}
-                    className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
+                </div>
+              ))}
+              {uncategorized > 0 ? (
+                <div className="rounded-xl bg-(--bg-subtle) px-3 py-2.5 text-xs leading-relaxed text-(--text-muted)">
+                  <Money cents={uncategorized} currency={currency} /> sem categoria.{" "}
+                  <Link
+                    href={`/transacoes?month=${selected}&category=none`}
+                    className="font-semibold text-(--primary) hover:text-(--primary-hover)"
                   >
-                    <span className="text-table-body flex-1 truncate text-(--text-primary)">
-                      {row.description}
-                    </span>
-                    <span className="text-metadata shrink-0 whitespace-nowrap">{shortDate(row.date)}</span>
-                    <span
-                      className="ml-auto shrink-0 text-right font-semibold tabular-nums"
-                      style={{
-                        color:
-                          row.direction === "out"
-                            ? "var(--table-amount-out)"
-                            : "var(--table-amount-in)",
-                      }}
-                    >
-                      {row.direction === "out" ? "-" : "+"}
-                      <Money cents={row.amount_cents} currency={currency} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Link
-              href="/a-pagar"
-              className="mt-3 flex items-center gap-1 text-xs text-(--text-muted) hover:text-(--text-primary)"
-            >
-              Ver todas <ArrowRight className="h-3 w-3" />
-            </Link>
+                    Categorizar
+                  </Link>
+                </div>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
 
-        <ForecastCard
-          entradaRealizado={entrou}
-          entradaPrevisto={entrouPrevisto}
-          saidaRealizado={saiu}
-          saidaPrevisto={saiuPrevisto}
-          saldoRealizado={sobrou}
-          saldoPrevisto={sobrouPrevisto}
-          currency={currency}
-        />
-      </div>
+        <Card className="lg:col-span-7">
+          <CardContent className="flex h-full flex-col">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <h2 className="text-card-title">Últimos lançamentos</h2>
+              <SectionLink href={`/transacoes?month=${selected}`}>Ver todos</SectionLink>
+            </div>
+            {recent.length === 0 ? (
+              <p className="text-sm text-(--text-muted)">Nenhum lançamento neste mês.</p>
+            ) : (
+              recent.map((row) => {
+                const Icon = getCategoryIcon(
+                  row.category_name,
+                  row.direction,
+                  row.category_name ? (iconMap.get(row.category_name) ?? null) : null,
+                );
+                const colors = row.category_name
+                  ? (colorMap.get(row.category_name) ?? MUTED_CATEGORY_COLOR)
+                  : MUTED_CATEGORY_COLOR;
+                return (
+                  <div key={row.id} className="flex min-h-[60px] items-center gap-3">
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                      style={{ background: colors.bg, color: colors.fg }}
+                    >
+                      <Icon className="h-[18px] w-[18px]" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-semibold">{row.description}</span>
+                      <span className="truncate text-xs text-(--text-muted)">
+                        {shortDate(row.date)} · {row.category_name ?? "Sem categoria"}
+                      </span>
+                    </div>
+                    <Amount cents={row.amount_cents} direction={row.direction} currency={currency} />
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-card-title">Entradas vs saídas</CardTitle>
-          <p className="text-xs text-(--text-muted)">Últimos {TREND_MONTHS} meses</p>
-        </CardHeader>
-        <CardContent>
-          <TrendBarChart points={trendPoints} compact currency={currency} />
-        </CardContent>
-      </Card>
+        <Card className="lg:col-span-5">
+          <CardContent className="flex h-full flex-col">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-card-title">Entradas e saídas</h2>
+              <span className="text-xs text-(--text-muted)">{TREND_MONTHS} meses</span>
+            </div>
+            <TrendBarChart points={trendPoints} compact currency={currency} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

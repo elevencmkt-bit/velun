@@ -33,8 +33,8 @@ const KPI_TONES = {
 function CardSurface({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`rounded-2xl border ${className}`}
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+      className={`rounded-[20px] ${className}`}
+      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
     >
       {children}
     </div>

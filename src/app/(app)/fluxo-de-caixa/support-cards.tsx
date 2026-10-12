@@ -23,8 +23,8 @@ export function UpcomingEventsCard({
 
   return (
     <article
-      className="flex min-h-[230px] flex-col rounded-2xl border p-5"
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+      className="flex min-h-[230px] flex-col rounded-[20px] p-5"
+      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
@@ -136,8 +136,8 @@ export function ImpactsCard({
 
   return (
     <article
-      className="flex min-h-[230px] flex-col rounded-2xl border p-5"
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+      className="flex min-h-[230px] flex-col rounded-[20px] p-5"
+      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
     >
       <div className="mb-1 flex items-center gap-2.5">
         <div
@@ -191,8 +191,8 @@ export function ImpactsCard({
 export function InsightCard({ insight }: { insight: CashFlowInsight }) {
   return (
     <article
-      className="flex min-h-[230px] flex-col rounded-2xl border p-5"
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 6px 20px rgba(20,28,60,.04)" }}
+      className="flex min-h-[230px] flex-col rounded-[20px] p-5"
+      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
     >
       <div className="mb-3 flex items-center gap-2.5">
         <div
