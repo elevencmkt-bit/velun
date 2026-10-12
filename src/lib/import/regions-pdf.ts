@@ -1,6 +1,8 @@
 
 // Parser do extrato mensal da Regions Bank (LifeGreen eAccess).
 //
+// Puro: entra texto, sai estrutura. Nenhuma dependência de PDF aqui.
+//
 // Três armadilhas do formato, todas tratadas aqui:
 //
 // 1. As linhas trazem só MM/DD. O ano vem do período no cabeçalho
@@ -107,34 +109,15 @@ function extractMcc(description: string): string | null {
   return null;
 }
 
-async function extractText(data: Uint8Array): Promise<string> {
-  // Import dinâmico, e não no topo do arquivo, por dois motivos: mantém
-  // o pdf-parse fora de qualquer caminho de render que não importe
-  // extrato, e deixa uma falha de carregamento do pacote virar mensagem
-  // legível em vez de erro opaco de servidor.
-  let PDFParse: typeof import("pdf-parse").PDFParse;
-  try {
-    ({ PDFParse } = await import("pdf-parse"));
-  } catch {
-    throw new StatementParseError(
-      "Não consegui carregar o leitor de PDF no servidor. Isso é um problema de configuração, não do seu arquivo.",
-    );
-  }
-
-  const parser = new PDFParse({ data });
-  try {
-    return (await parser.getText()).text;
-  } catch {
-    throw new StatementParseError(
-      "Não consegui ler esse PDF. Ele pode estar protegido por senha ou ser um documento escaneado.",
-    );
-  } finally {
-    await parser.destroy();
-  }
-}
-
-export async function parseRegionsStatement(data: Uint8Array): Promise<ParsedStatement> {
-  const text = await extractText(data);
+/**
+ * Converte o texto já extraído de um extrato da Regions em lançamentos.
+ *
+ * Recebe TEXTO, não bytes: a extração do PDF acontece no navegador
+ * (src/lib/import/extract-pdf-text.ts). Dois motivos — o leitor de PDF
+ * não sobrevive ao empacotamento serverless, e assim o arquivo nunca
+ * sai da máquina de quem importa.
+ */
+export function parseRegionsStatementText(text: string): ParsedStatement {
 
   const lines = text.split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
 

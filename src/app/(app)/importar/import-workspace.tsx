@@ -10,6 +10,7 @@ import {
   setStagedCategory,
   toggleStagedRow,
 } from "@/lib/actions/imports";
+import { extractPdfText } from "@/lib/import/extract-pdf-text";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -83,10 +84,30 @@ export function ImportWorkspace({
   function onUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const accountId = String(formData.get("account_id") ?? "");
+    const file = formData.get("file");
+
     setError(null);
+
+    if (!accountId) return setError("Escolha a conta do extrato.");
+    if (!(file instanceof File) || file.size === 0) return setError("Escolha um arquivo.");
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      return setError("Por enquanto só extrato em PDF da Regions.");
+    }
+
     startTransition(async () => {
+      // O PDF é lido aqui, no navegador. Pro servidor vai só o texto
+      // extraído — o arquivo não sai da máquina.
+      let text: string;
       try {
-        const result = await importStatement(formData);
+        text = await extractPdfText(file);
+      } catch {
+        setError("Não consegui abrir esse PDF. Ele pode estar protegido por senha.");
+        return;
+      }
+
+      try {
+        const result = await importStatement({ accountId, fileName: file.name, text });
         // Falha prevista volta como resultado, não como exceção — a
         // mensagem aqui é a real, não um código do React.
         if (!result.ok) {
@@ -113,7 +134,8 @@ export function ImportWorkspace({
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Importar</h1>
           <p className="text-page-subtitle">
-            Extrato da Regions em PDF. Os lançamentos passam por revisão antes de entrar.
+            Extrato da Regions em PDF. O arquivo é lido aqui no navegador e não sai da sua
+            máquina. Os lançamentos passam por revisão antes de entrar.
           </p>
         </div>
 
