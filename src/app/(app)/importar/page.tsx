@@ -21,7 +21,7 @@ export default async function ImportarPage() {
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, owner_id")
+      .select("id, name, owner_id, type, institution")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .or(`owner_id.is.null,owner_id.eq.${memberId}`)
@@ -47,7 +47,7 @@ export default async function ImportarPage() {
     supabase
       .from("imports")
       .select(
-        "id, file_path, statement_start, statement_end, created_at, account:accounts(name)",
+        "id, file_path, statement_start, statement_end, created_at, account:accounts(name, type, institution)",
       )
       .eq("household_id", householdId)
       .eq("status", "confirmed")
@@ -142,6 +142,8 @@ export default async function ImportarPage() {
         id: a.id as string,
         name: a.name as string,
         isPersonal: a.owner_id !== null,
+        type: a.type as string,
+        institution: (a.institution as string | null) ?? null,
       }))}
       categories={(categories ?? []).map((c) => ({
         id: c.id as string,
@@ -221,14 +223,15 @@ export default async function ImportarPage() {
           direction: f.direction as "in" | "out",
         }))}
       history={(history ?? []).map((h) => {
-        const account = h.account as
-          { name: string } | { name: string }[] | null;
+        type Acc = { name: string; type: string; institution: string | null };
+        const raw = h.account as Acc | Acc[] | null;
+        const account = Array.isArray(raw) ? (raw[0] ?? null) : raw;
         return {
           id: h.id as string,
           fileName: h.file_path as string,
-          accountName: Array.isArray(account)
-            ? (account[0]?.name ?? "—")
-            : (account?.name ?? "—"),
+          accountName: account?.name ?? "—",
+          accountType: account?.type ?? "checking",
+          accountInstitution: account?.institution ?? null,
           periodStart: h.statement_start as string,
           periodEnd: h.statement_end as string,
           transactionCount: countByImport.get(h.id as string) ?? 0,
