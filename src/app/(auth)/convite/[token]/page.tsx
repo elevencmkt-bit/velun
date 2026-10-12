@@ -19,7 +19,7 @@ export default async function ConvitePage({
 
   const { data: invite } = await admin
     .from("household_invites")
-    .select("id, expires_at, accepted_at, created_by")
+    .select("id, expires_at, accepted_at, created_by, email")
     .eq("token", token)
     .maybeSingle();
 
@@ -69,7 +69,17 @@ export default async function ConvitePage({
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" required autoComplete="email" />
+                {/* Convite feito pra um email: ele já vem preenchido e travado —
+                    só esse email consegue usar o link. */}
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  defaultValue={invite?.email ?? undefined}
+                  readOnly={Boolean(invite?.email)}
+                />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="password">Senha</Label>
