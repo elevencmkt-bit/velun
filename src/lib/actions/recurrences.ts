@@ -99,3 +99,39 @@ export async function deactivateRecurrence(recurrenceId: string) {
   revalidatePath("/a-pagar");
   revalidatePath("/transacoes");
 }
+
+export type MoveRecurrenceResult = { ok: true; moved: number } | { ok: false; error: string };
+
+/**
+ * Move a recorrência e as ocorrências PREVISTAS pra outra conta. O que
+ * já foi confirmado fica onde aconteceu. Tudo numa transação no banco
+ * (migração 0017), que também decide quem pode: só quem mexe nas duas
+ * contas — ninguém empurra despesa pra conta pessoal do outro.
+ *
+ * Devolve o erro em vez de lançar: o Next esconde a mensagem de exceção
+ * em produção, e "você não pode mover pra essa conta" precisa chegar à
+ * tela como está.
+ */
+export async function moveRecurrence(
+  recurrenceId: string,
+  accountId: string,
+): Promise<MoveRecurrenceResult> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("move_recurrence", {
+      p_recurrence_id: recurrenceId,
+      p_account_id: accountId,
+    });
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/a-pagar");
+    revalidatePath("/transacoes");
+    revalidatePath("/mes");
+    revalidatePath("/fluxo-de-caixa");
+    revalidatePath("/contas");
+
+    return { ok: true, moved: (data as { moved: number }).moved };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Algo deu errado." };
+  }
+}

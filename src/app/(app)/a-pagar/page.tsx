@@ -45,7 +45,7 @@ export default async function AVencerPage() {
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, owner_id")
+      .select("id, name, owner_id, is_archived")
       .eq("household_id", householdId)
       .in("id", visibleIds)
       .order("name"),
@@ -79,10 +79,17 @@ export default async function AVencerPage() {
   // Onde quem está vendo pode mexer: conta do casal e as próprias. É
   // também a lista de contas do formulário de recorrência — o banco
   // recusaria criar recorrência na conta pessoal do outro.
-  const writable = (accounts ?? []).filter(
-    (a) => a.owner_id === null || a.owner_id === memberId,
+  const mine = (accounts ?? []).filter((a) => a.owner_id === null || a.owner_id === memberId);
+  const writableIds = new Set(mine.map((a) => a.id as string));
+  // Destino de recorrência nova ou movida: só conta ativa.
+  const writable = mine.filter((a) => !a.is_archived);
+  const accountNames = new Map(
+    (accounts ?? []).map((a) => [a.id as string, a.name as string]),
   );
-  const writableIds = new Set(writable.map((a) => a.id as string));
+  const moveTargets = writable.map((a) => ({
+    id: a.id as string,
+    name: a.name as string,
+  }));
 
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
@@ -124,6 +131,8 @@ export default async function AVencerPage() {
         direction: template.direction,
         frequency: row.frequency,
         day_of_month: row.day_of_month,
+        account_id: template.account_id,
+        account_name: accountNames.get(template.account_id) ?? "—",
         can_edit: writableIds.has(template.account_id),
       };
     });
@@ -204,6 +213,7 @@ export default async function AVencerPage() {
             </CardHeader>
             <CardContent>
               <RecurrencesList
+                accounts={moveTargets}
                 rows={recurrencesIn}
                 currency={currency}
                 emptyMessage="Nenhuma entrada recorrente cadastrada."
@@ -218,6 +228,7 @@ export default async function AVencerPage() {
             </CardHeader>
             <CardContent>
               <RecurrencesList
+                accounts={moveTargets}
                 rows={recurrencesOut}
                 currency={currency}
                 emptyMessage="Nenhuma saída recorrente cadastrada."
