@@ -42,7 +42,7 @@ function Preview() {
           src="/velun-mark.png"
           alt=""
           aria-hidden
-          className="object-contain absolute -top-8 -right-12 h-[200px] w-[220px] opacity-30"
+          className="object-contain absolute -top-[45px] -right-[78px] h-[210px] w-[300px] opacity-[0.14]"
         />
         <div className="relative text-[13px] font-semibold">
           Cartão do casal

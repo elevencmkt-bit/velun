@@ -32,8 +32,8 @@ export function CardArt({
         src="/velun-mark.png"
         alt=""
         aria-hidden
-        className="object-contain pointer-events-none absolute -top-8 -right-12 h-[230px] w-[250px]"
-        style={{ opacity: color === "ink" ? 0.28 : 0.2 }}
+        className={`object-contain pointer-events-none absolute ${small ? "-top-[45px] -right-[78px] h-[210px] w-[300px]" : "-top-[55px] -right-[95px] h-[260px] w-[372px]"}`}
+        style={{ opacity: color === "ink" ? 0.14 : 0.12 }}
       />
       <div className="relative flex items-start justify-between gap-2">
         <span className="truncate text-[14px] font-semibold">{name}</span>
