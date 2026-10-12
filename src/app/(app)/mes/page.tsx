@@ -17,7 +17,8 @@ import { fetchMonthTransactions } from "@/lib/month-transactions";
 import { accountScope, scopeLabel, type AccountScope } from "@/lib/visibility";
 import { excludeTransfers, groupExpensesByCategory, sumByDirection } from "@/lib/reports";
 import { getAccountBalances } from "@/lib/balances";
-import { ACCOUNT_TYPE_ICONS, ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
+import { ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
+import { AccountAvatar } from "@/components/account-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge } from "@/components/category-badge";
 import { MonthSelector } from "@/components/month-selector";
@@ -32,11 +33,12 @@ const TREND_MONTHS = 6;
 const RECENT_TRANSACTIONS_LIMIT = 6;
 const PENDING_PREVIEW_LIMIT = 4;
 
+// "21 set" — curto o bastante pra nunca quebrar em duas linhas.
 function shortDate(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-  });
+  return new Date(`${date}T00:00:00`)
+    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+    .replace(" de ", " ")
+    .replace(".", "");
 }
 
 type PendingPreviewRow = {
@@ -185,7 +187,7 @@ export default async function MesPage({
       getAccountBalances(supabase, householdId, balanceScope),
       supabase
         .from("accounts")
-        .select("id, name, type, owner_id")
+        .select("id, name, type, owner_id, institution")
         .eq("household_id", householdId)
         .eq("is_archived", false)
         .in("id", balanceScope.ids.length > 0 ? balanceScope.ids : ["00000000-0000-0000-0000-000000000000"])
@@ -215,6 +217,7 @@ export default async function MesPage({
     id: a.id as string,
     name: a.name as string,
     type: a.type as string,
+    institution: (a.institution as string | null) ?? null,
     owner:
       a.owner_id === null
         ? "Do casal"
@@ -342,18 +345,12 @@ export default async function MesPage({
             ) : (
               <div className="flex flex-col">
                 {dashboardAccounts.slice(0, MAX_DASHBOARD_ACCOUNTS).map((account) => {
-                  const Icon = ACCOUNT_TYPE_ICONS[account.type] ?? Wallet;
                   return (
                     <div
                       key={account.id}
                       className="flex min-h-[56px] items-center gap-3 border-b border-(--border-soft) last:border-0"
                     >
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                        style={{ backgroundColor: "var(--badge-purple-bg)" }}
-                      >
-                        <Icon className="h-4 w-4" style={{ color: "var(--badge-purple-fg)" }} />
-                      </div>
+                      <AccountAvatar institution={account.institution} type={account.type} />
                       <div className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate text-sm font-medium text-(--text-primary)">{account.name}</span>
                         <span className="truncate text-xs text-(--text-muted)">
@@ -438,7 +435,7 @@ export default async function MesPage({
                     key={row.id}
                     className="flex min-h-[50px] items-center gap-3 border-b border-(--border-soft) px-1 transition-colors last:border-0 hover:bg-[#F9FAFB]"
                   >
-                    <span className="text-metadata w-14 shrink-0">{shortDate(row.date)}</span>
+                    <span className="text-metadata w-12 shrink-0 whitespace-nowrap">{shortDate(row.date)}</span>
                     <span className="text-table-body w-40 flex-1 truncate text-(--text-primary)">
                       {row.description}
                     </span>
@@ -488,7 +485,7 @@ export default async function MesPage({
                     <span className="text-table-body flex-1 truncate text-(--text-primary)">
                       {row.description}
                     </span>
-                    <span className="text-metadata shrink-0">{shortDate(row.date)}</span>
+                    <span className="text-metadata shrink-0 whitespace-nowrap">{shortDate(row.date)}</span>
                     <span
                       className="ml-auto shrink-0 text-right font-semibold tabular-nums"
                       style={{

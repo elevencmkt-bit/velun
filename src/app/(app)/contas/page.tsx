@@ -1,5 +1,6 @@
 import { Lock, Wallet } from "lucide-react";
-import { ACCOUNT_TYPE_ICONS, ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
+import { ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
+import { AccountAvatar } from "@/components/account-avatar";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { getAccountBalances } from "@/lib/balances";
@@ -76,7 +77,6 @@ export default async function ContasPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
             {accounts.map((account) => {
               const balance = balances.get(account.id) ?? 0;
-              const Icon = ACCOUNT_TYPE_ICONS[account.type] ?? Wallet;
               // Conta do casal ou minha: posso editar e arquivar. Conta
               // pessoal do outro: só olho o que ele escolheu mostrar.
               const isPersonal = account.owner_id !== null;
@@ -92,12 +92,7 @@ export default async function ContasPage() {
                 >
                   <CardContent className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <div
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl"
-                        style={{ backgroundColor: "var(--badge-purple-bg)" }}
-                      >
-                        <Icon className="h-5 w-5 sm:h-8 sm:w-8" style={{ color: "var(--badge-purple-fg)" }} />
-                      </div>
+                      <AccountAvatar institution={account.institution} type={account.type} size={44} />
                       {canManage ? (
                         <div className="flex items-center gap-1">
                           <AccountForm

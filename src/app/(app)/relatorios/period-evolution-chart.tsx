@@ -1,10 +1,11 @@
 "use client";
 
-import { useId } from "react";
 import {
-  Area,
-  AreaChart,
+  Bar,
   CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,13 +15,25 @@ import { formatCents, type CurrencyCode } from "@/lib/money";
 import type { DailyReportPoint } from "@/lib/reports";
 import { Money } from "@/components/money";
 
+type ChartPoint = DailyReportPoint & { cumulative_cents: number };
+
+function withCumulative(points: DailyReportPoint[]): ChartPoint[] {
+  const out: ChartPoint[] = [];
+  let running = 0;
+  for (const p of points) {
+    running += p.net_cents;
+    out.push({ ...p, cumulative_cents: running });
+  }
+  return out;
+}
+
 function ChartTooltip({
   active,
   payload,
   currency,
 }: {
   active?: boolean;
-  payload?: { payload: DailyReportPoint }[];
+  payload?: { payload: ChartPoint }[];
   currency: CurrencyCode;
 }) {
   if (!active || !payload?.length) return null;
@@ -50,9 +63,9 @@ function ChartTooltip({
           </span>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-(--text-secondary)">Saldo</span>
+          <span className="text-(--text-secondary)">Acumulado no mês</span>
           <span className="font-semibold tabular-nums" style={{ color: "#3B82F6" }}>
-            <Money cents={point.net_cents} currency={currency} />
+            <Money cents={point.cumulative_cents} currency={currency} />
           </span>
         </div>
       </div>
@@ -60,6 +73,10 @@ function ChartTooltip({
   );
 }
 
+// Barras pra receitas e despesas de cada dia, e uma linha em degraus pro
+// saldo acumulado no mês. Antes eram três curvas suavizadas: entre um dia
+// com gasto e um dia vazio a curva "afundava" abaixo de zero — um valor
+// que nunca existiu. Barra e degrau só desenham o que aconteceu.
 export function PeriodEvolutionChart({
   points,
   currency,
@@ -67,32 +84,17 @@ export function PeriodEvolutionChart({
   points: DailyReportPoint[];
   currency: CurrencyCode;
 }) {
-  const incomeGradientId = useId();
-  const expenseGradientId = useId();
-  const netGradientId = useId();
+  const data = withCumulative(points);
 
   return (
     <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <defs>
-            <linearGradient id={incomeGradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#22C55E" stopOpacity={0.16} />
-              <stop offset="100%" stopColor="#22C55E" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id={expenseGradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#F04469" stopOpacity={0.14} />
-              <stop offset="100%" stopColor="#F04469" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id={netGradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.12} />
-              <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={1} barCategoryGap="20%">
           <CartesianGrid stroke="#EEF1F5" vertical={false} />
           <XAxis
             dataKey="label"
-            interval={1}
+            interval="preserveStartEnd"
+            minTickGap={8}
             tick={{ fontSize: 11, fill: "var(--text-muted)" }}
             axisLine={{ stroke: "#E8ECF4" }}
             tickLine={false}
@@ -104,38 +106,20 @@ export function PeriodEvolutionChart({
             tickLine={false}
             width={72}
           />
-          <Tooltip content={<ChartTooltip currency={currency} />} />
-          <Area
-            type="monotone"
-            dataKey="income_cents"
-            stroke="#22C55E"
-            strokeWidth={2}
-            fill={`url(#${incomeGradientId})`}
-            dot={false}
-            activeDot={{ r: 3.5 }}
-            isAnimationActive={false}
-          />
-          <Area
-            type="monotone"
-            dataKey="expense_cents"
-            stroke="#F04469"
-            strokeWidth={2}
-            fill={`url(#${expenseGradientId})`}
-            dot={false}
-            activeDot={{ r: 3.5 }}
-            isAnimationActive={false}
-          />
-          <Area
-            type="monotone"
-            dataKey="net_cents"
+          <ReferenceLine y={0} stroke="#D5DAE3" />
+          <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ fill: "rgba(83,109,254,0.06)" }} />
+          <Bar dataKey="income_cents" fill="#22C55E" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
+          <Bar dataKey="expense_cents" fill="#F04469" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
+          <Line
+            type="stepAfter"
+            dataKey="cumulative_cents"
             stroke="#3B82F6"
             strokeWidth={2}
-            fill={`url(#${netGradientId})`}
             dot={false}
             activeDot={{ r: 3.5 }}
             isAnimationActive={false}
           />
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
