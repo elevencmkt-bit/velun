@@ -63,7 +63,7 @@ export function TransactionFilters({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="relative min-w-0 flex-1 lg:w-[230px] lg:flex-none">
+      <div className="relative min-w-0 flex-1 xl:w-[220px] xl:flex-none">
         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-(--text-muted)" />
         <Input
           placeholder="Buscar…"
@@ -95,7 +95,7 @@ export function TransactionFilters({
           defaultValue={searchParams.get("category") ?? ALL}
           onValueChange={(v) => setParam("category", v)}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-52">
             <Tag className="h-3.5 w-3.5 text-(--text-muted) " />
             <SelectValue placeholder="Todas as categorias" />
           </SelectTrigger>

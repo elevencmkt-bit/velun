@@ -325,7 +325,7 @@ export function TransactionsTable({
                         }}
                       >
                         <SelectTrigger
-                          className="h-7 w-fit max-w-full gap-1 rounded-full border-transparent px-2.5 text-[12px] font-semibold shadow-none hover:border-current [&>svg]:opacity-50"
+                          className="h-7! w-fit max-w-full gap-1 rounded-full py-0 border-transparent px-2.5 text-[12px] font-semibold shadow-none hover:border-current [&>svg]:opacity-50"
                           style={{
                             color: catColor,
                             backgroundColor: `color-mix(in srgb, ${catColor} 11%, transparent)`,
