@@ -157,7 +157,7 @@ export default async function ImportarPage() {
               fileName: openImport.file_path as string,
               periodStart: openImport.statement_start as string,
               periodEnd: openImport.statement_end as string,
-              balanceMatches: openImport.balance_matches as boolean,
+              balanceMatches: (openImport.balance_matches as boolean | null) ?? null,
             }
           : null
       }

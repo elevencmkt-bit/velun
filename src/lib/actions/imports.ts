@@ -21,6 +21,7 @@ import {
   verifyCardStatement,
 } from "@/lib/import/nubank-pdf";
 import { verifyStatement } from "@/lib/import/verify";
+import { looksLikeNomad, parseNomadStatementText } from "@/lib/import/nomad-pdf";
 import { suggestCategoryId } from "@/lib/import/mcc";
 import {
   matchForecast,
@@ -41,7 +42,8 @@ export type ImportResult =
   | {
       ok: true;
       importId: string;
-      matches: boolean;
+      /** null: o documento não traz como conferir (Nomad). */
+      matches: boolean | null;
       count: number;
       duplicates: number;
       message: string | null;
@@ -172,8 +174,10 @@ async function runImportStatement(input: {
 
   let statement: ParsedStatement;
   let cardDaysNote: string | null = null;
+  let nomadNote: string | null = null;
+  // `matches` null: o documento não traz como conferir (Nomad).
   let verification: {
-    matches: boolean;
+    matches: boolean | null;
     extractedSumCents: number;
     firstDivergence?: { date: string } | null;
   };
@@ -212,8 +216,38 @@ async function runImportStatement(input: {
             "Esse PDF é fatura de cartão. Escolha o cartão como conta pra importar.",
         };
       }
-      statement = parseRegionsStatementText(text);
-      verification = verifyStatement(statement);
+      if (looksLikeNomad(text)) {
+        const nomad = parseNomadStatementText(text);
+        statement = nomad;
+        verification = {
+          matches: null,
+          extractedSumCents: nomad.transactions.reduce(
+            (n, t) => n + (t.direction === "in" ? t.amountCents : -t.amountCents),
+            0,
+          ),
+        };
+        const parts: string[] = [];
+        if (nomad.cancelledCount > 0) {
+          parts.push(
+            nomad.cancelledCount === 1
+              ? "1 compra cancelada ficou de fora."
+              : `${nomad.cancelledCount} compras canceladas ficaram de fora.`,
+          );
+        }
+        if (nomad.reportedBalance) {
+          const [y, m, d] = nomad.reportedBalance.date.split("-");
+          const amount = (nomad.reportedBalance.cents / 100).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+          });
+          parts.push(
+            `A Nomad informa saldo de US$ ${amount} em ${d}/${m}/${y}. Depois de importar até essa data, compare com o saldo da conta no Velun.`,
+          );
+        }
+        nomadNote = parts.join(" ") || null;
+      } else {
+        statement = parseRegionsStatementText(text);
+        verification = verifyStatement(statement);
+      }
     }
   } catch (err) {
     if (err instanceof StatementParseError)
@@ -499,7 +533,7 @@ async function runImportStatement(input: {
   const duplicates = rows.filter((r) => r.dup_status === "duplicate").length;
 
   let message: string | null = null;
-  if (!verification.matches) {
+  if (verification.matches === false) {
     message = isCard
       ? "A soma dos lançamentos não fecha com o total da fatura. Revise antes de confirmar."
       : verification.firstDivergence
@@ -509,6 +543,7 @@ async function runImportStatement(input: {
 
   if (cardDaysNote)
     message = message ? `${message} ${cardDaysNote}` : cardDaysNote;
+  if (nomadNote) message = message ? `${message} ${nomadNote}` : nomadNote;
 
   revalidatePath("/importar");
   revalidatePath("/cartoes");

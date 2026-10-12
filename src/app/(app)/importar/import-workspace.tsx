@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   CreditCard,
   FileText,
+  Info,
   Link2,
   Lock,
   Link2Off,
@@ -51,7 +52,8 @@ type OpenImport = {
   fileName: string;
   periodStart: string;
   periodEnd: string;
-  balanceMatches: boolean;
+  /** null: o extrato não traz saldo pra conferir (Nomad). */
+  balanceMatches: boolean | null;
 };
 type HistoryEntry = {
   id: string;
@@ -306,7 +308,7 @@ export function ImportWorkspace({
     setError(null);
     if (!f.name.toLowerCase().endsWith(".pdf")) {
       setFile(null);
-      setError("Por enquanto só PDF: extrato da Regions ou fatura do Nubank.");
+      setError("Por enquanto só PDF: extrato da Regions ou da Nomad, ou fatura do Nubank.");
       return;
     }
     setFile(f);
@@ -475,7 +477,7 @@ export function ImportWorkspace({
                       <span className="max-md:hidden">
                         ou <span className="font-semibold text-(--primary)">clique pra escolher</span> · só PDF
                       </span>
-                      <span className="md:hidden">Regions ou Nubank, em PDF</span>
+                      <span className="md:hidden">Regions, Nomad ou Nubank, em PDF</span>
                     </span>
                   </span>
                 )}
@@ -484,6 +486,9 @@ export function ImportWorkspace({
                 <span className="text-xs text-(--text-light)">O Velun lê:</span>
                 <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
                   Extrato Regions
+                </span>
+                <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
+                  Extrato Nomad
                 </span>
                 <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
                   Fatura Nubank
@@ -643,7 +648,9 @@ export function ImportWorkspace({
           automática confiável de aposta. Fica em cima, antes da grade. */}
       <Card>
         <CardContent className="flex items-start gap-3">
-          {openImport.balanceMatches ? (
+          {openImport.balanceMatches === null ? (
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-(--primary)" />
+          ) : openImport.balanceMatches ? (
             <CheckCircle2
               className="mt-0.5 h-5 w-5 shrink-0"
               style={{ color: "var(--income)" }}
@@ -656,14 +663,18 @@ export function ImportWorkspace({
           )}
           <div className="flex flex-col gap-0.5">
             <span className="text-card-title">
-              {openImport.balanceMatches
-                ? "O saldo bate com o extrato"
-                : "O saldo não bate com o extrato"}
+              {openImport.balanceMatches === null
+                ? "Esse extrato não traz saldo pra conferir"
+                : openImport.balanceMatches
+                  ? "O saldo bate com o extrato"
+                  : "O saldo não bate com o extrato"}
             </span>
             <span className="text-sm text-(--text-muted)">
-              {openImport.balanceMatches
-                ? `${rows.length} lançamentos lidos, e o saldo reconstruído dia a dia fecha com o do banco.`
-                : "Revise os lançamentos antes de confirmar — pode haver linha faltando ou lida errado."}
+              {openImport.balanceMatches === null
+                ? `${rows.length} lançamentos lidos. O documento não informa saldo inicial e final do período, então a conferência fica pra depois: compare o saldo da conta no Velun com o do app do banco.`
+                : openImport.balanceMatches
+                  ? `${rows.length} lançamentos lidos, e o saldo reconstruído dia a dia fecha com o do banco.`
+                  : "Revise os lançamentos antes de confirmar — pode haver linha faltando ou lida errado."}
             </span>
           </div>
         </CardContent>
