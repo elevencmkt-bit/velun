@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // nela — oferecer na lista seria convidar um erro.
     supabase
       .from("accounts")
-      .select("id, name")
+      .select("id, name, type")
       .eq("household_id", member.householdId)
       .eq("is_archived", false)
       .or(`owner_id.is.null,owner_id.eq.${member.memberId}`)

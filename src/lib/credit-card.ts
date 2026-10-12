@@ -24,6 +24,8 @@ export type CardTransaction = {
   amount_cents: number;
   direction: "in" | "out";
   transfer_group_id: string | null;
+  /** Parcela de compra parcelada: já ocupa o limite antes da data dela. */
+  installment_group_id?: string | null;
 };
 
 export type StatementStatus = "open" | "closed" | "paid" | "overdue";
@@ -190,7 +192,8 @@ export function currentDebt(
 ): number {
   let debt = -settings.openingBalanceCents;
   for (const t of transactions) {
-    if (t.date > today) continue;
+    // Parcela futura já ocupa o limite: o banco bloqueia a compra inteira.
+    if (t.date > today && !t.installment_group_id) continue;
     debt += t.direction === "out" ? t.amount_cents : -t.amount_cents;
   }
   return Math.max(0, debt);

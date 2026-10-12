@@ -12,7 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { AccountOption, CategoryOption, MemberOption } from "./types";
 
 const ALL = "__all__";
@@ -49,7 +53,9 @@ export function TransactionFilters({
     router.push(`/transacoes?${params.toString()}`);
   }
 
-  const advancedCount = ADVANCED_KEYS.filter((key) => searchParams.get(key)).length;
+  const advancedCount = ADVANCED_KEYS.filter((key) =>
+    searchParams.get(key),
+  ).length;
 
   return (
     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -102,7 +108,12 @@ export function TransactionFilters({
 
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="icon" className="relative" aria-label="Mais filtros">
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative"
+            aria-label="Mais filtros"
+          >
             <SlidersHorizontal className="h-4 w-4" />
             {advancedCount > 0 ? (
               <span
@@ -116,7 +127,9 @@ export function TransactionFilters({
         </PopoverTrigger>
         <PopoverContent className="flex flex-col gap-3.5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-(--text-primary)">Mais filtros</span>
+            <span className="text-sm font-semibold text-(--text-primary)">
+              Mais filtros
+            </span>
             {advancedCount > 0 ? (
               <button
                 type="button"
@@ -129,7 +142,9 @@ export function TransactionFilters({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-(--text-secondary)">Quem lançou</span>
+            <span className="text-xs font-medium text-(--text-secondary)">
+              Quem lançou
+            </span>
             <Select
               defaultValue={searchParams.get("member") ?? ALL}
               onValueChange={(v) => setParam("member", v)}
@@ -149,7 +164,9 @@ export function TransactionFilters({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-(--text-secondary)">Origem</span>
+            <span className="text-xs font-medium text-(--text-secondary)">
+              Origem
+            </span>
             <Select
               defaultValue={searchParams.get("origin") ?? ALL}
               onValueChange={(v) => setParam("origin", v)}
@@ -166,7 +183,9 @@ export function TransactionFilters({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-(--text-secondary)">Entradas x saídas</span>
+            <span className="text-xs font-medium text-(--text-secondary)">
+              Entradas x saídas
+            </span>
             <Select
               defaultValue={searchParams.get("direction") ?? ALL}
               onValueChange={(v) => setParam("direction", v)}
@@ -183,7 +202,9 @@ export function TransactionFilters({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-(--text-secondary)">Período personalizado</span>
+            <span className="text-xs font-medium text-(--text-secondary)">
+              Período personalizado
+            </span>
             <div className="flex items-center gap-2">
               <Input
                 type="date"

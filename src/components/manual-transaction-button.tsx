@@ -26,7 +26,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NEW_TRANSACTION_EVENT } from "@/components/nav-items";
 
-type Account = { id: string; name: string };
+type Account = { id: string; name: string; type?: string };
 type Category = { id: string; name: string; kind: "income" | "expense" };
 type Mode = "in" | "out" | "transfer";
 
@@ -48,6 +48,12 @@ export function ManualTransactionButton({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [makeRecurring, setMakeRecurring] = useState(false);
+  // Conta escolhida: se for cartão, a compra pode ser parcelada.
+  const [accountId, setAccountId] = useState("");
+  const [installments, setInstallments] = useState("1");
+  const isCard =
+    accounts.find((a) => a.id === accountId)?.type === "credit_card";
+  const parcelado = mode === "out" && isCard && Number(installments) > 1;
   const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -59,8 +65,16 @@ export function ManualTransactionButton({
       const target = event.target as HTMLElement | null;
       const isTyping =
         target &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (event.key === "n" && !isTyping && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (
+        event.key === "n" &&
+        !isTyping &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
         event.preventDefault();
         setOpen(true);
       }
@@ -97,6 +111,8 @@ export function ManualTransactionButton({
         setSelectedCategoryId("");
         setMakeRecurring(false);
         setRecurrenceFrequency("monthly");
+        setAccountId("");
+        setInstallments("1");
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -114,12 +130,17 @@ export function ManualTransactionButton({
         formData.set("name", name);
         formData.set("kind", mode === "in" ? "income" : "expense");
         const id = await createCategory(formData);
-        setCategories((prev) => [...prev, { id, name, kind: mode === "in" ? "income" : "expense" }]);
+        setCategories((prev) => [
+          ...prev,
+          { id, name, kind: mode === "in" ? "income" : "expense" },
+        ]);
         setSelectedCategoryId(id);
         setNewCategoryName("");
         setNewCategoryOpen(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao criar categoria.");
+        setError(
+          err instanceof Error ? err.message : "Erro ao criar categoria.",
+        );
       }
     });
   }
@@ -133,7 +154,10 @@ export function ManualTransactionButton({
       }}
     >
       <DialogTrigger asChild>
-        <Button title="Atalho: n" className="h-11 rounded-[14px] px-4.5 text-[14px] font-semibold">
+        <Button
+          title="Atalho: n"
+          className="h-11 rounded-[14px] px-4.5 text-[14px] font-semibold"
+        >
           + Lançamento
         </Button>
       </DialogTrigger>
@@ -165,7 +189,13 @@ export function ManualTransactionButton({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="date">Data</Label>
-              <Input id="date" name="date" type="date" defaultValue={todayISO()} required />
+              <Input
+                id="date"
+                name="date"
+                type="date"
+                defaultValue={todayISO()}
+                required
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="amount">Valor (USD)</Label>
@@ -216,7 +246,12 @@ export function ManualTransactionButton({
           ) : (
             <div className="flex flex-col gap-2">
               <Label htmlFor="account_id">Conta</Label>
-              <Select name="account_id" required>
+              <Select
+                name="account_id"
+                required
+                value={accountId}
+                onValueChange={setAccountId}
+              >
                 <SelectTrigger id="account_id">
                   <SelectValue placeholder="Selecione a conta" />
                 </SelectTrigger>
@@ -264,7 +299,12 @@ export function ManualTransactionButton({
                       }
                     }}
                   />
-                  <Button type="button" size="sm" onClick={onCreateCategory} disabled={isPending}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={onCreateCategory}
+                    disabled={isPending}
+                  >
                     Criar
                   </Button>
                 </div>
@@ -295,20 +335,53 @@ export function ManualTransactionButton({
             <Input id="notes" name="notes" />
           </div>
 
-          {mode !== "transfer" ? (
+          {mode === "out" && isCard ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="installments">Parcelas</Label>
+              <Select
+                name="installments"
+                value={installments}
+                onValueChange={setInstallments}
+              >
+                <SelectTrigger id="installments">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">À vista</SelectItem>
+                  {Array.from({ length: 23 }, (_, i) => String(i + 2)).map(
+                    (n) => (
+                      <SelectItem key={n} value={n}>
+                        {n} vezes
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+              {parcelado ? (
+                <p className="text-xs text-(--text-muted)">
+                  O valor acima é o total. Cada parcela entra na fatura do seu
+                  mês.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {mode !== "transfer" && !parcelado ? (
             <label className="flex items-center gap-2 text-sm">
               <Checkbox name="is_pending" />
               Ainda não caiu (pendente)
             </label>
           ) : null}
 
-          {mode !== "transfer" ? (
+          {mode !== "transfer" && !parcelado ? (
             <div className="flex flex-col gap-3 rounded-md border border-(--border-soft) p-3">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   name="make_recurring"
                   checked={makeRecurring}
-                  onCheckedChange={(checked) => setMakeRecurring(checked === true)}
+                  onCheckedChange={(checked) =>
+                    setMakeRecurring(checked === true)
+                  }
                 />
                 Repetir esse lançamento
               </label>
@@ -332,8 +405,14 @@ export function ManualTransactionButton({
                     </Select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="recurrence_ends_on">Repetir até (opcional)</Label>
-                    <Input id="recurrence_ends_on" name="recurrence_ends_on" type="date" />
+                    <Label htmlFor="recurrence_ends_on">
+                      Repetir até (opcional)
+                    </Label>
+                    <Input
+                      id="recurrence_ends_on"
+                      name="recurrence_ends_on"
+                      type="date"
+                    />
                   </div>
                 </div>
               ) : null}

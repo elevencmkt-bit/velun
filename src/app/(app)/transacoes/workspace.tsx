@@ -9,7 +9,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MonthSelector } from "@/components/month-selector";
 import { TransactionFilters } from "./filters";
 import { TransactionsTable } from "./transactions-table";
-import type { AccountOption, CategoryOption, MemberOption, TransactionRow } from "./types";
+import type {
+  AccountOption,
+  CategoryOption,
+  MemberOption,
+  TransactionRow,
+} from "./types";
 
 export function TransactionsWorkspace({
   rows,
@@ -53,10 +58,16 @@ export function TransactionsWorkspace({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Transações</h1>
-          <p className="text-page-subtitle">Acompanhe e gerencie todos os seus lançamentos.</p>
+          <p className="text-page-subtitle">
+            Acompanhe e gerencie todos os seus lançamentos.
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <MonthSelector label={monthLabel} prevHref={prevHref} nextHref={nextHref} />
+          <MonthSelector
+            label={monthLabel}
+            prevHref={prevHref}
+            nextHref={nextHref}
+          />
           <Button
             variant={selectionMode ? "secondary" : "outline"}
             size="sm"
@@ -79,18 +90,27 @@ export function TransactionsWorkspace({
           moldura do cartão, que ali só come largura. */}
       <Card className="max-md:-mx-4 max-md:rounded-none max-md:border-x-0 max-md:shadow-none max-md:[--card-spacing:--spacing(4)]">
         <CardContent className="flex flex-col gap-4 md:gap-5 md:pt-6">
-          <TransactionFilters accounts={accounts} categories={categories} members={members} />
+          <TransactionFilters
+            accounts={accounts}
+            categories={categories}
+            members={members}
+          />
 
           <div className="flex items-center justify-between border-b border-(--border-soft) pb-3">
             <span className="flex flex-col">
               <span className="text-metadata">
                 {rows.length} {rows.length === 1 ? "transação" : "transações"}
               </span>
-              {scopeNote ? <span className="text-xs text-(--text-muted)">{scopeNote}</span> : null}
+              {scopeNote ? (
+                <span className="text-xs text-(--text-muted)">{scopeNote}</span>
+              ) : null}
             </span>
             <span className="flex items-baseline gap-2">
               <span className="text-metadata">{totalLabel}</span>
-              <span className="money font-semibold tabular-nums" style={{ color: totalColor }}>
+              <span
+                className="money font-semibold tabular-nums"
+                style={{ color: totalColor }}
+              >
                 {totalDisplay}
               </span>
             </span>

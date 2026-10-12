@@ -3,7 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CurrencyCode } from "@/lib/money";
-import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
+import {
+  MUTED_CATEGORY_COLOR,
+  type CategoryColorPair,
+} from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { Check, Lock } from "lucide-react";
 import {
@@ -123,7 +126,8 @@ export function TransactionsTable({
   }
 
   function applyBulkCategory() {
-    const categoryId = bulkCategoryId === NO_CATEGORY ? null : bulkCategoryId || null;
+    const categoryId =
+      bulkCategoryId === NO_CATEGORY ? null : bulkCategoryId || null;
     const ids = Array.from(selected);
     startTransition(async () => {
       await bulkUpdateCategory(ids, categoryId);
@@ -145,7 +149,9 @@ export function TransactionsTable({
     <div className="flex flex-col gap-4">
       {selected.size > 0 ? (
         <div className="flex items-center gap-3 rounded-[10px] border border-(--border-primary) bg-(--bg-subtle) px-3 py-2">
-          <span className="text-sm font-medium text-(--text-primary)">{selected.size} selecionada(s)</span>
+          <span className="text-sm font-medium text-(--text-primary)">
+            {selected.size} selecionada(s)
+          </span>
           <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Recategorizar para..." />
@@ -159,26 +165,44 @@ export function TransactionsTable({
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" disabled={!bulkCategoryId || isPending} onClick={applyBulkCategory}>
+          <Button
+            size="sm"
+            disabled={!bulkCategoryId || isPending}
+            onClick={applyBulkCategory}
+          >
             Aplicar
           </Button>
           {selectedPendingIds.length > 0 ? (
-            <Button size="sm" variant="outline" disabled={isPending} onClick={applyBulkConfirm}>
-              <Check className="h-3.5 w-3.5" /> Confirmar {selectedPendingIds.length}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={applyBulkConfirm}
+            >
+              <Check className="h-3.5 w-3.5" /> Confirmar{" "}
+              {selectedPendingIds.length}
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelected(new Set())}
+          >
             Limpar seleção
           </Button>
         </div>
       ) : null}
 
       {groups.map(([date, dayRows]) => {
-        const editableDayIds = dayRows.filter((r) => r.can_edit).map((r) => r.id);
+        const editableDayIds = dayRows
+          .filter((r) => r.can_edit)
+          .map((r) => r.id);
         const allSelected =
-          editableDayIds.length > 0 && editableDayIds.every((id) => selected.has(id));
+          editableDayIds.length > 0 &&
+          editableDayIds.every((id) => selected.has(id));
         const dayNet = dayRows.reduce(
-          (sum, r) => sum + (r.direction === "in" ? r.amount_cents : -r.amount_cents),
+          (sum, r) =>
+            sum + (r.direction === "in" ? r.amount_cents : -r.amount_cents),
           0,
         );
 
@@ -188,14 +212,23 @@ export function TransactionsTable({
               {selectionMode ? (
                 <Checkbox
                   checked={allSelected}
-                  onCheckedChange={(checked) => toggleAll(editableDayIds, checked === true)}
+                  onCheckedChange={(checked) =>
+                    toggleAll(editableDayIds, checked === true)
+                  }
                 />
               ) : null}
-              <span className="shrink-0 text-[12.5px] font-semibold text-(--text-secondary)">{formatDayHeading(date)}</span>
-              <span className="h-px flex-1" style={{ background: "var(--border-primary)" }} />
+              <span className="shrink-0 text-[12.5px] font-semibold text-(--text-secondary)">
+                {formatDayHeading(date)}
+              </span>
+              <span
+                className="h-px flex-1"
+                style={{ background: "var(--border-primary)" }}
+              />
               <span
                 className="shrink-0 text-xs font-bold tabular-nums"
-                style={{ color: dayNet < 0 ? "var(--expense)" : "var(--income)" }}
+                style={{
+                  color: dayNet < 0 ? "var(--expense)" : "var(--income)",
+                }}
               >
                 {dayNet < 0 ? "-" : "+"}
                 <Money cents={Math.abs(dayNet)} currency={currency} />
@@ -230,7 +263,10 @@ export function TransactionsTable({
                   tabIndex={row.can_edit ? 0 : undefined}
                   onClick={() => onRowClick(row)}
                   onKeyDown={(e) => {
-                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                    if (
+                      e.target === e.currentTarget &&
+                      (e.key === "Enter" || e.key === " ")
+                    ) {
                       e.preventDefault();
                       onRowClick(row);
                     }
@@ -263,10 +299,16 @@ export function TransactionsTable({
                     <p className="truncate text-xs text-(--text-muted)">
                       {/* A categoria só aparece aqui no celular; no
                           computador ela tem o seletor à direita. */}
-                      <span className="md:hidden">{row.category_name ?? "Sem categoria"} · </span>
+                      <span className="md:hidden">
+                        {row.category_name ?? "Sem categoria"} ·{" "}
+                      </span>
                       {row.account_name}
+                      {row.installment ? ` · ${row.installment}` : ""}
                       {status ? (
-                        <span style={{ color: status.color }} className="font-medium">
+                        <span
+                          style={{ color: status.color }}
+                          className="font-medium"
+                        >
                           {" · "}
                           {status.label}
                         </span>
@@ -275,11 +317,15 @@ export function TransactionsTable({
                   </div>
 
                   {row.can_edit ? (
-                    <span className="hidden w-40 shrink-0 md:block" onClick={(e) => e.stopPropagation()}>
+                    <span
+                      className="hidden w-40 shrink-0 md:block"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Select
                         value={row.category_id ?? NO_CATEGORY}
                         onValueChange={(value) => {
-                          const categoryId = value === NO_CATEGORY ? null : value;
+                          const categoryId =
+                            value === NO_CATEGORY ? null : value;
                           startTransition(async () => {
                             await updateTransactionCategory(row.id, categoryId);
                             router.refresh();
@@ -293,13 +339,19 @@ export function TransactionsTable({
                           <span className="flex min-w-0 items-center gap-2">
                             <span
                               className="h-2 w-2 shrink-0 rounded-full"
-                              style={{ background: row.category_name ? iconColors.fg : "var(--text-light)" }}
+                              style={{
+                                background: row.category_name
+                                  ? iconColors.fg
+                                  : "var(--text-light)",
+                              }}
                             />
                             <SelectValue placeholder="Sem categoria" />
                           </span>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
+                          <SelectItem value={NO_CATEGORY}>
+                            Sem categoria
+                          </SelectItem>
                           {categories.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
@@ -317,7 +369,10 @@ export function TransactionsTable({
                   <span
                     className="shrink-0 text-right text-[14px] font-semibold tabular-nums md:w-28"
                     style={{
-                      color: row.direction === "out" ? "var(--table-amount-out)" : "var(--table-amount-in)",
+                      color:
+                        row.direction === "out"
+                          ? "var(--table-amount-out)"
+                          : "var(--table-amount-in)",
                     }}
                   >
                     {row.direction === "out" ? "-" : "+"}

@@ -160,7 +160,7 @@ export default async function CartoesPage({
     ? await supabase
         .from("transactions")
         .select(
-          "id, date, description, amount_cents, direction, status, transfer_group_id, category:categories(name)",
+          "id, date, description, amount_cents, direction, status, transfer_group_id, installment_number, installment_total, category:categories(name)",
         )
         .eq("household_id", householdId)
         .eq("account_id", selected.id)
@@ -175,6 +175,22 @@ export default async function CartoesPage({
   const payments = (purchaseRows ?? []).filter(
     (r) => r.transfer_group_id && r.direction === "in",
   );
+
+  // Parcelas que ainda vão cair nas próximas faturas deste cartão.
+  const { data: futureParcels } = selected.canSeeTransactions
+    ? await supabase
+        .from("transactions")
+        .select("amount_cents")
+        .eq("household_id", householdId)
+        .eq("account_id", selected.id)
+        .not("installment_group_id", "is", null)
+        .gt("date", selected.current.closing)
+    : { data: null };
+  const futureParcelsCents = (futureParcels ?? []).reduce(
+    (sum, r) => sum + (r.amount_cents as number),
+    0,
+  );
+  const futureParcelsCount = futureParcels?.length ?? 0;
 
   const toPay =
     statement.status === "open"
@@ -296,6 +312,11 @@ export default async function CartoesPage({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">
                         {out ? row.description : `Estorno · ${row.description}`}
+                        {row.installment_total ? (
+                          <span className="ml-2 rounded-full bg-(--primary-light) px-2 py-0.5 text-[11px] font-semibold text-(--primary-hover)">
+                            {row.installment_number} de {row.installment_total}
+                          </span>
+                        ) : null}
                       </p>
                       <p className="truncate text-xs text-(--text-muted)">
                         {shortDate(row.date as string)} ·{" "}
@@ -431,6 +452,20 @@ export default async function CartoesPage({
               </div>
             ) : null}
           </section>
+
+          {futureParcelsCount > 0 ? (
+            <section className="rounded-[20px] bg-(--primary-soft) p-5 md:p-6">
+              <div className="text-[14px] font-bold text-(--primary-hover)">
+                Parcelas que ainda vêm
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-(--text-secondary)">
+                <Money cents={futureParcelsCents} currency={currency} /> em{" "}
+                {futureParcelsCount}{" "}
+                {futureParcelsCount === 1 ? "parcela" : "parcelas"} nas próximas
+                faturas. Já contam no limite usado.
+              </p>
+            </section>
+          ) : null}
 
           {selected.canEdit ? (
             <p className="px-1 text-xs leading-relaxed text-(--text-muted)">

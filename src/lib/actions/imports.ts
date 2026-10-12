@@ -6,10 +6,20 @@ import { getCurrentMember } from "@/lib/current-member";
 import { computeFingerprint, normalizeDescription } from "@/lib/fingerprint";
 import { cleanBankDescription } from "@/lib/import/clean-description";
 import { rememberMerchantName } from "@/lib/merchant-names";
-import { parseRegionsStatementText, StatementParseError } from "@/lib/import/regions-pdf";
+import { loadCards } from "@/lib/cards";
+import { todayIn } from "@/lib/today";
+import { matchCardPayments } from "@/lib/import/match-card-payment";
+import { fetchExistingCardPayments } from "@/lib/import/confirmed-candidates";
+import {
+  parseRegionsStatementText,
+  StatementParseError,
+} from "@/lib/import/regions-pdf";
 import { verifyStatement } from "@/lib/import/verify";
 import { suggestCategoryId } from "@/lib/import/mcc";
-import { matchForecast, type ForecastCandidate } from "@/lib/import/match-forecast";
+import {
+  matchForecast,
+  type ForecastCandidate,
+} from "@/lib/import/match-forecast";
 import { matchConfirmed } from "@/lib/import/match-confirmed";
 import { fetchConfirmedCandidates } from "@/lib/import/confirmed-candidates";
 
@@ -44,7 +54,8 @@ export type ImportResult =
  * arquivo lançando. Resultado: confirmar uma importação quebrou em
  * produção e o usuário levou um clique no vazio, sem mensagem nenhuma.
  */
-export type ActionResult = { ok: true } | { ok: false; error: string; detail?: string };
+export type ActionResult =
+  { ok: true } | { ok: false; error: string; detail?: string };
 
 /**
  * Roda a ação e traduz qualquer exceção em resultado.
@@ -54,7 +65,10 @@ export type ActionResult = { ok: true } | { ok: false; error: string; detail?: s
  * vira "algo deu errado" e a depuração depende de acesso ao log — o que
  * não serve nem pra mim nem pra quem for usar isso depois.
  */
-async function attempt(error: string, fn: () => Promise<void>): Promise<ActionResult> {
+async function attempt(
+  error: string,
+  fn: () => Promise<void>,
+): Promise<ActionResult> {
   try {
     await fn();
     return { ok: true };
@@ -96,7 +110,7 @@ async function runImportStatement(input: {
   fileName: string;
   text: string;
 }): Promise<ImportResult> {
-  const { householdId, memberId } = await getCurrentMember();
+  const { householdId, memberId, timezone } = await getCurrentMember();
   const supabase = await createClient();
 
   const { accountId, fileName, text } = input;
@@ -108,11 +122,15 @@ async function runImportStatement(input: {
   if (!text.trim()) {
     return {
       ok: false,
-      error: "Não consegui ler texto nesse PDF. Ele pode ser um documento escaneado.",
+      error:
+        "Não consegui ler texto nesse PDF. Ele pode ser um documento escaneado.",
     };
   }
   if (text.length > MAX_TEXT_LENGTH) {
-    return { ok: false, error: "Esse extrato é grande demais para importar de uma vez." };
+    return {
+      ok: false,
+      error: "Esse extrato é grande demais para importar de uma vez.",
+    };
   }
 
   // Uma revisão aberta por conta. Duas revisões do mesmo extrato
@@ -139,7 +157,8 @@ async function runImportStatement(input: {
   try {
     statement = parseRegionsStatementText(text);
   } catch (err) {
-    if (err instanceof StatementParseError) return { ok: false, error: err.message };
+    if (err instanceof StatementParseError)
+      return { ok: false, error: err.message };
     throw err;
   }
 
@@ -171,7 +190,8 @@ async function runImportStatement(input: {
     if (importError.code === "23505") {
       return {
         ok: false,
-        error: "Já tem um extrato em revisão nessa conta. Confirme ou descarte antes de importar outro.",
+        error:
+          "Já tem um extrato em revisão nessa conta. Confirme ou descarte antes de importar outro.",
       };
     }
     throw new Error(importError.message);
@@ -205,7 +225,9 @@ async function runImportStatement(input: {
     .gte("date", statement.periodStart)
     .lte("date", statement.periodEnd);
 
-  const existingFingerprints = new Set((existing ?? []).map((t) => t.fingerprint as string));
+  const existingFingerprints = new Set(
+    (existing ?? []).map((t) => t.fingerprint as string),
+  );
 
   // Previsões em aberto no período: lançamento `pending` que veio de
   // recorrência. São elas que o extrato pode estar vindo quitar.
@@ -214,7 +236,9 @@ async function runImportStatement(input: {
   // cair pouco antes ou depois do dia em que o banco postou.
   const { data: forecastRows } = await supabase
     .from("transactions")
-    .select("id, date, amount_cents, direction, recurrence_id, recurrences(frequency)")
+    .select(
+      "id, date, amount_cents, direction, recurrence_id, recurrences(frequency)",
+    )
     .eq("household_id", householdId)
     .eq("account_id", accountId)
     .eq("status", "pending")
@@ -224,7 +248,8 @@ async function runImportStatement(input: {
     .order("date");
 
   const candidates: ForecastCandidate[] = (forecastRows ?? []).map((f) => {
-    const rec = f.recurrences as { frequency: string } | { frequency: string }[] | null;
+    const rec = f.recurrences as
+      { frequency: string } | { frequency: string }[] | null;
     const frequency = Array.isArray(rec) ? rec[0]?.frequency : rec?.frequency;
     return {
       id: f.id as string,
@@ -233,10 +258,9 @@ async function runImportStatement(input: {
       direction: f.direction as "in" | "out",
       // Recorrência apagada deixa `recurrence_id` órfão: trata como
       // mensal, que é a janela mais conservadora das duas.
-      frequency: (frequency === "weekly" || frequency === "yearly" ? frequency : "monthly") as
-        | "weekly"
-        | "monthly"
-        | "yearly",
+      frequency: (frequency === "weekly" || frequency === "yearly"
+        ? frequency
+        : "monthly") as "weekly" | "monthly" | "yearly",
     };
   });
 
@@ -248,7 +272,9 @@ async function runImportStatement(input: {
     .from("merchant_names")
     .select("bank_key, name")
     .eq("member_id", memberId);
-  const nameByKey = new Map((savedNames ?? []).map((n) => [n.bank_key as string, n.name as string]));
+  const nameByKey = new Map(
+    (savedNames ?? []).map((n) => [n.bank_key as string, n.name as string]),
+  );
 
   const rows = statement.transactions.map((t) => {
     const fingerprint = computeFingerprint({
@@ -262,13 +288,16 @@ async function runImportStatement(input: {
 
     // Duplicata não procura previsão: se essa linha já existe na conta,
     // não é ela que vai quitar previsão nenhuma.
-    const match = isDuplicate ? null : matchForecast(t, candidates, takenForecasts);
+    const match = isDuplicate
+      ? null
+      : matchForecast(t, candidates, takenForecasts);
     if (match) takenForecasts.add(match.id);
 
     // Nome pra lista; o texto do banco segue junto, e a impressão digital
     // (acima) continua sendo calculada sobre ele.
     const cleanName = cleanBankDescription(t.description);
-    const displayName = nameByKey.get(normalizeDescription(cleanName)) ?? cleanName;
+    const displayName =
+      nameByKey.get(normalizeDescription(cleanName)) ?? cleanName;
 
     return {
       import_id: importId,
@@ -292,7 +321,12 @@ async function runImportStatement(input: {
   // Só nas linhas que sobraram livres — não duplicata, não previsão.
   // Par único vira sugestão DESMARCADA: lançamento confirmado é algo que
   // o usuário afirmou, e juntar só acontece se ele pedir.
-  const confirmed = await fetchConfirmedCandidates(supabase, householdId, accountId, statement);
+  const confirmed = await fetchConfirmedCandidates(
+    supabase,
+    householdId,
+    accountId,
+    statement,
+  );
   const pairs = matchConfirmed(
     rows.map((r) => ({
       date: r.date,
@@ -308,7 +342,56 @@ async function runImportStatement(input: {
     rows[index].merge_accepted = false;
   }
 
-  const { error: stageError } = await supabase.from("staged_transactions").insert(rows);
+  // Terceiro cruzamento: pagamento de fatura de cartão. Só cartões em que
+  // quem importa pode lançar (o banco recusaria a outra ponta).
+  const cards = (
+    await loadCards(supabase, householdId, memberId, todayIn(timezone))
+  ).filter((c) => c.canEdit);
+  const cardPayments: (string | null)[] = rows.map(() => null);
+  const cardAccepted: boolean[] = rows.map(() => false);
+  if (cards.length > 0) {
+    const existing = await fetchExistingCardPayments(
+      supabase,
+      householdId,
+      accountId,
+      cards.map((c) => c.id),
+      statement,
+    );
+    const matches = matchCardPayments(
+      accountId,
+      rows.map((r) => ({
+        date: r.date,
+        amountCents: r.amount_cents,
+        direction: r.direction,
+        description: r.bank_description,
+        free: r.dup_status === "none" && r.match_transaction_id === null,
+      })),
+      cards,
+      existing,
+    );
+    matches.forEach((m, i) => {
+      if (!m) return;
+      if (m.kind === "already-registered") {
+        // Mesmo dinheiro que o "Pagar fatura" do app já registrou.
+        rows[i].dup_status = "duplicate";
+        rows[i].is_included = false;
+        return;
+      }
+      // O nome "Pagamento da fatura · <cartão>" é dado ao confirmar, se
+      // quem revisa mantiver a sugestão.
+      cardPayments[i] = m.cardId;
+      cardAccepted[i] = m.accepted;
+    });
+  }
+  const stagedRows = rows.map((r, i) => ({
+    ...r,
+    card_payment_account_id: cardPayments[i],
+    card_payment_accepted: cardAccepted[i],
+  }));
+
+  const { error: stageError } = await supabase
+    .from("staged_transactions")
+    .insert(stagedRows);
   if (stageError) {
     // Sem isto sobraria uma revisão vazia — e com a regra de uma revisão
     // por conta, ela travaria qualquer importação seguinte nessa conta.
@@ -339,7 +422,9 @@ async function runImportStatement(input: {
 
 /** Transforma o que está marcado na revisão em transações de verdade. */
 export async function confirmImport(importId: string): Promise<ActionResult> {
-  return attempt('Não consegui confirmar a importação.', () => runConfirmImport(importId));
+  return attempt("Não consegui confirmar a importação.", () =>
+    runConfirmImport(importId),
+  );
 }
 
 async function runConfirmImport(importId: string) {
@@ -354,7 +439,9 @@ async function runConfirmImport(importId: string) {
   // Antes eram chamadas soltas daqui, e na importação de setembro a
   // primeira tentativa gravou os lançamentos e morreu antes de marcar a
   // importação. O segundo clique gravou tudo de novo.
-  const { error } = await supabase.rpc("confirm_import", { p_import_id: importId });
+  const { error } = await supabase.rpc("confirm_import", {
+    p_import_id: importId,
+  });
   if (error) throw new Error(error.message);
 
   revalidatePath("/importar");
@@ -366,8 +453,13 @@ async function runConfirmImport(importId: string) {
 }
 
 /** Marca ou desmarca uma linha da revisão. */
-export async function toggleStagedRow(stagedId: string, isIncluded: boolean): Promise<ActionResult> {
-  return attempt('Não consegui marcar essa linha.', () => runToggleStagedRow(stagedId, isIncluded));
+export async function toggleStagedRow(
+  stagedId: string,
+  isIncluded: boolean,
+): Promise<ActionResult> {
+  return attempt("Não consegui marcar essa linha.", () =>
+    runToggleStagedRow(stagedId, isIncluded),
+  );
 }
 
 async function runToggleStagedRow(stagedId: string, isIncluded: boolean) {
@@ -385,8 +477,13 @@ async function runToggleStagedRow(stagedId: string, isIncluded: boolean) {
  * Responde o "essa linha parece ser a sua recorrência X": juntar ou
  * tratar como lançamento separado.
  */
-export async function setStagedMerge(stagedId: string, accepted: boolean): Promise<ActionResult> {
-  return attempt('Não consegui mudar o cruzamento dessa linha.', () => runSetStagedMerge(stagedId, accepted));
+export async function setStagedMerge(
+  stagedId: string,
+  accepted: boolean,
+): Promise<ActionResult> {
+  return attempt("Não consegui mudar o cruzamento dessa linha.", () =>
+    runSetStagedMerge(stagedId, accepted),
+  );
 }
 
 async function runSetStagedMerge(stagedId: string, accepted: boolean) {
@@ -400,6 +497,22 @@ async function runSetStagedMerge(stagedId: string, accepted: boolean) {
   revalidatePath("/importar");
 }
 
+/** Aceita ou recusa a sugestão "esta linha é pagamento da fatura do cartão". */
+export async function setStagedCardPayment(
+  stagedId: string,
+  accepted: boolean,
+): Promise<ActionResult> {
+  return attempt("Não consegui mudar essa linha.", async () => {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("staged_transactions")
+      .update({ card_payment_accepted: accepted })
+      .eq("id", stagedId);
+    if (error) throw new Error(error.message);
+    revalidatePath("/importar");
+  });
+}
+
 /**
  * Apaga uma previsão que o extrato não confirmou.
  *
@@ -411,8 +524,12 @@ async function runSetStagedMerge(stagedId: string, accepted: boolean) {
  * Só apaga previsão: `status` pendente e vinda de recorrência. Nunca
  * encosta em lançamento confirmado.
  */
-export async function dismissForecast(transactionId: string): Promise<ActionResult> {
-  return attempt('Não consegui apagar essa previsão.', () => runDismissForecast(transactionId));
+export async function dismissForecast(
+  transactionId: string,
+): Promise<ActionResult> {
+  return attempt("Não consegui apagar essa previsão.", () =>
+    runDismissForecast(transactionId),
+  );
 }
 
 async function runDismissForecast(transactionId: string) {
@@ -437,11 +554,19 @@ async function runDismissForecast(transactionId: string) {
 }
 
 /** Troca a categoria sugerida de uma linha da revisão. */
-export async function setStagedCategory(stagedId: string, categoryId: string | null): Promise<ActionResult> {
-  return attempt('Não consegui trocar a categoria.', () => runSetStagedCategory(stagedId, categoryId));
+export async function setStagedCategory(
+  stagedId: string,
+  categoryId: string | null,
+): Promise<ActionResult> {
+  return attempt("Não consegui trocar a categoria.", () =>
+    runSetStagedCategory(stagedId, categoryId),
+  );
 }
 
-async function runSetStagedCategory(stagedId: string, categoryId: string | null) {
+async function runSetStagedCategory(
+  stagedId: string,
+  categoryId: string | null,
+) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("staged_transactions")
@@ -457,8 +582,13 @@ async function runSetStagedCategory(stagedId: string, categoryId: string | null)
  * estabelecimento nesta importação ganham o mesmo nome, e o nome fica
  * lembrado pras próximas importações.
  */
-export async function renameStagedRow(stagedId: string, name: string): Promise<ActionResult> {
-  return attempt("Não consegui renomear.", () => runRenameStagedRow(stagedId, name));
+export async function renameStagedRow(
+  stagedId: string,
+  name: string,
+): Promise<ActionResult> {
+  return attempt("Não consegui renomear.", () =>
+    runRenameStagedRow(stagedId, name),
+  );
 }
 
 async function runRenameStagedRow(stagedId: string, rawName: string) {
@@ -477,7 +607,8 @@ async function runRenameStagedRow(stagedId: string, rawName: string) {
   if (rowError) throw new Error(rowError.message);
   if (!row) throw new Error("Linha não encontrada.");
 
-  const bank = (row.bank_description as string | null) ?? (row.description as string);
+  const bank =
+    (row.bank_description as string | null) ?? (row.description as string);
   const key = normalizeDescription(cleanBankDescription(bank));
 
   const { data: siblings, error: siblingsError } = await supabase
@@ -488,21 +619,35 @@ async function runRenameStagedRow(stagedId: string, rawName: string) {
 
   const ids = (siblings ?? [])
     .filter((s) => {
-      const sBank = (s.bank_description as string | null) ?? (s.description as string);
-      return s.id === stagedId || normalizeDescription(cleanBankDescription(sBank)) === key;
+      const sBank =
+        (s.bank_description as string | null) ?? (s.description as string);
+      return (
+        s.id === stagedId ||
+        normalizeDescription(cleanBankDescription(sBank)) === key
+      );
     })
     .map((s) => s.id as string);
 
-  const { error } = await supabase.from("staged_transactions").update({ description: name }).in("id", ids);
+  const { error } = await supabase
+    .from("staged_transactions")
+    .update({ description: name })
+    .in("id", ids);
   if (error) throw new Error(error.message);
 
-  await rememberMerchantName(supabase, { householdId, memberId, bankDescription: bank, name });
+  await rememberMerchantName(supabase, {
+    householdId,
+    memberId,
+    bankDescription: bank,
+    name,
+  });
   revalidatePath("/importar");
 }
 
 /** Descarta uma importação em revisão sem criar nada. */
 export async function discardImport(importId: string): Promise<ActionResult> {
-  return attempt('Não consegui descartar a importação.', () => runDiscardImport(importId));
+  return attempt("Não consegui descartar a importação.", () =>
+    runDiscardImport(importId),
+  );
 }
 
 async function runDiscardImport(importId: string) {
@@ -526,7 +671,9 @@ async function runDiscardImport(importId: string) {
  * de perguntar.
  */
 export async function undoImport(importId: string): Promise<ActionResult> {
-  return attempt('Não consegui desfazer a importação.', () => runUndoImport(importId));
+  return attempt("Não consegui desfazer a importação.", () =>
+    runUndoImport(importId),
+  );
 }
 
 async function runUndoImport(importId: string) {
@@ -536,7 +683,9 @@ async function runUndoImport(importId: string) {
   // lançamentos e apagar a importação acontecem juntos ou não acontecem.
   // Desfazer pela metade deixaria lançamento sem importação, que nenhum
   // desfazer posterior alcança.
-  const { error } = await supabase.rpc("undo_import", { p_import_id: importId });
+  const { error } = await supabase.rpc("undo_import", {
+    p_import_id: importId,
+  });
   if (error) throw new Error(error.message);
 
   revalidatePath("/importar");

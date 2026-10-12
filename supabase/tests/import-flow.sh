@@ -311,6 +311,28 @@ check "pagar a fatura vira transferência (sai do casal, entra no cartão)" "$(a
 check "cartão com saldo inicial positivo é recusado" "$(as_user $LEVI "update accounts set opening_balance_cents = 2500 where id = 'acc00000-0000-0000-0000-0000000000c1';" | grep -o 'violates check' | head -1)" "violates check"
 check "conta corrente com saldo positivo continua normal" "$(as_user $LEVI "update accounts set opening_balance_cents = 2500 where id = 'acc00000-0000-0000-0000-000000000002' returning opening_balance_cents;" | head -1)" "2500"
 
+echo "extrato pagando a fatura:"
+admin "update accounts set opening_balance_cents = 0 where id = 'acc00000-0000-0000-0000-000000000002'"
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+insert into imports (id, household_id, account_id, file_path, file_type, status, created_by) values
+  ('10000000-0000-0000-0000-0000000000b1', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', 'regions-nov.pdf', 'pdf', 'review', 'aaaaaaaa-0000-0000-0000-00000000000a');
+insert into staged_transactions (import_id, date, description, bank_description, amount_cents, direction, fingerprint, is_included, card_payment_account_id, card_payment_accepted) values
+  ('10000000-0000-0000-0000-0000000000b1', '2026-11-21', 'Pagamento da fatura · Cartão principal', 'Online Payment Thank You', 128430, 'out', 'fp-pay', true, 'acc00000-0000-0000-0000-0000000000c1', true),
+  ('10000000-0000-0000-0000-0000000000b1', '2026-11-22', 'Card Payment', 'Card Payment', 5000, 'out', 'fp-pay-2', true, 'acc00000-0000-0000-0000-0000000000c1', false);
+SQL
+check "confirma" "$(as_user $LEVI "select confirm_import('10000000-0000-0000-0000-0000000000b1');")" '{"merged": 0, "inserted": 2}'
+check "pagamento aceito vira transferência: sai da corrente, entra no cartão" "$(admin "select string_agg(a.type::text||':'||t.direction::text, ',' order by t.direction) from transactions t join accounts a on a.id = t.account_id where t.import_id='10000000-0000-0000-0000-0000000000b1' and t.transfer_group_id is not null")" "credit_card:in,checking:out"
+check "a ponta da corrente guarda o texto do banco" "$(admin "select bank_description from transactions where import_id='10000000-0000-0000-0000-0000000000b1' and direction='out' and transfer_group_id is not null")" "Online Payment Thank You"
+check "o pagamento ganha o nome do cartão" "$(admin "select string_agg(distinct description, ',') from transactions where import_id='10000000-0000-0000-0000-0000000000b1' and transfer_group_id is not null")" "Pagamento da fatura · Cartão principal"
+check "pagamento recusado entra como lançamento comum" "$(admin "select count(*) from transactions where import_id='10000000-0000-0000-0000-0000000000b1' and transfer_group_id is null and amount_cents = 5000")" "1"
+check "desfazer apaga as duas pontas" "$(as_user $LEVI "select undo_import('10000000-0000-0000-0000-0000000000b1');" >/dev/null; admin "select count(*) from transactions where import_id='10000000-0000-0000-0000-0000000000b1'")" "0"
+
+echo "parcelado:"
+as_user $LEVI "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by, installment_group_id, installment_number, installment_total) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-0000000000c1', '2026-10-10', 20000, 'out', 'Dentista', 'inst-1', '$LEVI', 'eeee0000-0000-0000-0000-000000000001', 1, 6);" >/dev/null
+check "parcela 1 de 6 gravada" "$(admin "select installment_number||' de '||installment_total from transactions where fingerprint='inst-1'")" "1 de 6"
+check "parcela 7 de 6 é recusada" "$(as_user $LEVI "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by, installment_group_id, installment_number, installment_total) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-0000000000c1', '2026-10-10', 20000, 'out', 'Dentista', 'inst-x', '$LEVI', 'eeee0000-0000-0000-0000-000000000001', 7, 6);" | grep -o 'violates check' | head -1)" "violates check"
+check "parcela sem grupo é recusada" "$(as_user $LEVI "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by, installment_number, installment_total) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-0000000000c1', '2026-10-10', 20000, 'out', 'Dentista', 'inst-y', '$LEVI', 1, 6);" | grep -o 'violates check' | head -1)" "violates check"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL

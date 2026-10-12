@@ -12,6 +12,8 @@ export type TransactionRow = {
   import_id: string | null;
   transfer_group_id: string | null;
   recurrence_id: string | null;
+  /** "3 de 6" em compra parcelada. */
+  installment?: string | null;
   account_id: string;
   category_id: string | null;
   account_name: string;
@@ -26,6 +28,10 @@ export type TransactionRow = {
   can_edit: boolean;
 };
 
-export type CategoryOption = { id: string; name: string; kind: "income" | "expense" };
+export type CategoryOption = {
+  id: string;
+  name: string;
+  kind: "income" | "expense";
+};
 export type AccountOption = { id: string; name: string };
 export type MemberOption = { id: string; name: string };

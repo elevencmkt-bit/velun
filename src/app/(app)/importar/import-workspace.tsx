@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Link2, Link2Off, Pencil, Undo2, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CreditCard,
+  Link2,
+  Link2Off,
+  Pencil,
+  Undo2,
+  Upload,
+} from "lucide-react";
 import {
   confirmImport,
   discardImport,
@@ -12,6 +21,7 @@ import {
   setStagedMerge,
   toggleStagedRow,
   renameStagedRow,
+  setStagedCardPayment,
   undoImport,
   type ActionResult,
 } from "@/lib/actions/imports";
@@ -59,6 +69,8 @@ type Row = {
   direction: "in" | "out";
   categoryId: string | null;
   isDuplicate: boolean;
+  /** Linha que parece ser pagamento da fatura de um cartão. */
+  cardPayment: { cardName: string; accepted: boolean } | null;
   isIncluded: boolean;
   /**
    * Lançamento seu que esta linha parece ser: uma previsão (vem marcada
@@ -118,7 +130,9 @@ function CategoryCell({
     row.direction === "in" ? c.kind === "income" : c.kind === "expense",
   );
 
-  const selected = options.some((c) => c.id === row.categoryId) ? row.categoryId : null;
+  const selected = options.some((c) => c.id === row.categoryId)
+    ? row.categoryId
+    : null;
 
   return (
     <Select
@@ -194,12 +208,17 @@ function NameCell({
           className="group flex min-w-0 items-center gap-1.5 text-left"
           title="Renomear"
         >
-          <span className="truncate font-medium text-(--text-primary)">{row.description}</span>
+          <span className="truncate font-medium text-(--text-primary)">
+            {row.description}
+          </span>
           <Pencil className="h-3 w-3 shrink-0 text-(--text-muted) opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-60" />
         </button>
       )}
       {row.bankDescription && row.bankDescription !== row.description ? (
-        <span className="truncate text-[11px] text-(--text-muted)" title={row.bankDescription}>
+        <span
+          className="truncate text-[11px] text-(--text-muted)"
+          title={row.bankDescription}
+        >
           {row.bankDescription}
         </span>
       ) : null}
@@ -261,7 +280,9 @@ export function ImportWorkspace({
     <div className="flex flex-col gap-1">
       <p className="text-sm text-(--expense)">{error}</p>
       {errorDetail ? (
-        <p className="font-mono text-xs break-all text-(--text-muted)">{errorDetail}</p>
+        <p className="font-mono text-xs break-all text-(--text-muted)">
+          {errorDetail}
+        </p>
       ) : null}
     </div>
   ) : null;
@@ -275,7 +296,8 @@ export function ImportWorkspace({
     setError(null);
 
     if (!accountId) return setError("Escolha a conta do extrato.");
-    if (!(file instanceof File) || file.size === 0) return setError("Escolha um arquivo.");
+    if (!(file instanceof File) || file.size === 0)
+      return setError("Escolha um arquivo.");
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       return setError("Por enquanto só extrato em PDF da Regions.");
     }
@@ -287,12 +309,18 @@ export function ImportWorkspace({
       try {
         text = await extractPdfText(file);
       } catch {
-        setError("Não consegui abrir esse PDF. Ele pode estar protegido por senha.");
+        setError(
+          "Não consegui abrir esse PDF. Ele pode estar protegido por senha.",
+        );
         return;
       }
 
       try {
-        const result = await importStatement({ accountId, fileName: file.name, text });
+        const result = await importStatement({
+          accountId,
+          fileName: file.name,
+          text,
+        });
         // Falha prevista volta como resultado, não como exceção — a
         // mensagem aqui é a real, não um código do React.
         if (!result.ok) {
@@ -301,7 +329,11 @@ export function ImportWorkspace({
         }
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Algo deu errado ao ler o extrato.");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Algo deu errado ao ler o extrato.",
+        );
       }
     });
   }
@@ -320,8 +352,9 @@ export function ImportWorkspace({
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Importar</h1>
           <p className="text-page-subtitle">
-            Extrato da Regions em PDF. O arquivo é lido aqui no navegador e não sai da sua
-            máquina. Os lançamentos passam por revisão antes de entrar.
+            Extrato da Regions em PDF. O arquivo é lido aqui no navegador e não
+            sai da sua máquina. Os lançamentos passam por revisão antes de
+            entrar.
           </p>
         </div>
 
@@ -359,7 +392,10 @@ export function ImportWorkspace({
 
               {errorBlock}
 
-              <Button type="submit" disabled={isPending || accounts.length === 0}>
+              <Button
+                type="submit"
+                disabled={isPending || accounts.length === 0}
+              >
                 <Upload className="mr-2 h-4 w-4" />
                 {isPending ? "Lendo o extrato..." : "Importar extrato"}
               </Button>
@@ -372,8 +408,8 @@ export function ImportWorkspace({
             <div className="flex flex-col gap-1">
               <h2 className="text-card-title">Importações recentes</h2>
               <p className="text-sm text-(--text-muted)">
-                Desfazer apaga os lançamentos que a importação criou, inclusive alterações
-                feitas neles depois.
+                Desfazer apaga os lançamentos que a importação criou, inclusive
+                alterações feitas neles depois.
               </p>
             </div>
 
@@ -460,7 +496,9 @@ export function ImportWorkspace({
             disabled={isPending || included.length === 0}
             onClick={() => run(() => confirmImport(openImport.id))}
           >
-            {isPending ? "Confirmando..." : `Confirmar ${included.length} lançamentos`}
+            {isPending
+              ? "Confirmando..."
+              : `Confirmar ${included.length} lançamentos`}
           </Button>
         </div>
       </div>
@@ -470,9 +508,15 @@ export function ImportWorkspace({
       <Card>
         <CardContent className="flex items-start gap-3">
           {openImport.balanceMatches ? (
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--income)" }} />
+            <CheckCircle2
+              className="mt-0.5 h-5 w-5 shrink-0"
+              style={{ color: "var(--income)" }}
+            />
           ) : (
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--expense)" }} />
+            <AlertTriangle
+              className="mt-0.5 h-5 w-5 shrink-0"
+              style={{ color: "var(--expense)" }}
+            />
           )}
           <div className="flex flex-col gap-0.5">
             <span className="text-card-title">
@@ -537,7 +581,9 @@ export function ImportWorkspace({
                       aria-label={`Incluir ${row.description}`}
                     />
                   </td>
-                  <td className="px-2 py-2 text-(--text-muted)">{shortDate(row.date)}</td>
+                  <td className="px-2 py-2 text-(--text-muted)">
+                    {shortDate(row.date)}
+                  </td>
                   <td className="px-2 py-2">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-start gap-2">
@@ -547,9 +593,13 @@ export function ImportWorkspace({
                           key={row.description}
                           row={row}
                           disabled={isPending}
-                          onRename={(name) => run(() => renameStagedRow(row.id, name))}
+                          onRename={(name) =>
+                            run(() => renameStagedRow(row.id, name))
+                          }
                         />
-                        {row.isDuplicate ? <Badge variant="secondary">Já existe</Badge> : null}
+                        {row.isDuplicate ? (
+                          <Badge variant="secondary">Já existe</Badge>
+                        ) : null}
                       </div>
 
                       {/* O cruzamento com a previsão é a pergunta mais
@@ -557,6 +607,53 @@ export function ImportWorkspace({
                           dinheiro duas vezes no mês. Fica embaixo da
                           descrição, não numa coluna, porque precisa de
                           frase. */}
+                      {row.cardPayment ? (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <CreditCard
+                            className="h-3.5 w-3.5 shrink-0"
+                            style={{
+                              color: row.cardPayment.accepted
+                                ? "var(--primary)"
+                                : "var(--text-muted)",
+                            }}
+                          />
+                          <span className="text-(--text-muted)">
+                            {row.cardPayment.accepted ? (
+                              <>
+                                Paga a fatura do{" "}
+                                <span className="text-(--text-primary)">
+                                  {row.cardPayment.cardName}
+                                </span>{" "}
+                                · entra como transferência, não como gasto
+                              </>
+                            ) : (
+                              <>
+                                Pode ser pagamento da fatura do{" "}
+                                <span className="text-(--text-primary)">
+                                  {row.cardPayment.cardName}
+                                </span>
+                              </>
+                            )}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            disabled={isPending}
+                            onClick={() =>
+                              run(() =>
+                                setStagedCardPayment(
+                                  row.id,
+                                  !row.cardPayment!.accepted,
+                                ),
+                              )
+                            }
+                          >
+                            {row.cardPayment.accepted
+                              ? "Não é pagamento"
+                              : "É pagamento da fatura"}
+                          </Button>
+                        </div>
+                      ) : null}
                       {row.match ? (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           {row.match.accepted ? (
@@ -566,7 +663,9 @@ export function ImportWorkspace({
                                 style={{ color: "var(--income)" }}
                               />
                               <span className="text-(--text-muted)">
-                                {row.match.kind === "forecast" ? "Quita" : "Substitui seu lançamento"}{" "}
+                                {row.match.kind === "forecast"
+                                  ? "Quita"
+                                  : "Substitui seu lançamento"}{" "}
                                 <span className="text-(--text-primary)">
                                   {row.match.description}
                                 </span>{" "}
@@ -576,7 +675,9 @@ export function ImportWorkspace({
                                 variant="ghost"
                                 size="xs"
                                 disabled={isPending}
-                                onClick={() => run(() => setStagedMerge(row.id, false))}
+                                onClick={() =>
+                                  run(() => setStagedMerge(row.id, false))
+                                }
                               >
                                 Separar
                               </Button>
@@ -601,7 +702,9 @@ export function ImportWorkspace({
                                 variant="ghost"
                                 size="xs"
                                 disabled={isPending}
-                                onClick={() => run(() => setStagedMerge(row.id, true))}
+                                onClick={() =>
+                                  run(() => setStagedMerge(row.id, true))
+                                }
                               >
                                 Juntar
                               </Button>
@@ -612,16 +715,29 @@ export function ImportWorkspace({
                     </div>
                   </td>
                   <td className="px-2 py-2">
-                    <CategoryCell
-                      row={row}
-                      categories={categories}
-                      disabled={isPending}
-                      onChange={(categoryId) => run(() => setStagedCategory(row.id, categoryId))}
-                    />
+                    {row.cardPayment?.accepted ? (
+                      <span className="text-xs text-(--text-muted)">
+                        Transferência
+                      </span>
+                    ) : (
+                      <CategoryCell
+                        row={row}
+                        categories={categories}
+                        disabled={isPending}
+                        onChange={(categoryId) =>
+                          run(() => setStagedCategory(row.id, categoryId))
+                        }
+                      />
+                    )}
                   </td>
                   <td
                     className="px-4 py-2 text-right tabular-nums"
-                    style={{ color: row.direction === "in" ? "var(--income)" : "var(--expense)" }}
+                    style={{
+                      color:
+                        row.direction === "in"
+                          ? "var(--income)"
+                          : "var(--expense)",
+                    }}
                   >
                     {row.direction === "in" ? "+" : "-"}
                     <Money cents={row.amountCents} currency={currency} />
@@ -634,7 +750,8 @@ export function ImportWorkspace({
       </Card>
 
       <p className="text-sm text-(--text-muted)">
-        Marcados somam <Money cents={includedTotal} currency={currency} /> no período.
+        Marcados somam <Money cents={includedTotal} currency={currency} /> no
+        período.
       </p>
 
       {/* Lançamento confirmado à mão que divide valor com linhas do
@@ -644,10 +761,13 @@ export function ImportWorkspace({
       {doubles.length > 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h2 className="text-card-title">Lançamentos seus que podem estar em dobro</h2>
+            <h2 className="text-card-title">
+              Lançamentos seus que podem estar em dobro
+            </h2>
             <p className="text-sm text-(--text-muted)">
-              Você já tinha lançado estes, e o extrato tem lançamentos do mesmo valor. Pode ser o
-              mesmo dinheiro com outro nome — ou não. Confira em Transações depois de confirmar.
+              Você já tinha lançado estes, e o extrato tem lançamentos do mesmo
+              valor. Pode ser o mesmo dinheiro com outro nome — ou não. Confira
+              em Transações depois de confirmar.
             </p>
           </div>
 
@@ -673,7 +793,12 @@ export function ImportWorkspace({
                   </div>
                   <span
                     className="shrink-0 text-sm tabular-nums"
-                    style={{ color: d.direction === "in" ? "var(--income)" : "var(--expense)" }}
+                    style={{
+                      color:
+                        d.direction === "in"
+                          ? "var(--income)"
+                          : "var(--expense)",
+                    }}
                   >
                     {d.direction === "in" ? "+" : "-"}
                     <Money cents={d.amountCents} currency={currency} />
@@ -693,11 +818,14 @@ export function ImportWorkspace({
       {forecasts.length > 0 ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h2 className="text-card-title">Previsões que o extrato não confirmou</h2>
+            <h2 className="text-card-title">
+              Previsões que o extrato não confirmou
+            </h2>
             <p className="text-sm text-(--text-muted)">
-              Estavam previstas nessa conta no período, e nenhum lançamento do extrato bate com
-              elas. Se o pagamento saiu de outra forma — valor diferente, ou dividido em duas
-              transferências — apague a previsão, senão o mês conta o mesmo dinheiro duas vezes.
+              Estavam previstas nessa conta no período, e nenhum lançamento do
+              extrato bate com elas. Se o pagamento saiu de outra forma — valor
+              diferente, ou dividido em duas transferências — apague a previsão,
+              senão o mês conta o mesmo dinheiro duas vezes.
             </p>
           </div>
 
@@ -712,14 +840,19 @@ export function ImportWorkspace({
                     <span className="w-12 shrink-0 text-xs text-(--text-muted)">
                       {shortDate(forecast.date)}
                     </span>
-                    <span className="truncate text-sm">{forecast.description}</span>
+                    <span className="truncate text-sm">
+                      {forecast.description}
+                    </span>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-3">
                     <span
                       className="text-sm tabular-nums"
                       style={{
-                        color: forecast.direction === "in" ? "var(--income)" : "var(--expense)",
+                        color:
+                          forecast.direction === "in"
+                            ? "var(--income)"
+                            : "var(--expense)",
                       }}
                     >
                       {forecast.direction === "in" ? "+" : "-"}
