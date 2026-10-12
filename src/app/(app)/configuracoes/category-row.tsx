@@ -91,20 +91,20 @@ export function CategoryRow({
   // Bloco da categoria. No computador, editar e apagar aparecem ao passar
   // o mouse; no celular, um toque abre a edição, que também tem o excluir.
   return (
-    <div className="group relative flex h-12 min-w-0 items-center gap-2.5 rounded-[14px] bg-[#F7F8FA] pr-1.5 pl-1.5 transition-colors hover:bg-[#F0F2F6]">
+    <div className="group relative flex h-12 min-w-0 items-center gap-2 rounded-[14px] bg-[#F7F8FA] pr-1.5 pl-1.5 md:gap-2.5 transition-colors hover:bg-[#F0F2F6]">
       <button
         type="button"
         onClick={() => setEditOpen(true)}
-        className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none md:gap-2.5"
         aria-label={`Editar ${category.name}`}
       >
         <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] md:h-9 md:w-9 md:rounded-[11px]"
           style={{ backgroundColor: `color-mix(in srgb, ${tint} 13%, transparent)`, color: tint }}
         >
           {createElement(RowIcon, { className: "h-[17px] w-[17px]" })}
         </span>
-        <span className="truncate text-[14px] font-semibold text-(--text-primary)">{category.name}</span>
+        <span className="truncate text-[13px] font-semibold text-(--text-primary) md:text-[14px]">{category.name}</span>
       </button>
 
       <span className="flex shrink-0 items-center opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">

@@ -19,22 +19,23 @@ export function CategoriesPanel({ expense, income }: { expense: Item[]; income: 
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      {/* No celular: título e "Nova categoria" na mesma linha, abas embaixo. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-4">
+        <div className="min-w-0 flex-1">
           <h2 className="text-card-title">Categorias</h2>
           <p className="mt-1 text-sm text-(--text-muted) max-md:hidden">
             Passe o mouse numa categoria pra editar ou apagar.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div role="tablist" className="flex flex-1 gap-1 rounded-xl bg-[#F4F5F8] p-1 sm:flex-none">
-            <button type="button" role="tab" aria-selected={tab === "expense"} className={tabClass(tab === "expense")} onClick={() => setTab("expense")}>
-              Despesas <span className="text-xs text-(--text-light)">{expense.length}</span>
-            </button>
-            <button type="button" role="tab" aria-selected={tab === "income"} className={tabClass(tab === "income")} onClick={() => setTab("income")}>
-              Receitas <span className="text-xs text-(--text-light)">{income.length}</span>
-            </button>
-          </div>
+        <div role="tablist" className="order-3 flex w-full gap-1 rounded-xl bg-[#F4F5F8] p-1 sm:order-2 sm:w-auto">
+          <button type="button" role="tab" aria-selected={tab === "expense"} className={tabClass(tab === "expense")} onClick={() => setTab("expense")}>
+            Despesas <span className="text-xs text-(--text-light)">{expense.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={tab === "income"} className={tabClass(tab === "income")} onClick={() => setTab("income")}>
+            Receitas <span className="text-xs text-(--text-light)">{income.length}</span>
+          </button>
+        </div>
+        <div className="order-2 sm:order-3">
           <NewCategoryDialog />
         </div>
       </div>
