@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Link2, Link2Off, Undo2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Link2, Link2Off, Pencil, Undo2, Upload } from "lucide-react";
 import {
   confirmImport,
   discardImport,
@@ -11,12 +11,14 @@ import {
   setStagedCategory,
   setStagedMerge,
   toggleStagedRow,
+  renameStagedRow,
   undoImport,
   type ActionResult,
 } from "@/lib/actions/imports";
 import { extractPdfText } from "@/lib/import/extract-pdf-text";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,6 +52,8 @@ type Row = {
   id: string;
   date: string;
   description: string;
+  /** Texto como veio do banco, quando difere do nome limpo. */
+  bankDescription: string | null;
   amountCents: number;
   direction: "in" | "out";
   categoryId: string | null;
@@ -133,6 +137,72 @@ function CategoryCell({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * Nome da linha, editável no lugar. O texto do banco aparece embaixo,
+ * pequeno, pra quem quiser conferir de onde o nome saiu.
+ */
+function NameCell({
+  row,
+  disabled,
+  onRename,
+}: {
+  row: Row;
+  disabled: boolean;
+  onRename: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(row.description);
+
+  function commit() {
+    setEditing(false);
+    const name = draft.replace(/\s+/g, " ").trim();
+    if (name && name !== row.description) onRename(name);
+    else setDraft(row.description);
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col">
+      {editing ? (
+        <Input
+          autoFocus
+          value={draft}
+          maxLength={200}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commit();
+            if (event.key === "Escape") {
+              setDraft(row.description);
+              setEditing(false);
+            }
+          }}
+          className="h-8"
+          aria-label="Nome do lançamento"
+        />
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            setDraft(row.description);
+            setEditing(true);
+          }}
+          className="group flex min-w-0 items-center gap-1.5 text-left"
+          title="Renomear"
+        >
+          <span className="truncate font-medium text-(--text-primary)">{row.description}</span>
+          <Pencil className="h-3 w-3 shrink-0 text-(--text-muted) opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-60" />
+        </button>
+      )}
+      {row.bankDescription && row.bankDescription !== row.description ? (
+        <span className="truncate text-[11px] text-(--text-muted)" title={row.bankDescription}>
+          {row.bankDescription}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -469,8 +539,15 @@ export function ImportWorkspace({
                   <td className="px-2 py-2 text-(--text-muted)">{shortDate(row.date)}</td>
                   <td className="px-2 py-2">
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate">{row.description}</span>
+                      <div className="flex items-start gap-2">
+                        <NameCell
+                          // Nome novo vindo do servidor recria a célula
+                          // com o rascunho certo.
+                          key={row.description}
+                          row={row}
+                          disabled={isPending}
+                          onRename={(name) => run(() => renameStagedRow(row.id, name))}
+                        />
                         {row.isDuplicate ? <Badge variant="secondary">Já existe</Badge> : null}
                       </div>
 

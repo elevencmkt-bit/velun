@@ -64,7 +64,7 @@ export default async function TransacoesPage({
   let query = supabase
     .from("transactions")
     .select(
-      `id, date, description, notes, amount_cents, direction, status, import_id,
+      `id, date, description, notes, bank_description, amount_cents, direction, status, import_id,
        transfer_group_id, recurrence_id, account_id, category_id,
        account:accounts(name),
        category:categories(name),
@@ -83,7 +83,13 @@ export default async function TransacoesPage({
   if (params.direction === "in" || params.direction === "out") {
     query = query.eq("direction", params.direction);
   }
-  if (params.q) query = query.ilike("description", `%${params.q}%`);
+  if (params.q) {
+    // Procura no nome e no texto do banco: quem lembra de "Card Purchase
+    // Fxreplay" também acha. Aspas protegem vírgula e parênteses, que a
+    // sintaxe do filtro usaria como separador.
+    const term = `"%${params.q.replace(/["\\]/g, "")}%"`;
+    query = query.or(`description.ilike.${term},bank_description.ilike.${term}`);
+  }
 
   if (hasCustomRange) {
     if (params.from) query = query.gte("date", params.from);
@@ -112,6 +118,7 @@ export default async function TransacoesPage({
     date: row.date,
     description: row.description,
     notes: row.notes,
+    bank_description: row.bank_description,
     amount_cents: row.amount_cents,
     direction: row.direction,
     status: row.status,

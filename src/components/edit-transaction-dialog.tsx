@@ -38,6 +38,7 @@ export type EditableTransaction = {
   amount_cents: number;
   description: string;
   notes: string | null;
+  bank_description?: string | null;
   status: "pending" | "cleared";
   recurrence_id: string | null;
 };
@@ -232,6 +233,13 @@ export function EditTransactionDialog({
               required
               defaultValue={transaction.description}
             />
+            {transaction.bank_description && transaction.bank_description !== transaction.description ? (
+              <p className="text-xs break-words text-(--text-muted)">
+                Como veio do banco: {transaction.bank_description}
+                <br />
+                Se você renomear, as próximas importações já trazem esse nome.
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-2">

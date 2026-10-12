@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { parseToCents } from "@/lib/money";
 import { computeFingerprint } from "@/lib/fingerprint";
+import { rememberMerchantName } from "@/lib/merchant-names";
 import { createRecurrenceFromAnchor } from "@/lib/materialize-occurrences";
 import type { RecurrenceFrequency } from "@/lib/recurrence";
 
@@ -139,11 +140,20 @@ export async function updateTransaction(transactionId: string, formData: FormDat
 
   const { data: current } = await supabase
     .from("transactions")
-    .select("recurrence_id")
+    .select("recurrence_id, description, bank_description")
     .eq("id", transactionId)
     .maybeSingle();
 
-  const fingerprint = computeFingerprint({ accountId, date, amountCents, description });
+  // Lançamento que veio do banco: a impressão digital sai do texto do
+  // banco, não do nome. Assim renomear não faz o mesmo extrato, importado
+  // de novo, entrar em dobro.
+  const bankDescription = (current?.bank_description as string | null) ?? null;
+  const fingerprint = computeFingerprint({
+    accountId,
+    date,
+    amountCents,
+    description: bankDescription ?? description,
+  });
   const recurrenceInput = parseRecurrenceInput(formData);
 
   const { error } = await supabase
@@ -163,6 +173,12 @@ export async function updateTransaction(transactionId: string, formData: FormDat
     .is("transfer_group_id", null);
 
   if (error) throw new Error(error.message);
+
+  // Renomeou um lançamento do banco: a próxima importação já traz esse
+  // nome pro mesmo estabelecimento.
+  if (bankDescription && description !== current?.description) {
+    await rememberMerchantName(supabase, { householdId, memberId, bankDescription, name: description });
+  }
 
   if (recurrenceInput && !current?.recurrence_id) {
     const recurrenceId = await createRecurrenceFromAnchor({

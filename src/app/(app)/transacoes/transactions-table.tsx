@@ -393,6 +393,7 @@ export function TransactionsTable({
             amount_cents: editingRow.amount_cents,
             description: editingRow.description,
             notes: editingRow.notes,
+            bank_description: editingRow.bank_description,
             status: editingRow.status,
             recurrence_id: editingRow.recurrence_id,
           }}
