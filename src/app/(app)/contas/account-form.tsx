@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { createAccount, updateAccount } from "@/lib/actions/accounts";
 import { CARD_COLORS } from "@/lib/credit-card";
 import { Button } from "@/components/ui/button";
@@ -64,16 +64,26 @@ export function AccountForm({
   paymentAccounts = [],
   defaultType,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   account?: EditableAccount;
   /** Contas que podem pagar a fatura de um cartão (correntes do casal ou próprias). */
   paymentAccounts?: { id: string; name: string }[];
   defaultType?: string;
-  /** Botão que abre o formulário, quando não é o padrão. */
+  /** Botão que abre o formulário, quando não é o padrão. `null`: sem botão (aberto por fora). */
   trigger?: React.ReactNode;
+  /** Aberto por fora (ex.: item "Editar" do menu ⋯ da conta). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const isEdit = Boolean(account);
-  const [open, setOpen] = useState(false);
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = controlledOpen ?? innerOpen;
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next);
+    else setInnerOpen(next);
+  };
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -112,15 +122,20 @@ export function AccountForm({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (isEdit ? (
-          <Button variant="ghost" size="icon" aria-label="Editar conta">
-            <Pencil className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button size="sm">Nova conta</Button>
-        ))}
-      </DialogTrigger>
+      {trigger === null ? null : (
+        <DialogTrigger asChild>
+          {trigger ?? (isEdit ? (
+            <Button variant="ghost" size="icon" aria-label="Editar conta">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button>
+              <Plus className="h-4 w-4" />
+              Nova conta
+            </Button>
+          ))}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
