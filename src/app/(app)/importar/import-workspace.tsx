@@ -6,7 +6,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   CreditCard,
+  FileText,
   Link2,
+  Lock,
   Link2Off,
   Pencil,
   Undo2,
@@ -29,7 +31,6 @@ import { extractPdfText } from "@/lib/import/extract-pdf-text";
 import type { CurrencyCode } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,8 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Money } from "@/components/money";
+import { AccountAvatar } from "@/components/account-avatar";
 
-type Account = { id: string; name: string; isPersonal: boolean };
+type Account = { id: string; name: string; isPersonal: boolean; type: string; institution: string | null };
 type Category = { id: string; name: string; kind: string };
 type OpenImport = {
   id: string;
@@ -55,6 +57,8 @@ type HistoryEntry = {
   id: string;
   fileName: string;
   accountName: string;
+  accountType: string;
+  accountInstitution: string | null;
   periodStart: string;
   periodEnd: string;
   transactionCount: number;
@@ -289,22 +293,31 @@ export function ImportWorkspace({
     </div>
   ) : null;
 
+  // Conta escolhida e arquivo, fora de um <form>: o arquivo pode chegar
+  // arrastado pra área, não só pelo seletor.
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const chosen = accounts.find((a) => a.id === accountId) ?? null;
+  const isCardChosen = chosen?.type === "credit_card";
+
+  function pickFile(f: File | null | undefined) {
+    if (!f) return;
+    setError(null);
+    if (!f.name.toLowerCase().endsWith(".pdf")) {
+      setFile(null);
+      setError("Por enquanto só PDF: extrato da Regions ou fatura do Nubank.");
+      return;
+    }
+    setFile(f);
+  }
+
   function onUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const accountId = String(formData.get("account_id") ?? "");
-    const file = formData.get("file");
-
     setError(null);
 
-    if (!accountId) return setError("Escolha a conta do extrato.");
-    if (!(file instanceof File) || file.size === 0)
-      return setError("Escolha um arquivo.");
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      return setError(
-        "Por enquanto só PDF: extrato da Regions ou fatura do Nubank.",
-      );
-    }
+    if (!accountId) return setError("Escolha de qual conta é o extrato.");
+    if (!file || file.size === 0) return setError("Escolha o arquivo PDF.");
 
     startTransition(async () => {
       // O PDF é lido aqui, no navegador. Pro servidor vai só o texto
@@ -332,6 +345,7 @@ export function ImportWorkspace({
           return;
         }
         setNotice(result.message);
+        setFile(null);
         router.refresh();
       } catch (err) {
         setError(
@@ -352,136 +366,245 @@ export function ImportWorkspace({
   const merges = rows.filter((r) => r.match && r.match.accepted).length;
 
   if (!openImport) {
+    const checking = accounts.filter((a) => a.type !== "credit_card");
+    const cards = accounts.filter((a) => a.type === "credit_card");
+    const accountButton = (a: Account) => {
+      const on = a.id === accountId;
+      return (
+        <button
+          key={a.id}
+          type="button"
+          onClick={() => {
+            setAccountId(a.id);
+            setError(null);
+          }}
+          aria-pressed={on}
+          className={`flex h-16 w-full items-center gap-3 rounded-[16px] border-[1.5px] bg-(--bg-surface) px-3.5 text-left transition-colors ${
+            on
+              ? "border-(--primary) bg-[#F5F6FF] shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
+              : "border-[#EAECF0] hover:border-[#C7D0FF]"
+          }`}
+        >
+          <AccountAvatar institution={a.institution} type={a.type} size={38} />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-(--text-primary)">{a.name}</span>
+            <span className="block text-xs text-(--text-muted)">
+              {a.type === "credit_card" ? "Cartão · fatura" : "Conta · extrato"}
+              {a.isPersonal ? " · minha" : ""}
+            </span>
+          </span>
+        </button>
+      );
+    };
+
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5 md:gap-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Importar</h1>
           <p className="text-page-subtitle">
-            Extrato da Regions ou fatura do cartão Nubank, em PDF. O arquivo é
-            lido aqui no navegador e não sai da sua máquina. Os lançamentos
-            passam por revisão antes de entrar.
+            Traga o extrato do banco ou a fatura do cartão. Nada entra sem você revisar.
           </p>
         </div>
 
-        <Card className="max-w-xl">
-          <CardContent>
-            <form onSubmit={onUpload} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="account_id">Conta do extrato</Label>
-                <Select name="account_id" required>
-                  <SelectTrigger id="account_id">
-                    <SelectValue placeholder="Escolha a conta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                        {a.isPersonal ? " (pessoal)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-6">
+          <form
+            onSubmit={onUpload}
+            className="flex flex-col gap-5 rounded-[20px] bg-(--bg-surface) p-4 shadow-(--shadow-card) md:gap-6 md:p-6"
+          >
+            <div>
+              <div className="mb-2.5 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase md:text-xs">
+                1 · De qual conta é?
               </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="file">Arquivo PDF</Label>
-                <input
-                  id="file"
-                  name="file"
-                  type="file"
-                  accept="application/pdf"
-                  required
-                  className="text-sm file:mr-3 file:rounded-lg file:border file:border-(--border-primary) file:bg-transparent file:px-3 file:py-1.5 file:text-sm"
-                />
-              </div>
-
-              {errorBlock}
-              {notice ? (
-                <p
-                  className="rounded-xl bg-(--primary-soft) px-3 py-2 text-sm text-(--primary-hover)"
-                  role="status"
-                >
-                  {notice}
-                </p>
-              ) : null}
-
-              <Button
-                type="submit"
-                disabled={isPending || accounts.length === 0}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {isPending ? "Lendo o extrato..." : "Importar extrato"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {history.length > 0 ? (
-          <div className="flex max-w-xl flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-card-title">Importações recentes</h2>
-              <p className="text-sm text-(--text-muted)">
-                Desfazer apaga os lançamentos que a importação criou, inclusive
-                alterações feitas neles depois.
-              </p>
+              {accounts.length === 0 ? (
+                <p className="text-sm text-(--text-muted)">Crie uma conta antes de importar.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-2.5">{checking.map(accountButton)}</div>
+                  {cards.length > 0 ? (
+                    <>
+                      <div className="mt-3.5 mb-2 text-xs font-semibold text-(--text-light)">Cartões</div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-2.5">{cards.map(accountButton)}</div>
+                    </>
+                  ) : null}
+                </>
+              )}
             </div>
 
-            <Card>
-              <CardContent className="flex flex-col gap-0 p-0">
-                {history.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between gap-4 border-b px-4 py-3 last:border-0"
-                  >
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-sm">{entry.fileName}</span>
-                      <span className="text-xs text-(--text-muted)">
-                        {entry.accountName} · {shortDate(entry.periodStart)} a{" "}
-                        {shortDate(entry.periodEnd)} ·{" "}
-                        {entry.transactionCount === 1
-                          ? "1 lançamento"
-                          : `${entry.transactionCount} lançamentos`}
+            <div>
+              <div className="mb-2.5 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase md:text-xs">
+                2 · {isCardChosen ? "Mande a fatura" : "Mande o PDF"}
+              </div>
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  pickFile(e.dataTransfer.files?.[0]);
+                }}
+                className={`flex cursor-pointer items-center gap-3 rounded-[18px] border-2 border-dashed px-4 transition-colors max-md:h-[76px] md:h-[200px] md:flex-col md:justify-center md:gap-2.5 md:px-6 md:text-center ${
+                  dragging ? "border-(--primary) bg-[#EEF1FF]" : "border-[#C7D0FF] bg-[#F8F9FF] hover:bg-[#F3F5FF]"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="sr-only"
+                  onChange={(e) => pickFile(e.target.files?.[0])}
+                />
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-(--primary-light) text-(--primary) md:h-[52px] md:w-[52px] md:rounded-[16px]">
+                  {file ? <FileText className="h-5 w-5 md:h-6 md:w-6" /> : <Upload className="h-5 w-5 md:h-6 md:w-6" />}
+                </span>
+                {file ? (
+                  <span className="min-w-0">
+                    <span className="block truncate text-[15px] font-semibold text-(--text-primary)">{file.name}</span>
+                    <span className="block text-[13px] text-(--text-muted)">
+                      Pronto pra ler · <span className="font-semibold text-(--primary)">trocar arquivo</span>
+                    </span>
+                  </span>
+                ) : (
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-semibold text-(--text-primary)">
+                      <span className="max-md:hidden">Arraste {isCardChosen ? "a fatura do cartão" : "o extrato"} aqui</span>
+                      <span className="md:hidden">Escolher {isCardChosen ? "a fatura" : "o extrato"}</span>
+                    </span>
+                    <span className="block text-[13px] text-(--text-muted)">
+                      <span className="max-md:hidden">
+                        ou <span className="font-semibold text-(--primary)">clique pra escolher</span> · só PDF
+                      </span>
+                      <span className="md:hidden">Regions ou Nubank, em PDF</span>
+                    </span>
+                  </span>
+                )}
+              </label>
+              <div className="mt-3 flex flex-wrap items-center gap-2 max-md:hidden">
+                <span className="text-xs text-(--text-light)">O Velun lê:</span>
+                <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
+                  Extrato Regions
+                </span>
+                <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
+                  Fatura Nubank
+                </span>
+                <span className="inline-flex h-7 items-center rounded-full border-[1.5px] border-dashed border-[#D0D5DD] px-2.5 text-xs font-semibold text-(--text-light)">
+                  mais bancos em breve
+                </span>
+              </div>
+            </div>
+
+            {errorBlock}
+            {notice ? (
+              <p className="rounded-xl bg-(--primary-soft) px-3 py-2 text-sm text-(--primary-hover)" role="status">
+                {notice}
+              </p>
+            ) : null}
+
+            <Button type="submit" disabled={isPending || accounts.length === 0} className="h-12 rounded-[14px] text-[15px]">
+              {isPending ? "Lendo o PDF…" : "Ler e revisar"}
+            </Button>
+
+            <p className="flex items-start gap-2 text-xs leading-relaxed text-(--text-muted) lg:hidden">
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-(--primary)" />
+              O arquivo é lido aqui no aparelho e não sai dele. Só os lançamentos que você aprovar são salvos.
+            </p>
+          </form>
+
+          <aside className="flex flex-col gap-4 rounded-[20px] bg-(--bg-surface) p-6 shadow-(--shadow-card) max-lg:hidden">
+            <h2 className="text-card-title">Como funciona</h2>
+            {[
+              ["Escolha a conta", "Conta corrente recebe extrato; cartão recebe fatura."],
+              ["Mande o PDF do banco", "O mesmo que você baixa no app ou no site do banco."],
+              [
+                "Revise antes de entrar",
+                "O Velun sugere categoria, junta o que já foi lançado e marca pagamento de fatura. Você confirma.",
+              ],
+            ].map(([title, text], i) => (
+              <div key={title} className="flex items-start gap-3.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--primary-light) text-[13px] font-extrabold text-[#4257CB]">
+                  {i + 1}
+                </span>
+                <div>
+                  <div className="text-sm font-semibold text-(--text-primary)">{title}</div>
+                  <div className="text-[13px] leading-relaxed text-(--text-muted)">{text}</div>
+                </div>
+              </div>
+            ))}
+            <div className="flex items-start gap-2.5 rounded-[14px] bg-[#F5F6FF] p-3.5 text-[13px] leading-relaxed text-(--text-secondary)">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#4257CB]" />
+              <span>
+                O arquivo é lido no seu navegador e <b>não sai da sua máquina</b>. Só os lançamentos que você aprovar
+                são salvos.
+              </span>
+            </div>
+          </aside>
+        </div>
+
+        {history.length > 0 ? (
+          <section className="rounded-[20px] bg-(--bg-surface) p-4 shadow-(--shadow-card) md:p-6">
+            <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between">
+              <h2 className="text-card-title">Importações recentes</h2>
+              <span className="text-[13px] text-(--text-muted) max-md:hidden">
+                Desfazer apaga os lançamentos que a importação criou, inclusive alterações feitas neles depois.
+              </span>
+            </div>
+            <div className="mt-2">
+              {history.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex min-h-16 items-center gap-3 border-b border-(--border-soft) py-2 last:border-0 md:gap-3.5"
+                >
+                  <AccountAvatar institution={entry.accountInstitution} type={entry.accountType} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-(--text-primary)">{entry.fileName}</div>
+                    <div className="truncate text-xs text-(--text-muted)">
+                      {entry.accountName}
+                      <span className="max-md:hidden">
+                        {" "}· {entry.accountType === "credit_card" ? "fatura" : "extrato"} de {shortDate(entry.periodStart)} a{" "}
+                        {shortDate(entry.periodEnd)}
+                      </span>
+                      <span className="md:hidden">
+                        {" "}· {entry.transactionCount === 1 ? "1 lançamento" : `${entry.transactionCount} lançamentos`}
                       </span>
                     </div>
-
-                    {confirmingUndo === entry.id ? (
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={isPending}
-                          onClick={() => setConfirmingUndo(null)}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          size="sm"
-                          disabled={isPending}
-                          onClick={() => {
-                            setConfirmingUndo(null);
-                            run(() => undoImport(entry.id));
-                          }}
-                        >
-                          Apagar {entry.transactionCount}
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0"
-                        disabled={isPending}
-                        onClick={() => setConfirmingUndo(entry.id)}
-                      >
-                        <Undo2 className="mr-2 h-4 w-4" />
-                        Desfazer
-                      </Button>
-                    )}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                  <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
+                    {entry.transactionCount === 1 ? "1 lançamento" : `${entry.transactionCount} lançamentos`}
+                  </span>
+
+                  {confirmingUndo === entry.id ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button variant="ghost" size="sm" disabled={isPending} onClick={() => setConfirmingUndo(null)}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={isPending}
+                        onClick={() => {
+                          setConfirmingUndo(null);
+                          run(() => undoImport(entry.id));
+                        }}
+                      >
+                        Apagar {entry.transactionCount}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={isPending}
+                      onClick={() => setConfirmingUndo(entry.id)}
+                    >
+                      <Undo2 className="mr-1.5 h-4 w-4" />
+                      Desfazer
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
       </div>
     );
