@@ -84,13 +84,15 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         <Motif className="pointer-events-none absolute -top-24 -right-28 h-[420px] w-[420px] opacity-[0.14] lg:-top-32 lg:-right-40 lg:h-[680px] lg:w-[680px]" />
 
         <div className="relative flex items-center gap-3 px-6 pt-8 lg:p-0">
-          <Image
-            src="/velun-icon.png"
-            alt=""
-            width={40}
-            height={40}
-            className="h-10 w-10 rounded-xl ring-2 ring-white/30"
-          />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-[0_6px_16px_rgba(20,28,90,0.25)]">
+            <Image
+              src="/velun-icon.png"
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-lg"
+            />
+          </div>
           <span className="text-[22px] font-extrabold tracking-[-0.03em]">
             velun
           </span>
