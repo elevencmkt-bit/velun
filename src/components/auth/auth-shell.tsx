@@ -71,7 +71,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           width={556}
           height={900}
           priority
-          className="pointer-events-none absolute -right-10 bottom-0 hidden h-[88%] w-auto opacity-[0.32] mix-blend-luminosity lg:block"
+          className="pointer-events-none absolute -right-10 bottom-0 hidden h-[88%] w-auto opacity-[0.2] mix-blend-luminosity lg:block"
         />
 
         <div className="relative flex items-center gap-3 px-6 pt-8 lg:p-0">
