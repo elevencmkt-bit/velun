@@ -1,2 +1,2 @@
 ERROR:  Esta importação já foi confirmada.
-CONTEXT:  PL/pgSQL function confirm_import(uuid) line 23 at RAISE
+CONTEXT:  PL/pgSQL function confirm_import(uuid) line 25 at RAISE

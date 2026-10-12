@@ -1,9 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { markNotificationsSeen } from "@/lib/actions/notifications";
-import type { VisibilityNotification } from "@/lib/notifications";
+import { approveAccountDeletion, declineAccountDeletion } from "@/lib/actions/accounts";
+import type { DeletionRequest, VisibilityNotification } from "@/lib/notifications";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,19 +21,38 @@ function relativeDay(iso: string) {
   return then.toLocaleDateString("pt-BR");
 }
 
-// Hoje o sino carrega um tipo de aviso só: mudança de visibilidade de
-// conta. É deliberado — a regra de que privacidade nunca muda em
-// silêncio não pode competir por atenção com lembrete de vencimento.
+// O sino carrega o que mexe na confiança entre os dois: mudança de
+// visibilidade de conta e pedido pra excluir conta do casal. É
+// deliberado — isso não pode competir por atenção com lembrete de
+// vencimento.
 export function NotificationBell({
   notifications,
+  deletionRequests = [],
 }: {
   notifications: VisibilityNotification[];
+  /** Pedidos do outro, esperando o seu aval. */
+  deletionRequests?: DeletionRequest[];
 }) {
-  const [, startTransition] = useTransition();
-  const unreadCount = notifications.filter((n) => n.isNew).length;
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  // Pedido esperando resposta conta como não lido até ser respondido.
+  const unreadCount = notifications.filter((n) => n.isNew).length + deletionRequests.length;
+
+  function decide(id: string, approve: boolean) {
+    setError(null);
+    startTransition(async () => {
+      const result = approve ? await approveAccountDeletion(id) : await declineAccountDeletion(id);
+      if (!result.ok) {
+        setError(result.error ?? "Não deu certo.");
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   function onOpenChange(open: boolean) {
-    if (open && unreadCount > 0) {
+    if (open && notifications.some((n) => n.isNew)) {
       startTransition(() => {
         void markNotificationsSeen();
       });
@@ -59,7 +80,38 @@ export function NotificationBell({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-3">
-        {notifications.length === 0 ? (
+        {deletionRequests.length > 0 ? (
+          <ul className="mb-3 flex flex-col gap-3 border-b border-(--border-soft) pb-3">
+            {deletionRequests.map((r) => (
+              <li key={r.id} className="flex flex-col gap-2">
+                <p className="text-sm text-(--text-primary)">
+                  <span className="font-medium">{r.requestedByName}</span> pediu pra excluir a conta do casal{" "}
+                  <span className="font-medium">{r.accountName}</span>
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => decide(r.id, true)}
+                    className="h-8 rounded-[10px] bg-(--expense) px-3 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Aprovar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => decide(r.id, false)}
+                    className="h-8 rounded-[10px] bg-[#F4F5F8] px-3 text-xs font-semibold text-(--text-secondary) disabled:opacity-50"
+                  >
+                    Recusar
+                  </button>
+                </div>
+              </li>
+            ))}
+            {error ? <li className="text-xs text-(--expense-dark)">{error}</li> : null}
+          </ul>
+        ) : null}
+        {notifications.length === 0 && deletionRequests.length === 0 ? (
           <p className="text-sm text-(--text-muted)">Nenhuma notificação por enquanto.</p>
         ) : (
           <ul className="flex flex-col gap-3">

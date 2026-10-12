@@ -204,8 +204,8 @@ admin "update members set removed_at = now() where id = '$ESPOSA'"
 as_user $ESPOSA "update members set removed_at = null where id = '$ESPOSA';" >/dev/null
 check "removida, ela não apaga a própria remoção" "$(admin "select (removed_at is not null)::text from members where id='$ESPOSA'")" "true"
 admin "update members set removed_at = null where id = '$ESPOSA'"
-admin "insert into households (id, name) values ('22222222-0000-0000-0000-000000000002', 'Casa de outra pessoa')"
-as_user $ESPOSA "update members set household_id = '22222222-0000-0000-0000-000000000002' where id = '$ESPOSA';" >/dev/null
+admin "insert into households (id, name) values ('33333333-0000-0000-0000-000000000003', 'Casa de outra pessoa')"
+as_user $ESPOSA "update members set household_id = '33333333-0000-0000-0000-000000000003' where id = '$ESPOSA';" >/dev/null
 check "ela não troca a própria casa por outra" "$(admin "select household_id from members where id='$ESPOSA'")" "11111111-0000-0000-0000-000000000001"
 
 echo "mover recorrência:"
@@ -294,7 +294,7 @@ as_user $LEVI "update households set country = 'BR', timezone = 'America/Sao_Pau
 check "membro troca país, fuso e moeda" "$(admin "select country||' · '||timezone||' · '||currency from households where id='11111111-0000-0000-0000-000000000001'")" "BR · America/Sao_Paulo · BRL"
 check "fuso inexistente é recusado" "$(as_user $LEVI "update households set timezone = 'Lua/Base' where id = '11111111-0000-0000-0000-000000000001';" | grep -o 'time zone' | head -1)" "time zone"
 check "país fora da lista é recusado" "$(as_user $LEVI "update households set country = 'XX' where id = '11111111-0000-0000-0000-000000000001';" | grep -o 'violates check' | head -1)" "violates check"
-check "ninguém mexe na casa dos outros" "$(as_user $LEVI "update households set timezone = 'America/Chicago' where id = '22222222-0000-0000-0000-000000000002' returning id;" | grep -c 2222)" "0"
+check "ninguém mexe na casa dos outros" "$(as_user $LEVI "update households set timezone = 'America/Chicago' where id = '33333333-0000-0000-0000-000000000003' returning id;" | grep -c 2222)" "0"
 
 echo "cartão de crédito:"
 admin "update households set country='US', timezone='America/New_York', currency='USD' where id='11111111-0000-0000-0000-000000000001'"
@@ -332,6 +332,29 @@ as_user $LEVI "insert into transactions (household_id, account_id, date, amount_
 check "parcela 1 de 6 gravada" "$(admin "select installment_number||' de '||installment_total from transactions where fingerprint='inst-1'")" "1 de 6"
 check "parcela 7 de 6 é recusada" "$(as_user $LEVI "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by, installment_group_id, installment_number, installment_total) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-0000000000c1', '2026-10-10', 20000, 'out', 'Dentista', 'inst-x', '$LEVI', 'eeee0000-0000-0000-0000-000000000001', 7, 6);" | grep -o 'violates check' | head -1)" "violates check"
 check "parcela sem grupo é recusada" "$(as_user $LEVI "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by, installment_number, installment_total) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-0000000000c1', '2026-10-10', 20000, 'out', 'Dentista', 'inst-y', '$LEVI', 1, 6);" | grep -o 'violates check' | head -1)" "violates check"
+
+echo "excluir conta do casal (aval dos dois):"
+admin "insert into accounts (id, household_id, name, type) values ('acc00000-0000-0000-0000-0000000000d1', '11111111-0000-0000-0000-000000000001', 'Conta teste', 'checking'), ('acc00000-0000-0000-0000-0000000000d2', '11111111-0000-0000-0000-000000000001', 'Com historico', 'checking');"
+admin "insert into transactions (household_id, account_id, date, amount_cents, direction, description, fingerprint, created_by) values ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-0000000000d2', '2026-10-01', 100, 'out', 'x', 'del-1', '$LEVI');"
+admin "insert into recurrences (household_id, template, frequency, starts_on) values ('11111111-0000-0000-0000-000000000001', '{\"account_id\": \"acc00000-0000-0000-0000-0000000000d1\"}', 'monthly', '2026-10-01');"
+as_user $LEVI "delete from accounts where id='acc00000-0000-0000-0000-0000000000d1';" >/dev/null
+check "com dois na casa, delete direto da conta do casal não passa" "$(admin "select count(*) from accounts where id='acc00000-0000-0000-0000-0000000000d1'")" "1"
+check "pedir com histórico é recusado" "$(as_user $LEVI "select request_account_deletion('acc00000-0000-0000-0000-0000000000d2');" | grep -o 'tem lançamentos')" "tem lançamentos"
+check "pedir abre pedido" "$(as_user $LEVI "select request_account_deletion('acc00000-0000-0000-0000-0000000000d1');")" "requested"
+check "segundo pedido igual é recusado" "$(as_user $LEVI "select request_account_deletion('acc00000-0000-0000-0000-0000000000d1');" | grep -o 'Já tem um pedido')" "Já tem um pedido"
+REQ=$(admin "select id from account_deletion_requests where account_id='acc00000-0000-0000-0000-0000000000d1'")
+check "esposa vê o pedido" "$(as_user $ESPOSA "select count(*) from account_deletion_requests;")" "1"
+check "quem pediu não aprova" "$(as_user $LEVI "select approve_account_deletion('$REQ');" | grep -o 'não pode aprovar')" "não pode aprovar"
+check "conta continua depois da tentativa" "$(admin "select count(*) from accounts where id='acc00000-0000-0000-0000-0000000000d1'")" "1"
+as_user $ESPOSA "select decline_account_deletion('$REQ');" >/dev/null
+check "esposa recusa" "$(admin "select status from account_deletion_requests where id='$REQ'")" "declined"
+as_user $LEVI "select request_account_deletion('acc00000-0000-0000-0000-0000000000d1');" >/dev/null
+REQ2=$(admin "select id from account_deletion_requests where account_id='acc00000-0000-0000-0000-0000000000d1' and status='pending'")
+as_user $ESPOSA "select approve_account_deletion('$REQ2');" >/dev/null
+check "esposa aprova: conta sai" "$(admin "select count(*) from accounts where id='acc00000-0000-0000-0000-0000000000d1'")" "0"
+check "recorrência da conta sai junto" "$(admin "select count(*) from recurrences where template->>'account_id'='acc00000-0000-0000-0000-0000000000d1'")" "0"
+check "conta pessoal: dono exclui direto" "$(admin "insert into accounts (id, household_id, name, type, owner_id, visibility) values ('acc00000-0000-0000-0000-0000000000d3', '11111111-0000-0000-0000-000000000001', 'Minha', 'checking', '$LEVI', 'hidden');"; as_user $LEVI "delete from accounts where id='acc00000-0000-0000-0000-0000000000d3';" >/dev/null; admin "select count(*) from accounts where id='acc00000-0000-0000-0000-0000000000d3'")" "0"
+check "casa de um membro: pedir exclui na hora" "$(admin "insert into auth.users (id) values ('dddddddd-0000-0000-0000-00000000000d'); insert into households (id, name) values ('44444444-0000-0000-0000-000000000004', 'Solo'); insert into members (id, household_id, display_name, color) values ('dddddddd-0000-0000-0000-00000000000d', '44444444-0000-0000-0000-000000000004', 'Solo', '#222'); insert into accounts (id, household_id, name, type) values ('acc00000-0000-0000-0000-0000000000d4', '44444444-0000-0000-0000-000000000004', 'Solo conta', 'checking');"; as_user dddddddd-0000-0000-0000-00000000000d "select request_account_deletion('acc00000-0000-0000-0000-0000000000d4');")" "deleted"
 
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1

@@ -182,30 +182,40 @@ export async function unarchiveAccount(accountId: string) {
   revalidatePath("/cartoes");
 }
 
-export type DeleteAccountResult = { ok: true } | { ok: false; error: string };
+export type DeleteAccountResult =
+  | { ok: true; outcome: "deleted" | "requested" }
+  | { ok: false; error: string };
 
 /**
- * Exclui uma conta de vez. Só conta sem lançamentos: com histórico, o
- * caminho é arquivar (o histórico continua contando nos meses em que
- * aconteceu). O banco só deixa excluir conta do casal ou a própria — a
- * conta pessoal do outro nem chega aqui.
+ * Exclui uma conta. Só conta sem lançamentos: com histórico, o caminho é
+ * arquivar (o histórico continua contando nos meses em que aconteceu).
+ *
+ * Conta pessoal: o dono exclui direto. Conta do casal: com mais alguém
+ * na casa, vira um PEDIDO que o outro aprova pelo sino; sozinho na casa,
+ * sai na hora. Quem garante é o banco (migração 0024).
  */
 export async function deleteAccount(accountId: string): Promise<DeleteAccountResult> {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 
-  // Conta do casal é dos dois: com mais alguém na casa, ninguém exclui
-  // sozinho. (O pedido de aprovação do outro vem num passo seguinte.)
-  const [{ data: acc }, { count: members }] = await Promise.all([
-    supabase.from("accounts").select("owner_id").eq("id", accountId).eq("household_id", householdId).maybeSingle(),
-    supabase.from("members").select("id", { count: "exact", head: true }).eq("household_id", householdId),
-  ]);
+  const { data: acc } = await supabase
+    .from("accounts")
+    .select("owner_id")
+    .eq("id", accountId)
+    .eq("household_id", householdId)
+    .maybeSingle();
   if (!acc) return { ok: false, error: "Conta não encontrada." };
-  if (acc.owner_id === null && (members ?? 1) > 1) {
-    return {
-      ok: false,
-      error: "Conta do casal só sai com o aval dos dois. Por enquanto, arquive — o pedido de exclusão pro outro aprovar vem em seguida.",
-    };
+
+  if (acc.owner_id === null) {
+    const { data, error } = await supabase.rpc("request_account_deletion", { p_account_id: accountId });
+    if (error) {
+      if (error.code === "42883" || error.code === "PGRST202") {
+        return { ok: false, error: "Falta rodar a migração 0024 no Supabase pra excluir conta do casal." };
+      }
+      return { ok: false, error: error.message };
+    }
+    revalidatePath("/", "layout");
+    return { ok: true, outcome: data === "deleted" ? "deleted" : "requested" };
   }
 
   const { count, error: countError } = await supabase
@@ -236,11 +246,28 @@ export async function deleteAccount(accountId: string): Promise<DeleteAccountRes
     .eq("id", accountId)
     .select("id");
   if (error) return { ok: false, error: "Não consegui excluir a conta." };
-  // O banco recusa em silêncio a conta pessoal de outra pessoa.
   if (!deleted || deleted.length === 0) {
     return { ok: false, error: "Só quem é dono da conta pode excluí-la." };
   }
 
+  revalidatePath("/", "layout");
+  return { ok: true, outcome: "deleted" };
+}
+
+/** Aprova o pedido de exclusão feito pelo outro: a conta sai. */
+export async function approveAccountDeletion(requestId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("approve_account_deletion", { p_request_id: requestId });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Recusa o pedido do outro, ou cancela o próprio. */
+export async function declineAccountDeletion(requestId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("decline_account_deletion", { p_request_id: requestId });
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/", "layout");
   return { ok: true };
 }

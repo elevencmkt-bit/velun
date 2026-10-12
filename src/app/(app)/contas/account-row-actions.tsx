@@ -2,8 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, Ellipsis, Pencil, Trash2 } from "lucide-react";
-import { archiveAccount, deleteAccount, unarchiveAccount } from "@/lib/actions/accounts";
+import { Archive, ArchiveRestore, Ellipsis, Pencil, Trash2, Undo2, X } from "lucide-react";
+import {
+  approveAccountDeletion,
+  archiveAccount,
+  declineAccountDeletion,
+  deleteAccount,
+  unarchiveAccount,
+} from "@/lib/actions/accounts";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -32,10 +38,18 @@ export function AccountRowActions({
   account,
   isArchived,
   paymentAccounts,
+  needsApproval = false,
+  partnerName = null,
+  pendingRequest = null,
 }: {
   account: EditableAccount;
   isArchived: boolean;
   paymentAccounts: { id: string; name: string }[];
+  /** Conta do casal com mais alguém na casa: excluir vira pedido. */
+  needsApproval?: boolean;
+  partnerName?: string | null;
+  /** Pedido de exclusão aberto pra esta conta. */
+  pendingRequest?: { id: string; isMine: boolean } | null;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -64,6 +78,23 @@ export function AccountRowActions({
     });
   }
 
+  function decide(approve: boolean) {
+    if (!pendingRequest) return;
+    startTransition(async () => {
+      const result = approve
+        ? await approveAccountDeletion(pendingRequest.id)
+        : await declineAccountDeletion(pendingRequest.id);
+      if (!result.ok) {
+        setDeleteError(result.error ?? "Não deu certo.");
+        setDeleteOpen(true);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  const who = partnerName ?? "a outra pessoa da casa";
+
   return (
     <>
       <DropdownMenu>
@@ -90,25 +121,51 @@ export function AccountRowActions({
             {isArchived ? "Reativar" : "Arquivar"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() => {
-              setDeleteError(null);
-              setDeleteOpen(true);
-            }}
-            className="text-(--expense-dark) focus:text-(--expense-dark)"
-          >
-            <Trash2 className="h-4 w-4" />
-            Excluir conta
-          </DropdownMenuItem>
+          {pendingRequest ? (
+            pendingRequest.isMine ? (
+              <DropdownMenuItem onSelect={() => decide(false)}>
+                <Undo2 className="h-4 w-4" />
+                Cancelar pedido de exclusão
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => decide(true)}
+                  className="text-(--expense-dark) focus:text-(--expense-dark)"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Aprovar exclusão
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => decide(false)}>
+                  <X className="h-4 w-4" />
+                  Recusar exclusão
+                </DropdownMenuItem>
+              </>
+            )
+          ) : (
+            <DropdownMenuItem
+              onSelect={() => {
+                setDeleteError(null);
+                setDeleteOpen(true);
+              }}
+              className="text-(--expense-dark) focus:text-(--expense-dark)"
+            >
+              <Trash2 className="h-4 w-4" />
+              {needsApproval ? "Pedir pra excluir" : "Excluir conta"}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir {account.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {needsApproval ? `Pedir pra excluir ${account.name}?` : `Excluir ${account.name}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              A conta some de vez, junto com as recorrências que lançariam nela. Só dá pra excluir conta
-              sem lançamentos. Essa ação não pode ser desfeita.
+              {needsApproval
+                ? `Conta do casal só sai com o aval dos dois. ${who} recebe o pedido no sino e aprova ou recusa. Só dá pra excluir conta sem lançamentos.`
+                : "A conta some de vez, junto com as recorrências que lançariam nela. Só dá pra excluir conta sem lançamentos. Essa ação não pode ser desfeita."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError ? <p className="text-sm text-(--expense-dark)">{deleteError}</p> : null}
@@ -123,7 +180,7 @@ export function AccountRowActions({
               }}
               className="bg-(--expense) hover:bg-(--expense-dark)"
             >
-              {isPending ? "Excluindo…" : "Excluir"}
+              {isPending ? (needsApproval ? "Enviando…" : "Excluindo…") : needsApproval ? "Pedir" : "Excluir"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -7,6 +7,7 @@ import { getCurrentMember } from "@/lib/current-member";
 import { getAccountBalances } from "@/lib/balances";
 import { accountScope } from "@/lib/visibility";
 import { CardArt } from "@/components/card-art";
+import { fetchDeletionRequests } from "@/lib/notifications";
 import { AccountForm } from "./account-form";
 import { AccountRowActions } from "./account-row-actions";
 import { Money } from "@/components/money";
@@ -31,7 +32,7 @@ export default async function ContasPage() {
   const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
 
-  const [{ data: accounts }, balances, { data: members }] = await Promise.all([
+  const [{ data: accounts }, balances, { data: members }, deletionRequests] = await Promise.all([
     supabase
       .from("accounts")
       .select(
@@ -44,7 +45,9 @@ export default async function ContasPage() {
       getAccountBalances(supabase, householdId, scope),
     ),
     supabase.from("members").select("id, display_name").eq("household_id", householdId),
+    fetchDeletionRequests(supabase, householdId, memberId),
   ]);
+  const requestByAccount = new Map(deletionRequests.map((r) => [r.accountId, r]));
 
   const memberNames = new Map(
     (members ?? []).map((m) => [m.id as string, m.display_name as string]),
@@ -122,6 +125,13 @@ export default async function ContasPage() {
             {a.institution ? <span className="max-md:hidden"> · {a.institution}</span> : null}
             {chip ? <span className="md:hidden"> · {chip}</span> : null}
           </div>
+          {requestByAccount.get(a.id) ? (
+            <div className="mt-0.5 text-xs font-semibold text-(--expense-dark)">
+              {requestByAccount.get(a.id)!.isMine
+                ? `Exclusão pedida · esperando ${partnerFirst ?? "o aval"}`
+                : `${requestByAccount.get(a.id)!.requestedByName} pediu pra excluir · aprove ou recuse no ⋯`}
+            </div>
+          ) : null}
         </div>
         {chip ? (
           <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
@@ -136,7 +146,14 @@ export default async function ContasPage() {
           {isCard ? <Money cents={Math.max(0, -balance)} currency={currency} /> : <Money cents={balance} currency={currency} />}
         </span>
         {canManage ? (
-          <AccountRowActions account={editable(a)} isArchived={a.is_archived} paymentAccounts={paymentAccounts} />
+          <AccountRowActions
+            account={editable(a)}
+            isArchived={a.is_archived}
+            paymentAccounts={paymentAccounts}
+            needsApproval={a.owner_id === null && Boolean(partner)}
+            partnerName={partnerFirst}
+            pendingRequest={requestByAccount.get(a.id) ?? null}
+          />
         ) : (
           <span className="w-9 shrink-0" aria-hidden />
         )}
@@ -255,7 +272,14 @@ export default async function ContasPage() {
                             : (ACCOUNT_TYPE_LABELS[a.type] ?? "")}
                         </span>
                         {a.owner_id === null || isMine ? (
-                          <AccountRowActions account={editable(a)} isArchived={false} paymentAccounts={paymentAccounts} />
+                          <AccountRowActions
+                            account={editable(a)}
+                            isArchived={false}
+                            paymentAccounts={paymentAccounts}
+                            needsApproval={a.owner_id === null && Boolean(partner)}
+                            partnerName={partnerFirst}
+                            pendingRequest={requestByAccount.get(a.id) ?? null}
+                          />
                         ) : null}
                       </div>
                     </div>
