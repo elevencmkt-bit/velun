@@ -105,6 +105,11 @@ function ChartTooltip({
       >
         <Money cents={point.balance_cents} currency={currency} />
       </div>
+      {point.with_overdue_cents !== undefined ? (
+        <div className="text-[11px] text-(--text-muted)">
+          Se os atrasados saírem: <Money cents={point.with_overdue_cents} currency={currency} />
+        </div>
+      ) : null}
       {point.events.length > 0 ? (
         <div className="mt-1.5 flex flex-col gap-1 border-t border-(--border-soft) pt-1.5">
           {point.events.map((event) => (
@@ -139,7 +144,7 @@ export function ProjectionChart({
   const EventDot = makeEventDot(new Set(highlightedEventIds));
 
   return (
-    <div className="h-[330px] w-full">
+    <div className="h-[260px] w-full md:h-[330px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 24, right: 16, bottom: 0, left: 8 }}>
           <defs>
@@ -172,6 +177,18 @@ export function ProjectionChart({
             label={{ value: "Hoje", position: "insideTopLeft", fill: "#5B6CFF", fontSize: 11, fontWeight: 600 }}
           />
           <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="5 5" strokeOpacity={0.8} />
+          {points.some((p) => p.with_overdue_cents !== undefined) ? (
+            <Line
+              type="basis"
+              dataKey="with_overdue_cents"
+              stroke="var(--expense)"
+              strokeWidth={2}
+              strokeDasharray="6 5"
+              dot={false}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+          ) : null}
           <Line
             type="basis"
             dataKey="balance_cents"

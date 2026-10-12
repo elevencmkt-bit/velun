@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { CalendarDays, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { addDaysISO } from "@/lib/today";
-import { buildCashFlowInsight, getCashFlowProjection } from "@/lib/cash-flow";
+import { buildCashFlowNote, getCashFlowProjection } from "@/lib/cash-flow";
 import { accountScope } from "@/lib/visibility";
 import { formatCents } from "@/lib/money";
 import { ProjectionChart } from "./projection-chart";
-import { ImpactsCard, InsightCard, UpcomingEventsCard } from "./support-cards";
+import { PeriodSummaryCard, UpcomingEventsCard } from "./support-cards";
+import { Money } from "@/components/money";
 
 const PERIODS = [
   { days: 30, label: "30 dias" },
@@ -22,24 +23,26 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: 
 export default async function FluxoDeCaixaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; atrasados?: string }>;
 }) {
-  const { period } = await searchParams;
+  const { period, atrasados } = await searchParams;
   const parsedDays = Number(period);
   const selectedPeriod =
     PERIODS.find((p) => p.days === parsedDays) ?? PERIODS.find((p) => p.days === DEFAULT_DAYS)!;
   const horizonDays = selectedPeriod.days;
+  const includeOverdue = atrasados === "1";
 
   const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
 
   const {
     points,
+    overdue,
+    withOverdue,
     currentTotal,
     lowestPoint,
     finalPoint,
     negativeDays,
-    negativeDaysPct,
     totalIncome,
     totalExpense,
     netResult,
@@ -51,207 +54,184 @@ export default async function FluxoDeCaixaPage({
     horizonDays,
     await accountScope(supabase, householdId, memberId, "balance"),
     today,
+    { includeOverdue },
   );
 
-  const insight = buildCashFlowInsight({
+  const fmt = (cents: number) => formatCents(cents, currency);
+  const note = buildCashFlowNote({
     points,
-    finalPoint,
-    negativeDays,
-    negativeDaysPct,
     upcomingEvents,
-    periodLabel: selectedPeriod.label,
+    formatMoney: fmt,
+    value: withOverdue ? (p) => p.with_overdue_cents ?? p.balance_cents : undefined,
   });
+
+  const href = (next: { period?: number; atrasados?: boolean }) => {
+    const q = new URLSearchParams();
+    const days = next.period ?? horizonDays;
+    if (days !== DEFAULT_DAYS) q.set("period", String(days));
+    if (next.atrasados ?? includeOverdue) q.set("atrasados", "1");
+    const qs = q.toString();
+    return `/fluxo-de-caixa${qs ? `?${qs}` : ""}`;
+  };
 
   const todayDate = new Date(`${today}T12:00:00`);
   const horizonDate = new Date(`${addDaysISO(today, horizonDays)}T12:00:00`);
   const rangeLabel = `${dateFormatter.format(todayDate)} – ${dateFormatter.format(horizonDate)}`;
 
-  const KPI_TONES = {
-    blue: { bg: "#EEF0FF", fg: "#5B6CFF" },
-    green: { bg: "#EAFBF2", fg: "#22C55E" },
-    red: { bg: "#FFF1F3", fg: "#F04469" },
-    purple: { bg: "#F3EEFF", fg: "#7C5CFA" },
-  };
-
-  const kpis = [
-    {
-      key: "current",
-      icon: WalletCards,
-      iconBg: KPI_TONES.blue.bg,
-      iconFg: KPI_TONES.blue.fg,
-      label: "Saldo atual",
-      value: formatCents(currentTotal, currency),
-      valueColor: undefined as string | undefined,
-      meta: null as string | null,
-    },
-    {
-      key: "end",
-      icon: TrendingUp,
-      iconBg: finalPoint.balance_cents < 0 ? KPI_TONES.red.bg : KPI_TONES.green.bg,
-      iconFg: finalPoint.balance_cents < 0 ? KPI_TONES.red.fg : KPI_TONES.green.fg,
-      label: "Saldo ao final do período",
-      value: formatCents(finalPoint.balance_cents, currency),
-      valueColor: finalPoint.balance_cents < 0 ? "var(--expense)" : undefined,
-      meta: `Após ${selectedPeriod.label}`,
-    },
-    {
-      key: "low",
-      icon: TrendingDown,
-      iconBg: KPI_TONES.red.bg,
-      iconFg: KPI_TONES.red.fg,
-      label: "Menor saldo projetado",
-      value: formatCents(lowestPoint.balance_cents, currency),
-      valueColor: lowestPoint.balance_cents < 0 ? "var(--expense)" : undefined,
-      meta: `em ${lowestPoint.label}`,
-    },
-    {
-      key: "negative-days",
-      icon: CalendarDays,
-      iconBg: KPI_TONES.purple.bg,
-      iconFg: KPI_TONES.purple.fg,
-      label: "Dias no negativo",
-      value: `${negativeDays} ${negativeDays === 1 ? "dia" : "dias"}`,
-      isMoney: false,
-      valueColor: negativeDays > 0 ? "var(--expense)" : undefined,
-      meta: negativeDays > 0 ? `${negativeDaysPct}% do período` : "Sem dias no negativo",
-    },
-  ];
+  const endCents = withOverdue ? withOverdue.finalCents : finalPoint.balance_cents;
+  const lowCents = withOverdue ? withOverdue.lowestCents : lowestPoint.balance_cents;
+  const lowDate = withOverdue ? withOverdue.lowestPoint.date : lowestPoint.date;
+  const negDays = withOverdue ? withOverdue.negativeDays : negativeDays;
+  const lowWhen =
+    lowDate === today
+      ? "hoje"
+      : new Date(`${lowDate}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }).replace(".", "");
+  const signed = (cents: number) => (
+    <>
+      {cents < 0 ? "−" : ""}
+      <Money cents={Math.abs(cents)} currency={currency} />
+    </>
+  );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col items-start justify-between gap-4 xl:flex-row xl:items-end">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-page-title">Fluxo de caixa</h1>
-          <p className="text-page-subtitle max-w-[620px]">
-            Acompanhe seu saldo atual, veja a projeção para os próximos meses e identifique os
-            principais eventos da sua vida financeira.
-          </p>
-        </div>
+    <div className="flex flex-col gap-5 md:gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-page-title">Fluxo de caixa</h1>
+        <p className="text-page-subtitle max-sm:hidden">
+          Quanto vai ter na conta nos próximos dias, com o que já está previsto.
+        </p>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div
-            className="inline-flex gap-0.5 rounded-[11px] border p-1"
-            style={{ background: "var(--bg-subtle)", borderColor: "var(--border-primary)" }}
-            role="tablist"
-            aria-label="Período da projeção"
-          >
+      {overdue.count > 0 ? (
+        <div className="flex flex-col gap-3 rounded-[16px] bg-[#FEF3F2] px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#B42318]" />
+            <p className="text-sm leading-relaxed text-[#7A271A]">
+              <b>
+                {overdue.count} {overdue.count === 1 ? "lançamento atrasado" : "lançamentos atrasados"} (
+                {signed(overdue.netOutCents)})
+              </b>{" "}
+              {includeOverdue
+                ? "estão na projeção como se saíssem hoje. A linha tracejada mostra o efeito."
+                : "ficaram fora da projeção. Se ainda vão sair da conta, o saldo real será menor."}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 max-md:pl-8">
+            <Link
+              href={href({ atrasados: !includeOverdue })}
+              className={`flex h-9 items-center rounded-[11px] px-3.5 text-[13px] font-semibold whitespace-nowrap ${
+                includeOverdue ? "bg-white text-[#B42318]" : "bg-[#B42318] text-white"
+              }`}
+            >
+              {includeOverdue ? "Tirar da projeção" : "Incluir na projeção"}
+            </Link>
+            <Link
+              href="/transacoes?status=late"
+              className="flex h-9 items-center px-2 text-[13px] font-semibold whitespace-nowrap text-[#B42318]"
+            >
+              Ver em Transações →
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="relative overflow-hidden rounded-[24px] bg-(--primary) p-5 text-white md:px-8 md:py-7">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/velun-mark.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -top-24 -right-28 h-[360px] w-[420px] object-contain opacity-[0.12] md:-top-28 md:-right-24 md:h-[420px] md:w-[520px]"
+        />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
+          <div>
+            <div className="text-sm text-white/80">Saldo hoje</div>
+            <div className="mt-1 text-[34px] leading-tight font-extrabold tracking-[-0.03em] tabular-nums md:text-[44px]">
+              {signed(currentTotal)}
+            </div>
+            <div className="mt-1 text-[13px] text-white/75 max-md:hidden">
+              Contas correntes e investimentos. Cartão entra pela fatura.
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 md:gap-3 lg:min-w-[540px]">
+            <div className="rounded-[12px] bg-white/15 px-2.5 py-2.5 md:rounded-[16px] md:px-4 md:py-3.5">
+              <div className="text-[11px] text-white/80 md:text-xs">Em {selectedPeriod.label}</div>
+              <div className="mt-0.5 truncate text-[14px] font-bold tabular-nums md:text-[20px]">{signed(endCents)}</div>
+            </div>
+            <div className="rounded-[12px] bg-white/15 px-2.5 py-2.5 md:rounded-[16px] md:px-4 md:py-3.5">
+              <div className="text-[11px] text-white/80 md:text-xs">
+                <span className="md:hidden">Menor</span>
+                <span className="max-md:hidden">Menor saldo</span>
+              </div>
+              <div className="mt-0.5 truncate text-[14px] font-bold tabular-nums md:text-[20px]">{signed(lowCents)}</div>
+              <div className="text-[11px] text-white/75 max-md:hidden">{lowWhen}</div>
+            </div>
+            <div className="rounded-[12px] bg-white/15 px-2.5 py-2.5 md:rounded-[16px] md:px-4 md:py-3.5">
+              <div className="text-[11px] text-white/80 md:text-xs">
+                <span className="md:hidden">No negativo</span>
+                <span className="max-md:hidden">Dias no negativo</span>
+              </div>
+              <div className="mt-0.5 truncate text-[14px] font-bold tabular-nums md:text-[20px]">
+                {negDays} {negDays === 1 ? "dia" : "dias"}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[20px] bg-(--bg-surface) p-4 shadow-(--shadow-card) md:p-6">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-sm:hidden">
+            <h2 className="text-card-title">Saldo projetado</h2>
+            <p className="mt-0.5 text-[13px] text-(--text-muted)">{rangeLabel}</p>
+          </div>
+          <div className="flex gap-1 rounded-[13px] bg-[#F4F5F8] p-1" role="tablist" aria-label="Período da projeção">
             {PERIODS.map((p) => (
               <Link
                 key={p.days}
-                href={p.days === DEFAULT_DAYS ? "/fluxo-de-caixa" : `/fluxo-de-caixa?period=${p.days}`}
+                href={href({ period: p.days })}
                 role="tab"
                 aria-selected={p.days === horizonDays}
-                className="rounded-[8px] px-4 py-[9px] text-[12px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
-                style={
+                className={`flex h-9 flex-1 items-center justify-center rounded-[10px] px-3.5 text-[13px] font-semibold whitespace-nowrap transition-colors sm:flex-none ${
                   p.days === horizonDays
-                    ? {
-                        color: "#fff",
-                        background: "linear-gradient(135deg, #6475FF, #5162F5)",
-                        boxShadow: "0 4px 12px rgba(91,108,255,.22)",
-                      }
-                    : { color: "var(--text-secondary)" }
-                }
+                    ? "bg-(--bg-surface) text-(--text-primary) shadow-[0_1px_3px_rgba(16,24,40,.08)]"
+                    : "text-(--text-muted)"
+                }`}
               >
                 {p.label}
               </Link>
             ))}
           </div>
-          <div
-            className="flex h-11 items-center rounded-[10px] border px-3.5 text-[12px] font-medium text-(--text-secondary)"
-            style={{ borderColor: "var(--border-primary)", background: "var(--bg-surface)" }}
-          >
-            {rangeLabel}
-          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:gap-3.5 xl:grid-cols-4">
-        {kpis.map((kpi) => (
-          <div
-            key={kpi.key}
-            className="flex flex-col items-start gap-2.5 rounded-[20px] p-4 sm:min-h-[116px] sm:flex-row sm:items-center sm:gap-4 sm:p-5"
-            style={{
-              background: "#FFFFFF",
-              boxShadow: "var(--shadow-card)",
-            }}
-          >
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] sm:h-12 sm:w-12 sm:rounded-[14px]"
-              style={{ background: kpi.iconBg, color: kpi.iconFg }}
-            >
-              <kpi.icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="mb-1 block text-[12px] font-semibold text-(--text-secondary)">{kpi.label}</span>
-              <p
-                className="text-[19px] leading-[1.1] font-extrabold sm:text-[24px] tracking-[-0.025em] tabular-nums"
-                style={{ color: kpi.valueColor ?? "var(--text-primary)" }}
-              >
-                <span className={kpi.isMoney === false ? undefined : "money"}>{kpi.value}</span>
-              </p>
-              {kpi.meta ? <span className="mt-2 block text-[11px] text-(--text-light)">{kpi.meta}</span> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div
-        className="rounded-[20px] p-6"
-        style={{
-          background: "#FFFFFF",
-          boxShadow: "var(--shadow-card)",
-        }}
-      >
-        <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row">
-          <div>
-            <h2 className="text-card-title">Evolução do saldo projetado</h2>
-            <p className="text-[12px] text-(--text-secondary)">
-              Saldo dia a dia considerando contas e lançamentos pendentes de {selectedPeriod.label}.
-              {upcomingEvents.length === 0 ? " Nenhum lançamento futuro encontrado neste período." : ""}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-4 text-[11px] text-(--text-secondary)">
+        <ProjectionChart points={points} currency={currency} highlightedEventIds={[...highlightedEventIds]} />
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-(--text-muted)">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-[3px] w-[18px] rounded-full" style={{ background: "var(--income)" }} />
+            Com o que está previsto
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-[3px] w-[18px] rounded-full" style={{ background: "var(--expense)" }} />
+            Abaixo de zero
+          </span>
+          {withOverdue ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: "var(--income)" }} /> Saldo positivo
+              <span className="w-[18px] border-t-[2.5px] border-dashed" style={{ borderColor: "var(--expense)" }} />
+              Se os atrasados ainda saírem
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: "var(--expense)" }} /> Saldo negativo
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: "#6674FF" }} /> Entrada
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full" style={{ background: "#F35D73" }} /> Saída
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-[18px] border-t-[1.5px] border-dashed" style={{ borderColor: "#6E7B94" }} /> Zero
-            </span>
-          </div>
+          ) : null}
         </div>
-        <div
-          className="rounded-[14px] px-2 pt-3 pb-1"
-          style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #FCFCFE 100%)" }}
-        >
-          <ProjectionChart
-            points={points}
-            currency={currency}
-            highlightedEventIds={[...highlightedEventIds]}
-          />
-        </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2 xl:grid-cols-3">
-        <UpcomingEventsCard events={upcomingEvents} currency={currency} />
-        <ImpactsCard
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-6">
+        <UpcomingEventsCard events={upcomingEvents} currency={currency} today={today} />
+        <PeriodSummaryCard
+          periodLabel={selectedPeriod.label}
           totalIncome={totalIncome}
           totalExpense={totalExpense}
           netResult={netResult}
+          note={note}
           currency={currency}
-          periodLabel={selectedPeriod.label}
         />
-        <div className="lg:col-span-2 xl:col-span-1">
-          <InsightCard insight={insight} />
-        </div>
       </div>
     </div>
   );
