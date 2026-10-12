@@ -112,6 +112,13 @@ check "esposa não descarta a importação dele" "$(admin "select count(*) from 
 check "Levi: vê as duas importações" "$(as_user $LEVI "select string_agg(file_path, ',' order by file_path) from imports;")" "conjunta.pdf,extrato-pessoal.pdf"
 check "Levi: vê o saldo e as duas metas" "$(as_user $LEVI "select count(*) from net_worth_snapshots;")/$(as_user $LEVI "select count(*) from goals;")" "1/2"
 
+echo "uma revisão por conta:"
+novo_review() { psql -h $D -p 54329 -U postgres -tA -q -c "insert into imports (household_id, account_id, file_path, file_type, status, created_by) values ('11111111-0000-0000-0000-000000000001', '$1', '$2', 'pdf', 'review', 'aaaaaaaa-0000-0000-0000-00000000000a');" 2>&1 | grep -o 'imports_one_review_per_account' | head -1; }
+check "segunda revisão na mesma conta é barrada" "$(novo_review acc00000-0000-0000-0000-000000000001 duplicado.pdf)" "imports_one_review_per_account"
+admin "update imports set status='confirmed' where id='10000000-0000-0000-0000-000000000003'"
+check "depois de confirmar, nova revisão é aceita" "$(novo_review acc00000-0000-0000-0000-000000000001 outubro.pdf)" ""
+check "revisões em contas diferentes convivem" "$(admin "select count(*) from imports where status='review'")" "2"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
