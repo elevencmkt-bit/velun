@@ -95,7 +95,7 @@ export function UpcomingEventsCard({
   );
 }
 
-/** Quanto entra, sai e sobra no período, e a frase do que ficar de olho. */
+/** Quanto entra, sai e sobra no período, e a frase do que vale ficar de olho. */
 export function PeriodSummaryCard({
   periodLabel,
   totalIncome,
@@ -112,7 +112,7 @@ export function PeriodSummaryCard({
   currency: CurrencyCode;
 }) {
   return (
-    <article className="flex min-w-0 flex-col gap-4 rounded-[20px] bg-(--bg-surface) p-5 shadow-(--shadow-card) md:p-6">
+    <article className="flex min-w-0 flex-col gap-4 self-start rounded-[20px] bg-(--bg-surface) p-5 shadow-(--shadow-card) md:p-6">
       <h2 className="text-card-title">Nos próximos {periodLabel}</h2>
       <div className="flex flex-col gap-3">
         <div className="flex justify-between text-sm">
@@ -136,8 +136,8 @@ export function PeriodSummaryCard({
         </div>
       </div>
       {note ? (
-        <div className="mt-auto rounded-[16px] bg-[#F5F6FF] p-4 text-sm leading-relaxed text-(--text-secondary)">
-          <div className="mb-1 text-xs font-bold text-[#4257CB]">O que fica de olho</div>
+        <div className="rounded-[16px] bg-[#F5F6FF] p-4 text-sm leading-relaxed text-(--text-secondary)">
+          <div className="mb-1 text-xs font-bold text-[#4257CB]">Fique de olho</div>
           {note}
         </div>
       ) : null}
