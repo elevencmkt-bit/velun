@@ -308,6 +308,9 @@ check "esposa não mexe no cartão dele" "$(admin "select credit_limit_cents fro
 as_user $LEVI "select create_transfer('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', 'acc00000-0000-0000-0000-0000000000c1', '2026-11-22', 128430, 'Pagamento da fatura', null, '$LEVI', 'pf-1', 'pf-2');" >/dev/null
 check "pagar a fatura vira transferência (sai do casal, entra no cartão)" "$(admin "select string_agg(direction::text, ',' order by direction) from transactions where description='Pagamento da fatura' and transfer_group_id is not null")" "in,out"
 
+check "cartão com saldo inicial positivo é recusado" "$(as_user $LEVI "update accounts set opening_balance_cents = 2500 where id = 'acc00000-0000-0000-0000-0000000000c1';" | grep -o 'violates check' | head -1)" "violates check"
+check "conta corrente com saldo positivo continua normal" "$(as_user $LEVI "update accounts set opening_balance_cents = 2500 where id = 'acc00000-0000-0000-0000-000000000002' returning opening_balance_cents;" | head -1)" "2500"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
