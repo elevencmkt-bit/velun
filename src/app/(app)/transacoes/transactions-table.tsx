@@ -244,17 +244,17 @@ export function TransactionsTable({
                 ? (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR)
                 : MUTED_CATEGORY_COLOR;
 
-              // Linha calma, como no Organizze: o que é, de onde e quanto.
-              // Categoria e situação viram texto discreto na segunda linha
-              // — antes eram uma pílula colorida e um selo vermelho
-              // disputando atenção com o valor. Trocar a categoria rápido
-              // continua no computador (seletor discreto à direita); no
-              // celular, tocar na linha abre a edição.
+              // O que é, de onde, categoria, situação e quanto. A categoria
+              // é uma etiqueta na cor dela (que troca rápido no computador);
+              // a situação, uma etiqueta suave — vermelha se atrasou,
+              // âmbar se ainda vai vencer. No celular, tocar na linha abre
+              // a edição.
               const status = row.is_overdue
-                ? { label: "Atrasado", color: "var(--expense-dark)" }
+                ? { label: "Atrasada", cls: "bg-[#FEE4E2] text-[#B42318]" }
                 : row.status === "pending"
-                  ? { label: "Pendente", color: "var(--warning-dark)" }
+                  ? { label: "Pendente", cls: "bg-[#FEF0C7] text-[#B54708]" }
                   : null;
+              const catColor = row.category_name ? iconColors.fg : "var(--text-light)";
 
               return (
                 <div
@@ -298,21 +298,13 @@ export function TransactionsTable({
                     </p>
                     <p className="truncate text-xs text-(--text-muted)">
                       {/* A categoria só aparece aqui no celular; no
-                          computador ela tem o seletor à direita. */}
-                      <span className="md:hidden">
-                        {row.category_name ?? "Sem categoria"} ·{" "}
+                          computador ela é a etiqueta à direita. */}
+                      <span className="font-semibold md:hidden" style={{ color: catColor }}>
+                        {row.category_name ?? "Sem categoria"}
+                        <span className="font-normal text-(--text-muted)"> · </span>
                       </span>
                       {row.account_name}
                       {row.installment ? ` · ${row.installment}` : ""}
-                      {status ? (
-                        <span
-                          style={{ color: status.color }}
-                          className="font-medium"
-                        >
-                          {" · "}
-                          {status.label}
-                        </span>
-                      ) : null}
                     </p>
                   </div>
 
@@ -333,18 +325,14 @@ export function TransactionsTable({
                         }}
                       >
                         <SelectTrigger
-                          className="h-8 w-full justify-between gap-1.5 rounded-lg border-transparent bg-transparent px-2.5 text-[12.5px] font-medium text-(--text-secondary) shadow-none hover:border-(--border-primary) hover:bg-white"
+                          className="h-7 w-fit max-w-full gap-1 rounded-full border-transparent px-2.5 text-[12px] font-semibold shadow-none hover:border-current [&>svg]:opacity-50"
+                          style={{
+                            color: catColor,
+                            backgroundColor: `color-mix(in srgb, ${catColor} 11%, transparent)`,
+                          }}
                           aria-label="Categoria"
                         >
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span
-                              className="h-2 w-2 shrink-0 rounded-full"
-                              style={{
-                                background: row.category_name
-                                  ? iconColors.fg
-                                  : "var(--text-light)",
-                              }}
-                            />
+                          <span className="truncate">
                             <SelectValue placeholder="Sem categoria" />
                           </span>
                         </SelectTrigger>
@@ -361,22 +349,46 @@ export function TransactionsTable({
                       </Select>
                     </span>
                   ) : (
-                    <span className="hidden w-40 shrink-0 truncate px-2.5 text-[12.5px] text-(--text-secondary) md:block">
-                      {row.category_name ?? "Sem categoria"}
+                    <span className="hidden w-40 shrink-0 md:block">
+                      <span
+                        className="inline-flex h-7 max-w-full items-center truncate rounded-full px-2.5 text-[12px] font-semibold"
+                        style={{
+                          color: catColor,
+                          backgroundColor: `color-mix(in srgb, ${catColor} 11%, transparent)`,
+                        }}
+                      >
+                        {row.category_name ?? "Sem categoria"}
+                      </span>
                     </span>
                   )}
 
-                  <span
-                    className="shrink-0 text-right text-[14px] font-semibold tabular-nums md:w-28"
-                    style={{
-                      color:
-                        row.direction === "out"
-                          ? "var(--table-amount-out)"
-                          : "var(--table-amount-in)",
-                    }}
-                  >
-                    {row.direction === "out" ? "-" : "+"}
-                    <Money cents={row.amount_cents} currency={currency} />
+                  {/* Situação: coluna própria no computador. */}
+                  <span className="hidden w-[92px] shrink-0 justify-end md:flex">
+                    {status ? (
+                      <span className={`inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-bold ${status.cls}`}>
+                        {status.label}
+                      </span>
+                    ) : null}
+                  </span>
+
+                  <span className="flex shrink-0 flex-col items-end gap-1 md:w-28">
+                    <span
+                      className="text-right text-[14px] font-semibold tabular-nums md:text-[15px]"
+                      style={{
+                        color:
+                          row.direction === "out"
+                            ? "var(--table-amount-out)"
+                            : "var(--table-amount-in)",
+                      }}
+                    >
+                      {row.direction === "out" ? "-" : "+"}
+                      <Money cents={row.amount_cents} currency={currency} />
+                    </span>
+                    {status ? (
+                      <span className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold md:hidden ${status.cls}`}>
+                        {status.label}
+                      </span>
+                    ) : null}
                   </span>
 
                   {/* Ações. Confirmar aparece sempre que há o que confirmar
@@ -389,13 +401,12 @@ export function TransactionsTable({
                     {row.can_edit ? (
                       <>
                         {row.status === "pending" ? (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
+                          <button
+                            type="button"
                             disabled={isPending}
-                            aria-label="Marcar como confirmado"
-                            title="Marcar como confirmado"
-                            className="text-(--income-dark) hover:bg-(--income-soft) hover:text-(--income-dark)"
+                            aria-label={`Confirmar ${row.description}`}
+                            title="Confirmar: já caiu na conta"
+                            className="flex h-8 w-8 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#D0D5DD] bg-white text-[12px] font-semibold text-(--text-secondary) transition-colors hover:border-(--primary) hover:text-(--primary) disabled:opacity-50 md:w-[108px]"
                             onClick={() =>
                               startTransition(async () => {
                                 await markTransactionPaid(row.id);
@@ -403,10 +414,11 @@ export function TransactionsTable({
                               })
                             }
                           >
-                            <Check className="h-4 w-4" />
-                          </Button>
+                            <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                            <span className="max-md:hidden">Confirmar</span>
+                          </button>
                         ) : (
-                          <span className="hidden h-7 w-7 md:block" />
+                          <span className="hidden h-8 w-[108px] md:block" />
                         )}
                         <span className="hidden opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 md:block">
                           <DeleteTransactionButton
@@ -417,7 +429,7 @@ export function TransactionsTable({
                       </>
                     ) : (
                       <span
-                        className="flex h-7 w-7 items-center justify-center text-(--text-light) md:w-[60px]"
+                        className="flex h-7 w-7 items-center justify-center text-(--text-light) md:w-[138px]"
                         title="Conta pessoal de outra pessoa: só leitura"
                         aria-label="Só leitura"
                       >
