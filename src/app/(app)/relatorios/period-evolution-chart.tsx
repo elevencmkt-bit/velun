@@ -74,9 +74,10 @@ function ChartTooltip({
 }
 
 // Barras pra receitas e despesas de cada dia, e uma linha curva pro
-// saldo acumulado no mês. A curva é "monotone": ela nunca passa além dos
-// pontos de verdade — sem inventar um vale ou um pico entre dois dias,
-// que era o defeito das curvas antigas.
+// saldo acumulado no mês. A curva é "basis": arredonda os degraus mas
+// fica sempre entre os valores de verdade — nunca inventa um vale abaixo
+// do menor saldo nem um pico acima do maior, que era o defeito das curvas
+// antigas.
 export function PeriodEvolutionChart({
   points,
   currency,
@@ -111,7 +112,7 @@ export function PeriodEvolutionChart({
           <Bar dataKey="income_cents" fill="#22C55E" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
           <Bar dataKey="expense_cents" fill="#F04469" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
           <Line
-            type="monotone"
+            type="basis"
             dataKey="cumulative_cents"
             stroke="#3B82F6"
             strokeWidth={2}
