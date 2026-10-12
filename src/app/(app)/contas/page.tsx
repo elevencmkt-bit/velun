@@ -119,7 +119,7 @@ export default async function ContasPage() {
           <div className="truncate text-[15px] font-semibold text-(--text-primary)">{a.name}</div>
           <div className="truncate text-xs text-(--text-muted)">
             {ACCOUNT_TYPE_LABELS[a.type] ?? a.type}
-            {a.institution ? ` · ${a.institution}` : ""}
+            {a.institution ? <span className="max-md:hidden"> · {a.institution}</span> : null}
             {chip ? <span className="md:hidden"> · {chip}</span> : null}
           </div>
         </div>
@@ -216,7 +216,7 @@ export default async function ContasPage() {
                 )}
                 {g.title === "Minhas" && !partner ? (
                   <p className="mt-3.5 rounded-[16px] border-[1.5px] border-dashed border-[#D0D5DD] px-4 py-3.5 text-[13px] leading-relaxed text-(--text-muted)">
-                    Quando quem divide a casa entrar, as contas dela aparecem aqui ao lado — só com o que ela liberar pra você.
+                    Quando quem divide a casa entrar, as contas dela aparecem aqui também — só com o que ela liberar pra você.
                   </p>
                 ) : null}
               </div>
@@ -231,7 +231,7 @@ export default async function ContasPage() {
                   Ver faturas →
                 </Link>
               </div>
-              <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0 lg:grid-cols-3">
+              <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-5 md:overflow-visible md:px-0 lg:grid-cols-3">
                 {cards.map((a) => {
                   const isMine = a.owner_id === memberId;
                   const owner = a.owner_id === null ? "Do casal" : isMine ? "Minha" : (memberNames.get(a.owner_id as string) ?? "");
