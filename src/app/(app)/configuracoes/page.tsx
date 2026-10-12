@@ -12,7 +12,7 @@ import { CurrencySelect } from "./currency-select";
 
 const BENEFITS = [
   { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
-  { icon: Folder, label: "Compartilhar categorias e contas", bg: "#F0EDFF", fg: "#7056EB" },
+  { icon: Folder, label: "Escolher o que cada conta mostra", bg: "#F0EDFF", fg: "#7056EB" },
   { icon: UserRoundCheck, label: "Tomar decisões em conjunto", bg: "#FFF0F3", fg: "#F04469" },
 ];
 
@@ -139,8 +139,9 @@ export default async function ConfiguracoesPage() {
                   Orçamento compartilhado
                 </h3>
                 <p className="max-w-[460px] text-sm leading-relaxed text-(--text-secondary)">
-                  Convide pessoas para acompanhar suas finanças, compartilhar categorias e contas, e
-                  tomar decisões em conjunto.
+                  Convide quem divide a casa com você. Contas do casal ficam abertas pros dois; nas
+                  suas contas pessoais, você escolhe o que o outro vê — nada, só o saldo, os gastos
+                  por categoria ou tudo.
                 </p>
               </div>
             </div>
