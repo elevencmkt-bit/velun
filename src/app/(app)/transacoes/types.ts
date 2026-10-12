@@ -35,3 +35,15 @@ export type CategoryOption = {
 };
 export type AccountOption = { id: string; name: string };
 export type MemberOption = { id: string; name: string };
+
+/** Situação pra abas: atrasado (pendente que passou), pendente, confirmado. */
+export type StatusKey = "late" | "pending" | "confirmed";
+
+export type TransactionsSummary = {
+  inCents: number;
+  outCents: number;
+  inCount: number;
+  outCount: number;
+  /** Entradas ainda não confirmadas. */
+  pendingInCount: number;
+};

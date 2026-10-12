@@ -10,9 +10,8 @@ import {
   monthLabel,
   parseMonthParam,
 } from "@/lib/month";
-import { formatCents } from "@/lib/money";
 import { TransactionsWorkspace } from "./workspace";
-import type { TransactionRow } from "./types";
+import type { StatusKey, TransactionRow } from "./types";
 
 // Constrói a URL de navegação de mês preservando os outros filtros ativos
 // (conta, categoria, quem lançou, origem, busca) e removendo o intervalo
@@ -159,34 +158,27 @@ export default async function TransacoesPage({
     can_edit: writableIds.has(row.account_id),
   }));
 
-  const totalIn = rows
-    .filter((r) => r.direction === "in")
-    .reduce((sum, r) => sum + r.amount_cents, 0);
-  const totalOut = rows
-    .filter((r) => r.direction === "out")
-    .reduce((sum, r) => sum + r.amount_cents, 0);
+  // Situação de cada lançamento. "Atrasado" é pendente com data que já
+  // passou; "pendente" ainda vai vencer.
+  const statusOf = (r: TransactionRow): StatusKey =>
+    r.status !== "pending" ? "confirmed" : r.is_overdue ? "late" : "pending";
+  const counts: Record<StatusKey | "all", number> = { all: rows.length, late: 0, pending: 0, confirmed: 0 };
+  for (const r of rows) counts[statusOf(r)] += 1;
+  const activeStatus: StatusKey | "all" =
+    params.status === "late" || params.status === "pending" || params.status === "confirmed"
+      ? params.status
+      : "all";
+  const shown = activeStatus === "all" ? rows : rows.filter((r) => statusOf(r) === activeStatus);
 
-  let totalLabel: string;
-  let totalDisplay: string;
-  let totalColor: string;
-  if (params.direction === "in") {
-    totalLabel = "Total de entradas";
-    totalDisplay = `+${formatCents(totalIn, currency)}`;
-    totalColor = "var(--income)";
-  } else if (params.direction === "out") {
-    totalLabel = "Total de saídas";
-    totalDisplay = `-${formatCents(totalOut, currency)}`;
-    totalColor = "var(--expense)";
-  } else {
-    const net = totalIn - totalOut;
-    totalLabel = "Saldo do período";
-    totalDisplay = `${net >= 0 ? "+" : "-"}${formatCents(Math.abs(net), currency)}`;
-    totalColor = net >= 0 ? "var(--income)" : "var(--expense)";
-  }
+  // O resumo é sempre do período inteiro, qualquer que seja a aba.
+  const ins = rows.filter((r) => r.direction === "in");
+  const outs = rows.filter((r) => r.direction === "out");
+  const totalIn = ins.reduce((sum, r) => sum + r.amount_cents, 0);
+  const totalOut = outs.reduce((sum, r) => sum + r.amount_cents, 0);
 
   return (
     <TransactionsWorkspace
-      rows={rows}
+      rows={shown}
       accounts={(accounts ?? []).map((a) => ({
         id: a.id as string,
         name: a.name as string,
@@ -203,9 +195,15 @@ export default async function TransacoesPage({
       monthLabel={monthLabel(year, monthIndex)}
       prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
       nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
-      totalLabel={totalLabel}
-      totalDisplay={totalDisplay}
-      totalColor={totalColor}
+      summary={{
+        inCents: totalIn,
+        outCents: totalOut,
+        inCount: ins.length,
+        outCount: outs.length,
+        pendingInCount: ins.filter((r) => r.status === "pending").length,
+      }}
+      counts={counts}
+      activeStatus={activeStatus}
     />
   );
 }

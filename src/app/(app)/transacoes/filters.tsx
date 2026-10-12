@@ -57,70 +57,75 @@ export function TransactionFilters({
     searchParams.get(key),
   ).length;
 
+  // Conta e categoria ficam à vista no computador; no celular entram no
+  // botão "Filtros", junto com o resto, pra lista aparecer logo.
+  const mobileCount = ["account", "category"].filter((key) => searchParams.get(key)).length;
+
   return (
-    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-      <div className="relative basis-full sm:min-w-[240px] sm:flex-1 sm:basis-auto">
+    <div className="flex items-center gap-2">
+      <div className="relative min-w-0 flex-1 2xl:w-[220px] 2xl:flex-none">
         <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-(--text-muted)" />
         <Input
-          placeholder="Filtrar por descrição, categoria ou conta..."
+          placeholder="Buscar…"
           defaultValue={searchParams.get("q") ?? ""}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
         />
       </div>
+      <div className="flex items-center gap-2 max-md:hidden">
+        <Select
+          defaultValue={searchParams.get("account") ?? ALL}
+          onValueChange={(v) => setParam("account", v)}
+        >
+          <SelectTrigger className="w-44">
+            <Landmark className="h-3.5 w-3.5 text-(--text-muted) " />
+            <SelectValue placeholder="Todas as contas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todas as contas</SelectItem>
+            {accounts.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        defaultValue={searchParams.get("account") ?? ALL}
-        onValueChange={(v) => setParam("account", v)}
-      >
-        <SelectTrigger className="min-w-0 flex-1 sm:w-44 sm:flex-none">
-          <Landmark className="h-3.5 w-3.5 text-(--text-muted) max-sm:hidden" />
-          <SelectValue placeholder="Todas as contas" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>Todas as contas</SelectItem>
-          {accounts.map((a) => (
-            <SelectItem key={a.id} value={a.id}>
-              {a.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select
+          defaultValue={searchParams.get("category") ?? ALL}
+          onValueChange={(v) => setParam("category", v)}
+        >
+          <SelectTrigger className="w-52">
+            <Tag className="h-3.5 w-3.5 text-(--text-muted) " />
+            <SelectValue placeholder="Todas as categorias" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todas as categorias</SelectItem>
+            <SelectItem value="none">Sem categoria</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        defaultValue={searchParams.get("category") ?? ALL}
-        onValueChange={(v) => setParam("category", v)}
-      >
-        <SelectTrigger className="min-w-0 flex-1 sm:w-48 sm:flex-none">
-          <Tag className="h-3.5 w-3.5 text-(--text-muted) max-sm:hidden" />
-          <SelectValue placeholder="Todas as categorias" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>Todas as categorias</SelectItem>
-          <SelectItem value="none">Sem categoria</SelectItem>
-          {categories.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
+      </div>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            size="icon"
-            className="relative"
+            className="relative h-10 shrink-0 gap-1.5 px-3.5 md:w-10 md:px-0"
             aria-label="Mais filtros"
           >
             <SlidersHorizontal className="h-4 w-4" />
-            {advancedCount > 0 ? (
+            <span className="md:hidden">Filtros</span>
+            {advancedCount + mobileCount > 0 ? (
               <span
                 className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
                 style={{ background: "var(--primary)" }}
               >
-                {advancedCount}
+                {advancedCount + mobileCount}
               </span>
             ) : null}
           </Button>
@@ -128,7 +133,8 @@ export function TransactionFilters({
         <PopoverContent className="flex flex-col gap-3.5">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-(--text-primary)">
-              Mais filtros
+              <span className="md:hidden">Filtros</span>
+              <span className="max-md:hidden">Mais filtros</span>
             </span>
             {advancedCount > 0 ? (
               <button
@@ -139,6 +145,47 @@ export function TransactionFilters({
                 Limpar
               </button>
             ) : null}
+          </div>
+
+          {/* No celular, conta e categoria moram aqui dentro. */}
+          <div className="flex flex-col gap-2.5 md:hidden">
+          <Select
+            defaultValue={searchParams.get("account") ?? ALL}
+            onValueChange={(v) => setParam("account", v)}
+          >
+            <SelectTrigger className="w-full">
+              <Landmark className="h-3.5 w-3.5 text-(--text-muted)" />
+              <SelectValue placeholder="Todas as contas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas as contas</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            defaultValue={searchParams.get("category") ?? ALL}
+            onValueChange={(v) => setParam("category", v)}
+          >
+            <SelectTrigger className="w-full">
+              <Tag className="h-3.5 w-3.5 text-(--text-muted)" />
+              <SelectValue placeholder="Todas as categorias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas as categorias</SelectItem>
+              <SelectItem value="none">Sem categoria</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           </div>
 
           <div className="flex flex-col gap-1.5">
