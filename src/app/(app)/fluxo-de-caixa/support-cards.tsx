@@ -4,10 +4,11 @@ import type { UpcomingEvent } from "@/lib/cash-flow";
 import { addDaysISO } from "@/lib/today";
 import { Money } from "@/components/money";
 
+// "16 out", sem o "de" que o pt-BR põe no meio e quebra a coluna.
 function shortDate(iso: string) {
-  return new Date(`${iso}T00:00:00`)
-    .toLocaleDateString("pt-BR", { day: "numeric", month: "short" })
-    .replace(".", "");
+  const d = new Date(`${iso}T00:00:00`);
+  const month = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  return `${d.getDate()} ${month}`;
 }
 
 // Segunda-feira da semana de uma data (AAAA-MM-DD).

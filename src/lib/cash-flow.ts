@@ -274,7 +274,7 @@ export function buildCashFlowNote(input: {
   const lift = day.events.filter((e) => e.type === "income").sort((a, b) => b.amount_cents - a.amount_cents)[0];
   const fallsAgain = points.slice(recovery).some((p) => value(p) < 0);
   const start = firstNeg === 0 ? "O saldo está negativo" : `O saldo fica negativo a partir de ${shortDate(points[firstNeg].date)}`;
-  return `${start} até ${shortDate(day.date)}${lift ? `, quando entra ${lift.label} (${formatMoney(lift.amount_cents)})` : ""}. ${
+  return `${start} até ${shortDate(day.date)}${lift ? `, quando entra ${lift.label}, de ${formatMoney(lift.amount_cents)}` : ""}. ${
     fallsAgain ? "Depois volta a ficar no vermelho em alguns dias — vale olhar o gráfico." : "Depois disso, não volta a ficar no vermelho."
   }`;
 }

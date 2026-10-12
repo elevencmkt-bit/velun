@@ -11,7 +11,7 @@ let note = buildCashFlowNote({
   upcomingEvents: [],
   formatMoney: fmt,
 });
-assert.match(note, /^O saldo está negativo até 16 de outubro, quando entra Will Business \(\$1600\.00\)\. Depois disso, não volta/);
+assert.match(note, /^O saldo está negativo até 16 de outubro, quando entra Will Business, de \$1600\.00\. Depois disso, não volta/);
 
 // Sempre positivo: cita a maior saída.
 note = buildCashFlowNote({
