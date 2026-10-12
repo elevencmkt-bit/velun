@@ -113,12 +113,12 @@ export function DangerZone() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-soft) py-4">
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-(--text-primary)">Apagar transações e recorrências</span>
-              <span className="text-metadata">Mantém contas e categorias cadastradas.</span>
+              <span className="text-metadata">Zera o saldo inicial de contas e cartões. Mantém o cadastro deles e as categorias.</span>
             </div>
             <ResetAction
               buttonLabel="Apagar transações"
               title="Apagar todas as transações?"
-              description="Todo o histórico de lançamentos e recorrências será removido. Contas e categorias continuam como estão. Essa ação não pode ser desfeita."
+              description="Todo o histórico de lançamentos, recorrências e importações será removido, e o saldo inicial de contas e cartões volta a zero. O cadastro das contas e cartões (nome, limite, fechamento e vencimento) e as categorias continuam. Essa ação não pode ser desfeita."
               confirmPhrase="EXCLUIR"
               action={resetTransactionsData}
             />

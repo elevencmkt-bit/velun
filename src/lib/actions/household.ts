@@ -81,6 +81,18 @@ export async function resetTransactionsData() {
     .eq("household_id", householdId);
   if (impError) throw new Error(impError.message);
 
+  // Saldo inicial de contas e cartões volta a zero: sem os lançamentos,
+  // o saldo antigo não conversa mais com nada — quem reimporta o
+  // histórico informa o saldo de abertura de novo. O resto do cadastro
+  // (nome, limite, dia de fechamento/vencimento, conta de pagamento)
+  // fica. O RLS só deixa mexer nas contas do casal e nas próprias.
+  const { error: accError } = await supabase
+    .from("accounts")
+    .update({ opening_balance_cents: 0 })
+    .eq("household_id", householdId)
+    .neq("opening_balance_cents", 0);
+  if (accError) throw new Error(accError.message);
+
   revalidateEverything();
 }
 

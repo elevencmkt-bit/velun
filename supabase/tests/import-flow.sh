@@ -356,6 +356,13 @@ check "recorrência da conta sai junto" "$(admin "select count(*) from recurrenc
 check "conta pessoal: dono exclui direto" "$(admin "insert into accounts (id, household_id, name, type, owner_id, visibility) values ('acc00000-0000-0000-0000-0000000000d3', '11111111-0000-0000-0000-000000000001', 'Minha', 'checking', '$LEVI', 'hidden');"; as_user $LEVI "delete from accounts where id='acc00000-0000-0000-0000-0000000000d3';" >/dev/null; admin "select count(*) from accounts where id='acc00000-0000-0000-0000-0000000000d3'")" "0"
 check "casa de um membro: pedir exclui na hora" "$(admin "insert into auth.users (id) values ('dddddddd-0000-0000-0000-00000000000d'); insert into households (id, name) values ('44444444-0000-0000-0000-000000000004', 'Solo'); insert into members (id, household_id, display_name, color) values ('dddddddd-0000-0000-0000-00000000000d', '44444444-0000-0000-0000-000000000004', 'Solo', '#222'); insert into accounts (id, household_id, name, type) values ('acc00000-0000-0000-0000-0000000000d4', '44444444-0000-0000-0000-000000000004', 'Solo conta', 'checking');"; as_user dddddddd-0000-0000-0000-00000000000d "select request_account_deletion('acc00000-0000-0000-0000-0000000000d4');")" "deleted"
 
+echo "apagar transações zera saldo inicial:"
+admin "insert into accounts (id, household_id, name, type, opening_balance_cents) values ('acc00000-0000-0000-0000-0000000000e1', '11111111-0000-0000-0000-000000000001', 'Casal com saldo', 'checking', 150000); insert into accounts (id, household_id, name, type, opening_balance_cents, owner_id, visibility) values ('acc00000-0000-0000-0000-0000000000e2', '11111111-0000-0000-0000-000000000001', 'Cartao do Levi', 'credit_card', -32000, '$LEVI', 'hidden'), ('acc00000-0000-0000-0000-0000000000e3', '11111111-0000-0000-0000-000000000001', 'Da esposa', 'checking', 9900, '$ESPOSA', 'hidden');"
+as_user $LEVI "update accounts set opening_balance_cents = 0 where household_id='11111111-0000-0000-0000-000000000001' and opening_balance_cents <> 0;" >/dev/null
+check "conta do casal zerada" "$(admin "select opening_balance_cents from accounts where id='acc00000-0000-0000-0000-0000000000e1'")" "0"
+check "cartão próprio zerado (regra do cartão aceita 0)" "$(admin "select opening_balance_cents from accounts where id='acc00000-0000-0000-0000-0000000000e2'")" "0"
+check "conta pessoal da outra pessoa não é tocada" "$(admin "select opening_balance_cents from accounts where id='acc00000-0000-0000-0000-0000000000e3'")" "9900"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
