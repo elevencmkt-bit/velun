@@ -31,6 +31,21 @@ const cases: [string,string][] = [
 ["Recurring Card Transaction Netlify 5734 Netlify.Com CA 94104 9889","Netlify"],
 ["PIN Purchase Wal-Mart #1220 5411 Orlando 9889","Walmart"],
 ["Zelle Credit From Gold Striker Ref# 624400a03fnu","Zelle · Gold Striker"],
+// Nomad (nomes inventados no formato do extrato)
+["Compra PUBLIX #2022","Publix"],
+["Compra PUBLIX SUPER MAR 2435","Publix"],
+["Compra WM SUPERCENTER #1220","Walmart"],
+["Compra DD *DOORDASH TARGET","DoorDash"],
+["Compra UBER * EATS PENDING","Uber Eats"],
+["Compra FACEBK *ABC123XYZ","Facebook"],
+["Compra APPLE.COM/BILL","Apple"],
+["Compra APPLE COM BILL","Apple"],
+["Compra LOJA EXEMPLO* ASSINATURA","Loja Exemplo"],
+["Adicionou dinheiro","Adicionou dinheiro"],
+["Saque","Saque"],
+["Compra SCRIBD R692483000","Scribd"],
+["Compra MACY'S 811 8001 S","Macy's"],
+["Compra MURPHY6707ATWALMRT","Murphy USA"],
 ];
 let fail=0; for (const [i,e] of cases){const g=c(i); if(g!==e){fail++; console.log("FAIL",JSON.stringify(i),"→",JSON.stringify(g),"esperado",JSON.stringify(e));}}
 console.log(cases.length-fail,"/",cases.length); if (fail) process.exit(1);

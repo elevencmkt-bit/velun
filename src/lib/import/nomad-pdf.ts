@@ -125,9 +125,10 @@ export function parseNomadStatementText(text: string): ParsedNomadStatement {
         } else {
           transactions.push({
             date: iso(Number(m[3]), Number(m[2]), Number(m[1])),
-            // "Compra PUBLIX #2022" → "PUBLIX #2022": o "Compra" é o tipo,
-            // não o nome. Saque e depósito mantêm o texto.
-            description: description.replace(/^Compra\s+/i, ""),
+            // Texto como veio ("Compra PUBLIX #2022"): a impressão
+            // digital sai dele, e o nome limpo ("Publix") sai na
+            // limpeza, junto com os outros bancos.
+            description,
             amountCents: brlStyleToCents(m[5]),
             direction: m[4] === "+" ? "in" : "out",
             mcc: null,

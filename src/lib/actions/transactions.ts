@@ -7,6 +7,8 @@ import { parseToCents } from "@/lib/money";
 import { computeFingerprint } from "@/lib/fingerprint";
 import { clampedDate } from "@/lib/credit-card";
 import { rememberMerchantName } from "@/lib/merchant-names";
+import { merchantKey, rememberMerchantCategory } from "@/lib/merchant-categories";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createRecurrenceFromAnchor } from "@/lib/materialize-occurrences";
 import type { RecurrenceFrequency } from "@/lib/recurrence";
 
@@ -210,7 +212,7 @@ export async function updateTransaction(
 
   const { data: current } = await supabase
     .from("transactions")
-    .select("recurrence_id, description, bank_description")
+    .select("recurrence_id, description, bank_description, category_id")
     .eq("id", transactionId)
     .maybeSingle();
 
@@ -252,6 +254,17 @@ export async function updateTransaction(
       memberId,
       bankDescription,
       name: description,
+    });
+  }
+
+  // Trocou a categoria de um lançamento do banco: os outros do mesmo
+  // estabelecimento sem categoria vão junto, e a escolha fica lembrada.
+  if (bankDescription && categoryId !== (current?.category_id ?? null)) {
+    await spreadCategory(supabase, {
+      householdId,
+      memberId,
+      sourceIds: [transactionId],
+      categoryId,
     });
   }
 
@@ -298,10 +311,86 @@ export async function deleteTransferGroup(transferGroupId: string) {
   revalidatePath("/mes");
 }
 
+/**
+ * Pôs categoria em lançamento(s) que vieram do banco: lembra a escolha
+ * por estabelecimento e leva a mesma categoria pros outros lançamentos
+ * do mesmo estabelecimento (e mesma direção) que estão SEM categoria. O
+ * que já tem categoria não muda. Devolve quantos foram junto.
+ */
+async function spreadCategory(
+  supabase: SupabaseClient,
+  params: {
+    householdId: string;
+    memberId: string;
+    sourceIds: string[];
+    categoryId: string | null;
+  },
+): Promise<number> {
+  const { data: sources } = await supabase
+    .from("transactions")
+    .select("id, bank_description, direction")
+    .in("id", params.sourceIds)
+    .not("bank_description", "is", null);
+  if (!sources || sources.length === 0) return 0;
+
+  // Uma vez por estabelecimento + direção.
+  const targets = new Map<string, { bank: string; direction: "in" | "out" }>();
+  for (const s of sources) {
+    const bank = s.bank_description as string;
+    const direction = s.direction as "in" | "out";
+    const key = merchantKey(bank);
+    if (key) targets.set(`${direction}|${key}`, { bank, direction });
+  }
+
+  for (const t of targets.values()) {
+    await rememberMerchantCategory(supabase, {
+      householdId: params.householdId,
+      memberId: params.memberId,
+      bankDescription: t.bank,
+      direction: t.direction,
+      categoryId: params.categoryId,
+    });
+  }
+
+  // "Sem categoria" só esquece; não tira a categoria de ninguém.
+  if (!params.categoryId || targets.size === 0) return 0;
+
+  const directions = [...new Set([...targets.values()].map((t) => t.direction))];
+  const { data: candidates, error } = await supabase
+    .from("transactions")
+    .select("id, bank_description, direction")
+    .eq("household_id", params.householdId)
+    .is("category_id", null)
+    .is("transfer_group_id", null)
+    .not("bank_description", "is", null)
+    .in("direction", directions);
+  if (error) throw new Error(error.message);
+
+  const sourceIds = new Set(params.sourceIds);
+  const ids = (candidates ?? [])
+    .filter(
+      (c) =>
+        !sourceIds.has(c.id as string) &&
+        targets.has(`${c.direction}|${merchantKey(c.bank_description as string)}`),
+    )
+    .map((c) => c.id as string);
+  if (ids.length === 0) return 0;
+
+  // RLS decide o que dá pra mexer; conta o que de fato mudou.
+  const { data: updated, error: updError } = await supabase
+    .from("transactions")
+    .update({ category_id: params.categoryId })
+    .in("id", ids)
+    .select("id");
+  if (updError) throw new Error(updError.message);
+  return updated?.length ?? 0;
+}
+
 export async function updateTransactionCategory(
   transactionId: string,
   categoryId: string | null,
-) {
+): Promise<{ alsoUpdated: number }> {
+  const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
   const { error } = await supabase
     .from("transactions")
@@ -310,15 +399,24 @@ export async function updateTransactionCategory(
 
   if (error) throw new Error(error.message);
 
+  const alsoUpdated = await spreadCategory(supabase, {
+    householdId,
+    memberId,
+    sourceIds: [transactionId],
+    categoryId,
+  });
+
   revalidatePath("/transacoes");
+  return { alsoUpdated };
 }
 
 export async function bulkUpdateCategory(
   transactionIds: string[],
   categoryId: string | null,
-) {
-  if (transactionIds.length === 0) return;
+): Promise<{ alsoUpdated: number }> {
+  if (transactionIds.length === 0) return { alsoUpdated: 0 };
 
+  const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
   const { error } = await supabase
     .from("transactions")
@@ -327,7 +425,15 @@ export async function bulkUpdateCategory(
 
   if (error) throw new Error(error.message);
 
+  const alsoUpdated = await spreadCategory(supabase, {
+    householdId,
+    memberId,
+    sourceIds: transactionIds,
+    categoryId,
+  });
+
   revalidatePath("/transacoes");
+  return { alsoUpdated };
 }
 
 export async function deleteTransaction(transactionId: string) {

@@ -23,6 +23,7 @@ const PURCHASE_PREFIXES = [
   /^debit card purchase\s+/i,
   /^pos purchase\s+/i,
   /^card refund\s+/i,
+  /^compra\s+/i, // Nomad: "Compra PUBLIX #2022"
 ];
 
 // Intermediários de pagamento que aparecem antes do nome da loja.
@@ -42,7 +43,7 @@ const KNOWN_NAMES: Array<[RegExp, string]> = [
   [/^facebk\b|^facebook\b|^meta\s*pay/i, "Facebook"],
   [/^amzn\b|^amazon\b/i, "Amazon"],
   [/^doordash/i, "DoorDash"],
-  [/^wal-?mart\b|^walmart\b/i, "Walmart"],
+  [/^wal-?mart\b|^walmart\b|^wm supercenter\b/i, "Walmart"],
   [/^publix\b/i, "Publix"],
   [/^google workspac/i, "Google Workspace"],
   [/^google \*?youtube/i, "YouTube"],
@@ -58,6 +59,7 @@ const KNOWN_NAMES: Array<[RegExp, string]> = [
   [/^mcdonald/i, "McDonald's"],
   [/^chick-?fil-?a/i, "Chick-fil-A"],
   [/^stltones/i, "STL Tones"],
+  [/^murphy\s*\d*\s*at\s*walmrt|^murphy usa/i, "Murphy USA"],
 ];
 
 /** Palavras com a primeira letra maiúscula, sem mexer em siglas (LLC, AI). */
@@ -80,11 +82,17 @@ function cleanMerchant(text: string): string {
 
   for (const prefix of PROCESSOR_PREFIXES) name = name.replace(prefix, "");
 
+  // "UBER * EATS": o asterisco aqui separa o nome, não um código.
+  if (/^uber\s*\*?\s*eats/i.test(name)) return "Uber Eats";
   // Código de pedido depois de asterisco: "Facebk *Y6vpa76".
   name = name.replace(/\s*\*.*$/, "");
   // Número de loja: "Wal-Mart #1220", "Speedway 43431".
   name = name.replace(/\s*#\s*\w+/g, "");
   name = name.replace(/\s+\d{3,}\b/g, "");
+  // Referência colada ao fim: "Scribd R692483000", "Godaddy#41854".
+  name = name.replace(/\s+[a-z]{1,2}\d{6,}\w*$/i, "");
+  // Letra solta que sobrou no fim ("Macy's 811 8001 S").
+  name = name.replace(/\s+[a-z]$/i, "");
   // Domínio: "Netflix.Com" → "Netflix".
   name = name.replace(/\.(com|net|org|io|co|us)\b/gi, "");
   // Sobras no fim: hífen, barra, ponto.
