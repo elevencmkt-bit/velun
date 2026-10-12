@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Info, Lightbulb, TrendingDown } from "lucide-react";
 import type { CurrencyCode } from "@/lib/money";
-import type { CategorySlice, ReportInsight } from "@/lib/reports";
+import type { CategorySlice, InsightPart, ReportInsight } from "@/lib/reports";
 import { Money } from "@/components/money";
 
 const RANK_GRADIENTS = [
@@ -111,7 +111,22 @@ const INSIGHT_BULLET_STYLE: Record<ReportInsight["items"][number]["tone"], { bg:
   info: { bg: "#EEF4FF", fg: "#3B82F6" },
 };
 
-export function InsightVelunCard({ insight }: { insight: ReportInsight }) {
+function Parts({ parts, currency }: { parts: InsightPart[]; currency: CurrencyCode }) {
+  return (
+    <>
+      {parts.map((part, i) =>
+        typeof part === "string" ? (
+          <span key={i}>{part}</span>
+        ) : (
+          <Money key={i} cents={part.cents} currency={currency} className="font-semibold" />
+        ),
+      )}
+    </>
+  );
+}
+
+export function InsightVelunCard({ insight, currency }: { insight: ReportInsight; currency: CurrencyCode }) {
+  const warning = insight.tone === "warning";
   return (
     <article
       className="flex flex-col rounded-2xl border p-5"
@@ -132,16 +147,24 @@ export function InsightVelunCard({ insight }: { insight: ReportInsight }) {
 
       <div
         className="mt-3 flex gap-3 rounded-[14px] border p-3.5"
-        style={{ background: "linear-gradient(135deg, #ECFBF3 0%, #F2FCF7 100%)", borderColor: "#DFF6EA" }}
+        style={
+          warning
+            ? { background: "linear-gradient(135deg, #FFF7EB 0%, #FFFBF3 100%)", borderColor: "#FCE9C8" }
+            : { background: "linear-gradient(135deg, #ECFBF3 0%, #F2FCF7 100%)", borderColor: "#DFF6EA" }
+        }
       >
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
           style={{ background: "rgba(255,255,255,.78)", color: "#16A34A" }}
         >
-          <Check className="h-4 w-4" style={{ color: insight.tone === "warning" ? "#F59E0B" : "#16A34A" }} />
+          {warning ? (
+            <TrendingDown className="h-4 w-4" style={{ color: "#F59E0B" }} />
+          ) : (
+            <Check className="h-4 w-4" style={{ color: "#16A34A" }} />
+          )}
         </div>
-        <p className="text-[12px] leading-[1.45] font-semibold" style={{ color: "#1D7A46" }}>
-          {insight.headline}
+        <p className="text-[12px] leading-[1.45] font-semibold" style={{ color: warning ? "#9A5B00" : "#1D7A46" }}>
+          <Parts parts={insight.headline} currency={currency} />
         </p>
       </div>
 
@@ -163,7 +186,9 @@ export function InsightVelunCard({ insight }: { insight: ReportInsight }) {
                     <Check className="h-3.5 w-3.5" />
                   )}
                 </div>
-                <p className="text-[12px] leading-[1.4] text-(--text-secondary)">{item.text}</p>
+                <p className="text-[12px] leading-[1.4] text-(--text-secondary)">
+                  <Parts parts={item.parts} currency={currency} />
+                </p>
               </div>
             );
           })}
