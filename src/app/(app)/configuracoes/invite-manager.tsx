@@ -13,6 +13,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
   const [isPending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [copied, setCopied] = useState(false);
+  const [invited, setInvited] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -29,7 +30,11 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
     setError(null);
     startTransition(async () => {
       try {
-        await ensureInvite(email);
+        // O Velun não manda email: gerar o convite já copia o link, pra
+        // quem convidou mandar por onde quiser.
+        const token = await ensureInvite(email);
+        copyToken(token);
+        setInvited(true);
         setEmail("");
         router.refresh();
       } catch (err) {
@@ -74,14 +79,21 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Digite o e-mail da pessoa"
+            placeholder="E-mail da pessoa (só ele vai poder usar o link)"
             className="h-[42px] pl-9 text-[13px]"
           />
         </div>
         <Button type="submit" disabled={isPending} className="h-[42px] shrink-0">
-          {isPending ? "Convidando..." : "Convidar pessoa"}
+          {isPending ? "Gerando..." : "Gerar convite"}
         </Button>
       </form>
+
+      {invited ? (
+        <p className="text-xs text-(--text-secondary)">
+          Link copiado. O Velun não manda email — cole o link numa mensagem pra ela (WhatsApp,
+          por exemplo). Vale por 7 dias e só uma vez.
+        </p>
+      ) : null}
 
       <div
         className="mt-1 flex flex-col items-start gap-3 rounded-xl border p-2.5 sm:flex-row sm:items-center sm:justify-between"
@@ -108,7 +120,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
             </span>
             <span className="text-[11px] text-(--text-light)">
               {pendingInvite?.email
-                ? `Convite pendente para ${pendingInvite.email}.`
+                ? `Convite pendente — só ${pendingInvite.email} pode usar o link.`
                 : "Qualquer pessoa com o link pode se juntar."}
             </span>
           </div>
