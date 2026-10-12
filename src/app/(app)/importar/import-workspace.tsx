@@ -352,8 +352,8 @@ export function ImportWorkspace({
         <div className="flex flex-col gap-1">
           <h1 className="text-page-title">Importar</h1>
           <p className="text-page-subtitle">
-            Extrato da Regions em PDF. O arquivo é lido aqui no navegador e não
-            sai da sua máquina. Os lançamentos passam por revisão antes de
+            Extrato da Regions ou fatura do cartão Nubank, em PDF. O arquivo é
+            lido aqui no navegador e não sai da sua máquina. Os lançamentos passam por revisão antes de
             entrar.
           </p>
         </div>

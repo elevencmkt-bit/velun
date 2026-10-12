@@ -13,7 +13,13 @@ import { fetchExistingCardPayments } from "@/lib/import/confirmed-candidates";
 import {
   parseRegionsStatementText,
   StatementParseError,
+  type ParsedStatement,
 } from "@/lib/import/regions-pdf";
+import {
+  looksLikeNubank,
+  parseNubankStatementText,
+  verifyCardStatement,
+} from "@/lib/import/nubank-pdf";
 import { verifyStatement } from "@/lib/import/verify";
 import { suggestCategoryId } from "@/lib/import/mcc";
 import {
@@ -153,16 +159,51 @@ async function runImportStatement(input: {
     };
   }
 
-  let statement;
+  // Cartão lê fatura; conta lê extrato. Cada lado recusa o PDF do outro
+  // com uma mensagem clara, em vez de importar lixo.
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("type")
+    .eq("id", accountId)
+    .eq("household_id", householdId)
+    .maybeSingle();
+  if (!account) return { ok: false, error: "Conta não encontrada." };
+  const isCard = account.type === "credit_card";
+
+  let statement: ParsedStatement;
+  let verification: {
+    matches: boolean;
+    extractedSumCents: number;
+    firstDivergence?: { date: string } | null;
+  };
   try {
-    statement = parseRegionsStatementText(text);
+    if (isCard) {
+      if (!looksLikeNubank(text)) {
+        return {
+          ok: false,
+          error:
+            "Não reconheci essa fatura. Por enquanto o Velun lê faturas do Nubank em PDF.",
+        };
+      }
+      const card = parseNubankStatementText(text);
+      statement = card;
+      verification = verifyCardStatement(card);
+    } else {
+      if (looksLikeNubank(text)) {
+        return {
+          ok: false,
+          error:
+            "Esse PDF é fatura de cartão. Escolha o cartão como conta pra importar.",
+        };
+      }
+      statement = parseRegionsStatementText(text);
+      verification = verifyStatement(statement);
+    }
   } catch (err) {
     if (err instanceof StatementParseError)
       return { ok: false, error: err.message };
     throw err;
   }
-
-  const verification = verifyStatement(statement);
 
   // O nome do arquivo é registrado, não o conteúdo: o PDF não é guardado
   // em lugar nenhum. O que fica é o que foi extraído e revisado.
@@ -344,9 +385,13 @@ async function runImportStatement(input: {
 
   // Terceiro cruzamento: pagamento de fatura de cartão. Só cartões em que
   // quem importa pode lançar (o banco recusaria a outra ponta).
-  const cards = (
-    await loadCards(supabase, householdId, memberId, todayIn(timezone))
-  ).filter((c) => c.canEdit);
+  // (Não vale pra fatura do próprio cartão: ali a linha de pagamento é
+  // tratada logo abaixo.)
+  const cards = isCard
+    ? []
+    : (
+        await loadCards(supabase, householdId, memberId, todayIn(timezone))
+      ).filter((c) => c.canEdit);
   const cardPayments: (string | null)[] = rows.map(() => null);
   const cardAccepted: boolean[] = rows.map(() => false);
   if (cards.length > 0) {
@@ -383,6 +428,42 @@ async function runImportStatement(input: {
       cardAccepted[i] = m.accepted;
     });
   }
+  // Fatura do cartão: a linha "Pagamento" é o mesmo dinheiro que saiu da
+  // corrente — já registrado pelo "Pagar fatura" ou pelo extrato da
+  // corrente. Se existe essa transferência pro cartão, a linha é duplicata.
+  if (isCard) {
+    const { data: paymentsIn } = await supabase
+      .from("transactions")
+      .select("date, amount_cents")
+      .eq("household_id", householdId)
+      .eq("account_id", accountId)
+      .eq("direction", "in")
+      .not("transfer_group_id", "is", null)
+      .gte("date", shiftDays(statement.periodStart, -7))
+      .lte("date", shiftDays(statement.periodEnd, 7));
+    const used = new Set<number>();
+    rows.forEach((r) => {
+      if (
+        r.direction !== "in" ||
+        r.dup_status !== "none" ||
+        !/pagamento|payment/i.test(r.bank_description)
+      )
+        return;
+      const k = (paymentsIn ?? []).findIndex(
+        (p, j) =>
+          !used.has(j) &&
+          p.amount_cents === r.amount_cents &&
+          Math.abs(Date.parse(p.date as string) - Date.parse(r.date)) <=
+            7 * 86_400_000,
+      );
+      if (k >= 0) {
+        used.add(k);
+        r.dup_status = "duplicate";
+        r.is_included = false;
+      }
+    });
+  }
+
   const stagedRows = rows.map((r, i) => ({
     ...r,
     card_payment_account_id: cardPayments[i],
@@ -403,9 +484,11 @@ async function runImportStatement(input: {
 
   let message: string | null = null;
   if (!verification.matches) {
-    message = verification.firstDivergence
-      ? `O saldo reconstruído diverge do extrato em ${verification.firstDivergence.date}. Revise os lançamentos desse dia antes de confirmar.`
-      : "A soma dos lançamentos não fecha com o saldo final do extrato. Revise antes de confirmar.";
+    message = isCard
+      ? "A soma dos lançamentos não fecha com o total da fatura. Revise antes de confirmar."
+      : verification.firstDivergence
+        ? `O saldo reconstruído diverge do extrato em ${verification.firstDivergence.date}. Revise os lançamentos desse dia antes de confirmar.`
+        : "A soma dos lançamentos não fecha com o saldo final do extrato. Revise antes de confirmar.";
   }
 
   revalidatePath("/importar");
