@@ -251,6 +251,8 @@ export function ImportWorkspace({
   // quem está usando: aparece embaixo, menor, e é o que permite
   // descobrir a causa sem acesso ao log do servidor.
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  // Aviso de uma importação que deu certo (ex.: "ajustei o fechamento").
+  const [notice, setNotice] = useState<string | null>(null);
   // Desfazer apaga lançamentos. Pede confirmação na própria linha em vez
   // de um dialog: a pergunta fica ao lado do que vai ser apagado.
   const [confirmingUndo, setConfirmingUndo] = useState<string | null>(null);
@@ -299,7 +301,9 @@ export function ImportWorkspace({
     if (!(file instanceof File) || file.size === 0)
       return setError("Escolha um arquivo.");
     if (!file.name.toLowerCase().endsWith(".pdf")) {
-      return setError("Por enquanto só extrato em PDF da Regions.");
+      return setError(
+        "Por enquanto só PDF: extrato da Regions ou fatura do Nubank.",
+      );
     }
 
     startTransition(async () => {
@@ -327,6 +331,7 @@ export function ImportWorkspace({
           setError(result.error);
           return;
         }
+        setNotice(result.message);
         router.refresh();
       } catch (err) {
         setError(
@@ -353,8 +358,8 @@ export function ImportWorkspace({
           <h1 className="text-page-title">Importar</h1>
           <p className="text-page-subtitle">
             Extrato da Regions ou fatura do cartão Nubank, em PDF. O arquivo é
-            lido aqui no navegador e não sai da sua máquina. Os lançamentos passam por revisão antes de
-            entrar.
+            lido aqui no navegador e não sai da sua máquina. Os lançamentos
+            passam por revisão antes de entrar.
           </p>
         </div>
 
@@ -391,6 +396,14 @@ export function ImportWorkspace({
               </div>
 
               {errorBlock}
+              {notice ? (
+                <p
+                  className="rounded-xl bg-(--primary-soft) px-3 py-2 text-sm text-(--primary-hover)"
+                  role="status"
+                >
+                  {notice}
+                </p>
+              ) : null}
 
               <Button
                 type="submit"
@@ -551,6 +564,14 @@ export function ImportWorkspace({
       ) : null}
 
       {errorBlock}
+      {notice ? (
+        <p
+          className="rounded-xl bg-(--primary-soft) px-3 py-2 text-sm text-(--primary-hover)"
+          role="status"
+        >
+          {notice}
+        </p>
+      ) : null}
 
       <Card>
         <CardContent className="p-0">

@@ -199,6 +199,14 @@ export default async function CartoesPage({
   const shownTotal = isFuture
     ? Math.max(0, statement.chargesCents - statement.creditsCents)
     : statement.totalCents;
+  // O que veio da fatura anterior (sem pagar) e está somado nesta.
+  const carriedCents = isFuture
+    ? 0
+    : Math.max(
+        0,
+        statement.totalCents -
+          (statement.chargesCents - statement.creditsCents),
+      );
 
   const toPay =
     statement.status === "open"
@@ -290,11 +298,26 @@ export default async function CartoesPage({
               Cartão pessoal de {selected.ownerLabel}: aparece só o total de
               cada fatura.
             </div>
-          ) : purchases.length === 0 ? (
+          ) : purchases.length === 0 && carriedCents === 0 ? (
             <p className="py-6 text-sm text-(--text-muted)">
               Nenhuma compra nesta fatura ainda. Lance as compras escolhendo
               este cartão como conta.
             </p>
+          ) : purchases.length === 0 ? (
+            <div className="flex min-h-[60px] items-center gap-3 rounded-[14px] bg-(--bg-subtle) px-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">
+                  Saldo da fatura anterior
+                </p>
+                <p className="text-xs text-(--text-muted)">
+                  Ficou sem pagar e passou pra esta fatura. Nenhuma compra nova
+                  ainda.
+                </p>
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums">
+                <Money cents={carriedCents} currency={currency} />
+              </span>
+            </div>
           ) : (
             <div className="flex flex-col">
               {purchases.map((row) => {
@@ -382,6 +405,12 @@ export default async function CartoesPage({
             <div className="mt-1.5 text-[30px] leading-tight font-extrabold tracking-[-0.02em] tabular-nums">
               <Money cents={shownTotal} currency={currency} />
             </div>
+            {carriedCents > 0 && purchases.length > 0 ? (
+              <div className="mt-1 text-[13px] text-(--text-muted)">
+                Inclui <Money cents={carriedCents} currency={currency} /> que
+                ficou da fatura anterior.
+              </div>
+            ) : null}
             {isFuture ? (
               <div className="mt-1 text-[13px] text-(--text-muted)">
                 Já lançado pra este mês. O que ficar sem pagar antes entra aqui

@@ -171,6 +171,7 @@ async function runImportStatement(input: {
   const isCard = account.type === "credit_card";
 
   let statement: ParsedStatement;
+  let cardDaysNote: string | null = null;
   let verification: {
     matches: boolean;
     extractedSumCents: number;
@@ -188,6 +189,21 @@ async function runImportStatement(input: {
       const card = parseNubankStatementText(text);
       statement = card;
       verification = verifyCardStatement(card);
+      // A fatura diz quando o cartão fecha e vence; se o cadastro está
+      // diferente, ela manda — é o que decide em que fatura cai cada compra.
+      const closeDay = Number(card.periodEnd.slice(8, 10));
+      const dueDay = Number(card.dueDate.slice(8, 10));
+      const { data: adjusted } = await supabase
+        .from("accounts")
+        .update({ statement_close_day: closeDay, payment_due_day: dueDay })
+        .eq("id", accountId)
+        .or(
+          `statement_close_day.is.null,payment_due_day.is.null,statement_close_day.neq.${closeDay},payment_due_day.neq.${dueDay}`,
+        )
+        .select("id");
+      if (adjusted && adjusted.length > 0) {
+        cardDaysNote = `Ajustei o cartão pra fechar dia ${closeDay} e vencer dia ${dueDay}, como na fatura.`;
+      }
     } else {
       if (looksLikeNubank(text)) {
         return {
@@ -491,7 +507,11 @@ async function runImportStatement(input: {
         : "A soma dos lançamentos não fecha com o saldo final do extrato. Revise antes de confirmar.";
   }
 
+  if (cardDaysNote)
+    message = message ? `${message} ${cardDaysNote}` : cardDaysNote;
+
   revalidatePath("/importar");
+  revalidatePath("/cartoes");
 
   return {
     ok: true,
