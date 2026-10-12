@@ -13,6 +13,8 @@ export type RecurrenceRow = {
   direction: "in" | "out";
   frequency: "monthly" | "weekly" | "yearly";
   day_of_month: number | null;
+  /** Conta do casal ou própria. Da conta "aberta" do outro, só leitura. */
+  can_edit: boolean;
 };
 
 const FREQUENCY_LABELS: Record<RecurrenceRow["frequency"], string> = {
@@ -69,19 +71,25 @@ export function RecurrencesList({
                 {row.direction === "out" ? "-" : "+"}
                 {formatCents(row.amount_cents, currency)}
               </span>
-              <Button
-                size="xs"
-                variant="ghost"
-                disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await deactivateRecurrence(row.id);
-                    router.refresh();
-                  })
-                }
-              >
-                Desativar
-              </Button>
+              {row.can_edit ? (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await deactivateRecurrence(row.id);
+                      router.refresh();
+                    })
+                  }
+                >
+                  Desativar
+                </Button>
+              ) : (
+                <span className="text-xs text-(--text-muted)" title="Conta pessoal de outra pessoa: só leitura">
+                  Só leitura
+                </span>
+              )}
             </span>
           </div>
         ))}

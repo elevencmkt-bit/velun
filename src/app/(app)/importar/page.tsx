@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { accountScope } from "@/lib/visibility";
 import { fetchConfirmedCandidates } from "@/lib/import/confirmed-candidates";
 import { possibleDoubles } from "@/lib/import/match-confirmed";
 import { ImportWorkspace } from "./import-workspace";
@@ -9,10 +8,10 @@ export default async function ImportarPage() {
   const { householdId, memberId, currency } = await getCurrentMember();
   const supabase = await createClient();
 
-  // Só dá pra importar extrato pra conta do casal ou conta minha: o
-  // `with check` do RLS recusa lançamento na conta pessoal do outro, e a
-  // tela não deve oferecer o que vai falhar.
-  const scope = await accountScope(supabase, householdId, memberId, "transactions");
+  // Só dá pra importar extrato pra conta do casal ou conta minha: o banco
+  // recusa importação e lançamento na conta pessoal do outro, mesmo
+  // quando ela é "aberta" (dá pra ver, não dá pra mexer). A tela não deve
+  // oferecer o que vai falhar.
 
   const [{ data: accounts }, { data: categories }, { data: pending }, { data: history }] =
     await Promise.all([
@@ -21,7 +20,7 @@ export default async function ImportarPage() {
         .select("id, name, owner_id")
         .eq("household_id", householdId)
         .eq("is_archived", false)
-        .in("id", scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"])
+        .or(`owner_id.is.null,owner_id.eq.${memberId}`)
         .order("name"),
       supabase
         .from("categories")

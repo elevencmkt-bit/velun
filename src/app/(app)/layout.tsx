@@ -16,11 +16,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
 
   const [{ data: accounts }, { data: categories }, notifications] = await Promise.all([
+    // Só contas em que dá pra lançar: a do casal e as próprias. A conta
+    // pessoal do outro pode estar visível, mas o banco recusa lançamento
+    // nela — oferecer na lista seria convidar um erro.
     supabase
       .from("accounts")
       .select("id, name")
       .eq("household_id", member.householdId)
       .eq("is_archived", false)
+      .or(`owner_id.is.null,owner_id.eq.${member.memberId}`)
       .order("sort_order")
       .order("name"),
     supabase

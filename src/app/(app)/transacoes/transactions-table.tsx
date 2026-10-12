@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { Check } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import {
   bulkMarkPaid,
   bulkUpdateCategory,
@@ -85,6 +85,7 @@ export function TransactionsTable({
   }
 
   function onRowClick(row: TransactionRow) {
+    if (!row.can_edit) return;
     if (selectionMode) {
       toggle(row.id);
       return;
@@ -156,8 +157,9 @@ export function TransactionsTable({
       ) : null}
 
       {groups.map(([date, dayRows]) => {
-        const dayIds = dayRows.map((r) => r.id);
-        const allSelected = dayIds.every((id) => selected.has(id));
+        const editableDayIds = dayRows.filter((r) => r.can_edit).map((r) => r.id);
+        const allSelected =
+          editableDayIds.length > 0 && editableDayIds.every((id) => selected.has(id));
         const dayNet = dayRows.reduce(
           (sum, r) => sum + (r.direction === "in" ? r.amount_cents : -r.amount_cents),
           0,
@@ -169,7 +171,7 @@ export function TransactionsTable({
               {selectionMode ? (
                 <Checkbox
                   checked={allSelected}
-                  onCheckedChange={(checked) => toggleAll(dayIds, checked === true)}
+                  onCheckedChange={(checked) => toggleAll(editableDayIds, checked === true)}
                 />
               ) : null}
               <span className="text-table-header shrink-0">{formatDayHeading(date)}</span>
@@ -208,7 +210,11 @@ export function TransactionsTable({
                 >
                   {selectionMode ? (
                     <span onClick={(e) => e.stopPropagation()}>
-                      <Checkbox checked={selected.has(row.id)} onCheckedChange={() => toggle(row.id)} />
+                      <Checkbox
+                        checked={selected.has(row.id)}
+                        disabled={!row.can_edit}
+                        onCheckedChange={() => toggle(row.id)}
+                      />
                     </span>
                   ) : null}
 
@@ -290,30 +296,42 @@ export function TransactionsTable({
                     className="flex shrink-0 items-center gap-0.5"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {row.status === "pending" ? (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        disabled={isPending}
-                        aria-label="Marcar como confirmado"
-                        title="Marcar como confirmado"
-                        className="text-(--income-dark) hover:bg-(--income-soft) hover:text-(--income-dark)"
-                        onClick={() =>
-                          startTransition(async () => {
-                            await markTransactionPaid(row.id);
-                            router.refresh();
-                          })
-                        }
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
+                    {row.can_edit ? (
+                      <>
+                      {row.status === "pending" ? (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isPending}
+                          aria-label="Marcar como confirmado"
+                          title="Marcar como confirmado"
+                          className="text-(--income-dark) hover:bg-(--income-soft) hover:text-(--income-dark)"
+                          onClick={() =>
+                            startTransition(async () => {
+                              await markTransactionPaid(row.id);
+                              router.refresh();
+                            })
+                          }
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <span className="h-7 w-7" />
+                      )}
+                      <DeleteTransactionButton
+                        transactionId={row.id}
+                        transferGroupId={row.transfer_group_id}
+                      />
+                      </>
                     ) : (
-                      <span className="h-7 w-7" />
+                      <span
+                        className="flex h-7 w-[60px] items-center justify-center text-(--text-muted)"
+                        title="Conta pessoal de outra pessoa: só leitura"
+                        aria-label="Só leitura"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                      </span>
                     )}
-                    <DeleteTransactionButton
-                      transactionId={row.id}
-                      transferGroupId={row.transfer_group_id}
-                    />
                   </span>
                 </div>
               );

@@ -18,6 +18,8 @@ export type PendingRow = {
   account_name: string;
   category_name: string | null;
   is_overdue: boolean;
+  /** Conta do casal ou própria. Da conta "aberta" do outro, só leitura. */
+  can_edit: boolean;
 };
 
 const PAGE_SIZE = 5;
@@ -104,19 +106,25 @@ export function PendingList({
                 {row.direction === "out" ? "-" : "+"}
                 {formatCents(row.amount_cents, currency)}
               </span>
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await markTransactionPaid(row.id);
-                    router.refresh();
-                  })
-                }
-              >
-                {kind === "pay" ? "Marcar paga" : "Marcar recebida"}
-              </Button>
+              {row.can_edit ? (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await markTransactionPaid(row.id);
+                      router.refresh();
+                    })
+                  }
+                >
+                  {kind === "pay" ? "Marcar paga" : "Marcar recebida"}
+                </Button>
+              ) : (
+                <span className="text-xs text-(--text-muted)" title="Conta pessoal de outra pessoa: só leitura">
+                  Só leitura
+                </span>
+              )}
             </span>
           </div>
         ))}
