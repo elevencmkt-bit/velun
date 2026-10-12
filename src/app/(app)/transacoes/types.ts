@@ -3,6 +3,8 @@ export type TransactionRow = {
   date: string;
   description: string;
   notes: string | null;
+  /** Texto como veio do banco, em lançamento importado. */
+  bank_description: string | null;
   amount_cents: number;
   direction: "in" | "out";
   status: "pending" | "cleared";

@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
-import { computeFingerprint } from "@/lib/fingerprint";
+import { computeFingerprint, normalizeDescription } from "@/lib/fingerprint";
+import { cleanBankDescription } from "@/lib/import/clean-description";
+import { rememberMerchantName } from "@/lib/merchant-names";
 import { parseRegionsStatementText, StatementParseError } from "@/lib/import/regions-pdf";
 import { verifyStatement } from "@/lib/import/verify";
 import { suggestCategoryId } from "@/lib/import/mcc";
@@ -240,6 +242,14 @@ async function runImportStatement(input: {
 
   const takenForecasts = new Set<string>();
 
+  // Nomes que esta pessoa já deu a estabelecimentos em importações
+  // anteriores. A chave é o nome limpo automático, normalizado.
+  const { data: savedNames } = await supabase
+    .from("merchant_names")
+    .select("bank_key, name")
+    .eq("member_id", memberId);
+  const nameByKey = new Map((savedNames ?? []).map((n) => [n.bank_key as string, n.name as string]));
+
   const rows = statement.transactions.map((t) => {
     const fingerprint = computeFingerprint({
       accountId,
@@ -255,10 +265,16 @@ async function runImportStatement(input: {
     const match = isDuplicate ? null : matchForecast(t, candidates, takenForecasts);
     if (match) takenForecasts.add(match.id);
 
+    // Nome pra lista; o texto do banco segue junto, e a impressão digital
+    // (acima) continua sendo calculada sobre ele.
+    const cleanName = cleanBankDescription(t.description);
+    const displayName = nameByKey.get(normalizeDescription(cleanName)) ?? cleanName;
+
     return {
       import_id: importId,
       date: t.date,
-      description: t.description,
+      description: displayName,
+      bank_description: t.description,
       amount_cents: t.amountCents,
       direction: t.direction,
       suggested_category_id: suggested,
@@ -433,6 +449,54 @@ async function runSetStagedCategory(stagedId: string, categoryId: string | null)
     .eq("id", stagedId);
 
   if (error) throw new Error(error.message);
+  revalidatePath("/importar");
+}
+
+/**
+ * Renomeia uma linha da revisão. As outras linhas do mesmo
+ * estabelecimento nesta importação ganham o mesmo nome, e o nome fica
+ * lembrado pras próximas importações.
+ */
+export async function renameStagedRow(stagedId: string, name: string): Promise<ActionResult> {
+  return attempt("Não consegui renomear.", () => runRenameStagedRow(stagedId, name));
+}
+
+async function runRenameStagedRow(stagedId: string, rawName: string) {
+  const name = rawName.replace(/\s+/g, " ").trim();
+  if (!name) throw new Error("O nome não pode ficar vazio.");
+  if (name.length > 200) throw new Error("Nome comprido demais.");
+
+  const { householdId, memberId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const { data: row, error: rowError } = await supabase
+    .from("staged_transactions")
+    .select("id, import_id, description, bank_description")
+    .eq("id", stagedId)
+    .maybeSingle();
+  if (rowError) throw new Error(rowError.message);
+  if (!row) throw new Error("Linha não encontrada.");
+
+  const bank = (row.bank_description as string | null) ?? (row.description as string);
+  const key = normalizeDescription(cleanBankDescription(bank));
+
+  const { data: siblings, error: siblingsError } = await supabase
+    .from("staged_transactions")
+    .select("id, description, bank_description")
+    .eq("import_id", row.import_id);
+  if (siblingsError) throw new Error(siblingsError.message);
+
+  const ids = (siblings ?? [])
+    .filter((s) => {
+      const sBank = (s.bank_description as string | null) ?? (s.description as string);
+      return s.id === stagedId || normalizeDescription(cleanBankDescription(sBank)) === key;
+    })
+    .map((s) => s.id as string);
+
+  const { error } = await supabase.from("staged_transactions").update({ description: name }).in("id", ids);
+  if (error) throw new Error(error.message);
+
+  await rememberMerchantName(supabase, { householdId, memberId, bankDescription: bank, name });
   revalidatePath("/importar");
 }
 

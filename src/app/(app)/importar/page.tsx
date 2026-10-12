@@ -73,7 +73,7 @@ export default async function ImportarPage() {
     ? await supabase
         .from("staged_transactions")
         .select(
-          "id, date, description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status)",
+          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status)",
         )
         .eq("import_id", openImport.id)
         .order("date")
@@ -159,6 +159,7 @@ export default async function ImportarPage() {
           id: s.id as string,
           date: s.date as string,
           description: s.description as string,
+          bankDescription: (s.bank_description as string | null) ?? null,
           amountCents: s.amount_cents as number,
           direction: s.direction as "in" | "out",
           categoryId: (s.suggested_category_id as string | null) ?? null,

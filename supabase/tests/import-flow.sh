@@ -42,7 +42,9 @@ check "importação marcada" "$(admin "select status from imports where id='1000
 check "duas Stltones idênticas mantidas" "$(admin "select count(*) from transactions where description='Sp Stltones.Com'")" "2"
 check "linha desmarcada não entra" "$(admin "select count(*) from transactions where description='Linha desmarcada'")" "0"
 check "Sylaris quitado" "$(admin "select status from transactions where id='$SYL'")" "cleared"
-check "observação: a sua, depois a do banco" "$(admin "select replace(notes, E'\n', ' / ') from transactions where id='$SYL'")" "pago via Zelle / Zelle Credit From Sylaris, LLC Ref# 626500g0ie64"
+check "observação continua a sua" "$(admin "select notes from transactions where id='$SYL'")" "pago via Zelle"
+check "texto do banco na coluna própria" "$(admin "select bank_description from transactions where id='$SYL'")" "Zelle Credit From Sylaris, LLC Ref# 626500g0ie64"
+check "revisão antiga (sem coluna): texto do banco = descrição" "$(admin "select count(*) from transactions where description='Sp Stltones.Com' and bank_description='Sp Stltones.Com'")" "2"
 check "snapshot guarda estado pendente" "$(admin "select match_previous->>'status' from staged_transactions where match_previous is not null")" "pending"
 check "snapshot guarda impressão" "$(admin "select (match_previous ? 'fingerprint')::text from staged_transactions where match_previous is not null")" "true"
 check "segundo clique recusado" "$(as_user $LEVI "select confirm_import('10000000-0000-0000-0000-000000000001');" | grep -o 'já foi confirmada')" "já foi confirmada"
@@ -51,6 +53,7 @@ check "segundo clique não duplica" "$(admin "select count(*) from transactions 
 echo "desfazer:"
 check "desfaz" "$(as_user $LEVI "select undo_import('10000000-0000-0000-0000-000000000001');")" '{"deleted": 2, "restored": 1}'
 check "Sylaris volta a previsão" "$(admin "select status||' · '||notes from transactions where id='$SYL'")" "pending · pago via Zelle"
+check "desfazer tira o texto do banco da previsão" "$(admin "select coalesce(bank_description, 'nenhum') from transactions where id='$SYL'")" "nenhum"
 check "impressão original de volta" "$(admin "select (fingerprint = transaction_fingerprint(account_id, date, amount_cents, description))::text from transactions where id='$SYL'")" "true"
 check "importação e staging somem" "$(admin "select count(*) from imports")/$(admin "select count(*) from staged_transactions")" "0/0"
 
@@ -226,6 +229,64 @@ check "…a já paga ficou na conta do casal" "$(admin "select account_id from t
 check "…impressão digital recalculada pra conta nova" "$(admin "select bool_and(fingerprint = transaction_fingerprint(account_id, date, amount_cents, description))::text from transactions where recurrence_id='dec00000-0000-0000-0000-0000000000a1' and status='pending'")" "true"
 check "…o resto do modelo intacto" "$(admin "select template->>'description'||' · '||(template->>'amount_cents') from recurrences where id='dec00000-0000-0000-0000-0000000000a1'")" "Spectrum · 8500"
 check "conta dela oculta: Levi nem enxerga a recorrência" "$(as_user $LEVI "select move_recurrence('dec00000-0000-0000-0000-0000000000a1', 'acc00000-0000-0000-0000-000000000002');" | grep -o 'não encontrada')" "não encontrada"
+
+echo "nomes limpos:"
+admin "delete from transactions; delete from imports;"
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+insert into imports (id, household_id, account_id, file_path, file_type, status, created_by) values
+  ('10000000-0000-0000-0000-000000000009', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', 'outubro.pdf', 'pdf', 'review', 'aaaaaaaa-0000-0000-0000-00000000000a');
+insert into staged_transactions (import_id, date, description, bank_description, amount_cents, direction, fingerprint, is_included) values
+  ('10000000-0000-0000-0000-000000000009', '2026-10-11', 'Fxreplay', 'Card Purchase Fxreplay 5817 Oklahoma City OK 73103 9889', 3500, 'out',
+   transaction_fingerprint('acc00000-0000-0000-0000-000000000001', '2026-10-11', 3500, 'Card Purchase Fxreplay 5817 Oklahoma City OK 73103 9889'), true);
+SQL
+as_user $LEVI "select confirm_import('10000000-0000-0000-0000-000000000009');" >/dev/null
+check "entra com o nome limpo e o texto do banco guardado" "$(admin "select description||' · '||bank_description from transactions where import_id='10000000-0000-0000-0000-000000000009'")" "Fxreplay · Card Purchase Fxreplay 5817 Oklahoma City OK 73103 9889"
+check "impressão digital é a do texto do banco" "$(admin "select (fingerprint = transaction_fingerprint(account_id, date, amount_cents, bank_description))::text from transactions where import_id='10000000-0000-0000-0000-000000000009'")" "true"
+
+as_user $LEVI "insert into merchant_names (household_id, member_id, bank_key, name) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'facebook', 'Anúncios');" >/dev/null
+check "Levi guarda o nome que escolheu" "$(admin "select name from merchant_names where member_id='$LEVI'")" "Anúncios"
+check "esposa não vê os nomes dele" "$(as_user $ESPOSA "select count(*) from merchant_names;")" "0"
+as_user $ESPOSA "insert into merchant_names (household_id, member_id, bank_key, name) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'netflix', 'Filmes');" >/dev/null
+check "esposa não grava nome no lugar dele" "$(admin "select count(*) from merchant_names where bank_key='netflix'")" "0"
+as_user $ESPOSA "update merchant_names set name = 'trocado' where member_id = '$LEVI';" >/dev/null
+check "esposa não troca nome dele" "$(admin "select name from merchant_names where member_id='$LEVI'")" "Anúncios"
+
+echo "lançamentos importados antes desta versão:"
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+insert into imports (id, household_id, account_id, file_path, file_type, status, created_by) values
+  ('10000000-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', 'antigo.pdf', 'pdf', 'confirmed', 'aaaaaaaa-0000-0000-0000-00000000000a');
+insert into transactions (id, household_id, account_id, date, amount_cents, direction, description, notes, status, fingerprint, import_id, created_by) values
+  -- importado e nunca mexido
+  ('e3000000-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', '2026-09-11', 3500, 'out',
+   'Card Purchase Fxreplay 5817 Oklahoma City OK 73103 9889', null, 'cleared',
+   transaction_fingerprint('acc00000-0000-0000-0000-000000000001', '2026-09-11', 3500, 'Card Purchase Fxreplay 5817 Oklahoma City OK 73103 9889'),
+   '10000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  -- importado e renomeado depois (a impressão foi recalculada com o nome novo)
+  ('e3000000-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', '2026-09-12', 900, 'out',
+   'Café', null, 'cleared',
+   transaction_fingerprint('acc00000-0000-0000-0000-000000000001', '2026-09-12', 900, 'Café'),
+   '10000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  -- previsão quitada: texto do banco na última linha da observação
+  ('e3000000-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', '2026-09-22', 40000, 'in',
+   'Sylaris Monthly', E'pago via Zelle\nZelle Credit From Sylaris, LLC Ref# 626500g0ie64', 'cleared',
+   transaction_fingerprint('acc00000-0000-0000-0000-000000000001', '2026-09-22', 40000, 'Zelle Credit From Sylaris, LLC Ref# 626500g0ie64'),
+   '10000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-00000000000a'),
+  -- previsão quitada sem observação própria
+  ('e3000000-0000-0000-0000-000000000004', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', '2026-09-24', 48000, 'out',
+   'Car Monthly', 'Card Purchase Toyota Fin 6012 800-874-8822 TX 75024 9889', 'cleared',
+   transaction_fingerprint('acc00000-0000-0000-0000-000000000001', '2026-09-24', 48000, 'Card Purchase Toyota Fin 6012 800-874-8822 TX 75024 9889'),
+   '10000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-00000000000a');
+SQL
+sed -n '/\[preenche-antigos:início\]/,/\[preenche-antigos:fim\]/p' "$S"/../migrations/0018_clean_bank_names.sql > $D/backfill.sql
+psql -h $D -p 54329 -U postgres -q -v ON_ERROR_STOP=1 -f $D/backfill.sql
+check "nunca mexido: texto do banco copiado" "$(admin "select bank_description from transactions where id='e3000000-0000-0000-0000-000000000001'")" "Card Purchase Fxreplay 5817 Oklahoma City OK 73103 9889"
+# Renomeado antes desta versão: a impressão foi recalculada com o nome
+# novo, então não dá pra distinguir de um nunca mexido. Fica com o nome
+# como "texto do banco" — a impressão segue exatamente a mesma de antes.
+check "renomeado antes: impressão segue a mesma" "$(admin "select (fingerprint = transaction_fingerprint(account_id, date, amount_cents, bank_description))::text from transactions where id='e3000000-0000-0000-0000-000000000002'")" "true"
+check "quitada: texto sai da observação pra coluna" "$(admin "select bank_description||' | '||notes from transactions where id='e3000000-0000-0000-0000-000000000003'")" "Zelle Credit From Sylaris, LLC Ref# 626500g0ie64 | pago via Zelle"
+check "quitada sem observação: observação fica vazia" "$(admin "select bank_description||' | '||coalesce(notes, 'vazia') from transactions where id='e3000000-0000-0000-0000-000000000004'")" "Card Purchase Toyota Fin 6012 800-874-8822 TX 75024 9889 | vazia"
+check "rodar de novo não muda nada" "$(psql -h $D -p 54329 -U postgres -q -f $D/backfill.sql >/dev/null; admin "select count(*) from transactions where import_id='10000000-0000-0000-0000-00000000000a' and bank_description is not null")" "4"
 
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
