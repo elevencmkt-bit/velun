@@ -1,5 +1,6 @@
 "use client";
 
+import { localToday } from "@/lib/today";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRecurrence } from "@/lib/actions/recurrences";
@@ -27,7 +28,7 @@ type Category = { id: string; name: string; kind: "income" | "expense" };
 type Frequency = "monthly" | "weekly" | "yearly";
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {

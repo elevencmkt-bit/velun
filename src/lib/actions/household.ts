@@ -4,29 +4,39 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import type { CurrencyCode } from "@/lib/money";
+import { COUNTRY_LABELS, TIMEZONES, type CountryCode } from "@/lib/household-settings";
 
 const VALID_CURRENCIES: CurrencyCode[] = ["BRL", "USD", "EUR"];
 
-export async function updateCurrency(currency: CurrencyCode) {
+export type HouseholdSettingsResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * País, fuso e moeda da casa. Devolve resultado em vez de lançar erro:
+ * em produção o Next esconde a mensagem de erro de server action, e a
+ * tela ficaria sem dizer o que deu errado.
+ */
+export async function updateHouseholdSettings(input: {
+  country: CountryCode;
+  timezone: string;
+  currency: CurrencyCode;
+}): Promise<HouseholdSettingsResult> {
+  if (!(input.country in COUNTRY_LABELS)) return { ok: false, error: "País inválido." };
+  if (!TIMEZONES.some((t) => t.value === input.timezone)) return { ok: false, error: "Fuso inválido." };
+  if (!VALID_CURRENCIES.includes(input.currency)) return { ok: false, error: "Moeda inválida." };
+
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
-
-  if (!VALID_CURRENCIES.includes(currency)) throw new Error("Moeda inválida.");
-
   const { data, error } = await supabase
     .from("households")
-    .update({ currency })
+    .update({ country: input.country, timezone: input.timezone, currency: input.currency })
     .eq("id", householdId)
     .select("id");
 
-  if (error) throw new Error(error.message);
-  // RLS bloqueando o update não gera erro, só devolve 0 linhas — sem
-  // essa checagem a escrita falha em silêncio.
-  if (!data || data.length === 0) {
-    throw new Error("Não foi possível salvar a moeda (permissão negada).");
-  }
+  if (error) return { ok: false, error: `Não foi possível salvar: ${error.message}` };
+  if (!data || data.length === 0) return { ok: false, error: "Não foi possível salvar (permissão negada)." };
 
   revalidateEverything();
+  return { ok: true };
 }
 
 function revalidateEverything() {

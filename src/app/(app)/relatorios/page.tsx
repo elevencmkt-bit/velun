@@ -55,11 +55,11 @@ export default async function RelatoriosPage({
 }: {
   searchParams: Promise<{ month?: string; view?: string }>;
 }) {
-  const { householdId, memberId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
   const { month, view: viewParam } = await searchParams;
   const view: ReportView = viewParam === "a-vencer" ? "a-vencer" : "realizado";
-  const { year, monthIndex } = parseMonthParam(month);
+  const { year, monthIndex } = parseMonthParam(month, today);
 
   const { start, end } = monthRange(year, monthIndex);
   const prev = shiftMonth(year, monthIndex, -1);

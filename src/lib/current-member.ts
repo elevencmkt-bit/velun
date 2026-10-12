@@ -1,3 +1,5 @@
+import { todayIn } from "@/lib/today";
+import type { CountryCode } from "@/lib/household-settings";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -66,7 +68,7 @@ export const getCurrentMember = cache(async () => {
       supabase
         .from("members")
         .select(
-          "id, household_id, display_name, avatar_url, notifications_seen_at, households(currency)",
+          "id, household_id, display_name, avatar_url, notifications_seen_at, households(currency, country, timezone)",
         )
         .eq("id", auth.userId)
         .single(),
@@ -85,14 +87,21 @@ export const getCurrentMember = cache(async () => {
 
   // Sem tipos gerados do Supabase ainda, o builder infere `households`
   // como array — na prática é o objeto único do lado "many-to-one".
-  const householdRaw = member.households as unknown as { currency: string } | { currency: string }[] | null;
+  type HouseholdRow = { currency: string; country?: string; timezone?: string };
+  const householdRaw = member.households as unknown as HouseholdRow | HouseholdRow[] | null;
   const household = Array.isArray(householdRaw) ? householdRaw[0] : householdRaw;
   const currency = (household?.currency as CurrencyCode) ?? "USD";
+  const country = (household?.country as CountryCode | undefined) ?? "US";
+  const timezone = household?.timezone ?? "America/New_York";
 
   return {
     memberId: member.id as string,
     householdId: member.household_id as string,
     currency,
+    country,
+    timezone,
+    /** Hoje no fuso da casa (AAAA-MM-DD). */
+    today: todayIn(timezone),
     displayName: (member.display_name as string | null) ?? auth.email ?? "Você",
     avatarUrl: (member.avatar_url as string | null) ?? null,
     notificationsSeenAt: (member.notifications_seen_at as string | null) ?? null,

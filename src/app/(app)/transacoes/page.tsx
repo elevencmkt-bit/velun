@@ -26,7 +26,7 @@ export default async function TransacoesPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { householdId, memberId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
 
   // Extrato é o nível máximo de exposição: de conta pessoal do outro, só
@@ -37,7 +37,7 @@ export default async function TransacoesPage({
   const visibleIds = scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
   const params = await searchParams;
   const hasCustomRange = Boolean(params.from || params.to);
-  const { year, monthIndex } = parseMonthParam(params.month);
+  const { year, monthIndex } = parseMonthParam(params.month, today);
   const { start, end } = monthRange(year, monthIndex);
   const prev = shiftMonth(year, monthIndex, -1);
   const next = shiftMonth(year, monthIndex, 1);
@@ -112,7 +112,6 @@ export default async function TransacoesPage({
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
 
-  const today = new Date().toISOString().slice(0, 10);
 
   const rows: TransactionRow[] = (rawRows ?? []).map((row) => ({
     id: row.id,

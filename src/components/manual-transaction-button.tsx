@@ -1,5 +1,6 @@
 "use client";
 
+import { localToday } from "@/lib/today";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createTransaction, createTransfer } from "@/lib/actions/transactions";
@@ -30,7 +31,7 @@ type Category = { id: string; name: string; kind: "income" | "expense" };
 type Mode = "in" | "out" | "transfer";
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 export function ManualTransactionButton({

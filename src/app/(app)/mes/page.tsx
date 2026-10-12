@@ -8,6 +8,7 @@ import { getCategoryIcon, getCategoryIconMap } from "@/lib/category-icons";
 import { getCashFlowProjection, type CashFlowPoint } from "@/lib/cash-flow";
 import { monthRange, shiftMonth, monthParam, monthLabel, shortMonthLabel, parseMonthParam } from "@/lib/month";
 import { fetchMonthTransactions } from "@/lib/month-transactions";
+import { addDaysISO } from "@/lib/today";
 import { accountScope, scopeLabel, type AccountScope } from "@/lib/visibility";
 import { excludeTransfers, groupByCategory, sumByDirection } from "@/lib/reports";
 import { getAccountBalances } from "@/lib/balances";
@@ -32,10 +33,6 @@ const WHERE_COLORS = ["#536DFE", "#FF8A5C", "#A78BFA", "#27C499"];
 
 const OUT = "var(--expense-dark)";
 const IN = "var(--income-dark)";
-
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 function dayAndMonth(date: string) {
   const d = new Date(`${date}T00:00:00`);
@@ -170,10 +167,10 @@ function Signed({ cents, currency }: { cents: number; currency: CurrencyCode }) 
 }
 
 export default async function MesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
-  const { householdId, memberId, currency, displayName } = await getCurrentMember();
+  const { householdId, memberId, currency, displayName, today } = await getCurrentMember();
   const supabase = await createClient();
   const { month } = await searchParams;
-  const { year, monthIndex } = parseMonthParam(month);
+  const { year, monthIndex } = parseMonthParam(month, today);
 
   const { start, end } = monthRange(year, monthIndex);
   const prev = shiftMonth(year, monthIndex, -1);
@@ -183,10 +180,8 @@ export default async function MesPage({ searchParams }: { searchParams: Promise<
   const trendStart = shiftMonth(year, monthIndex, -(TREND_MONTHS - 1));
   const trendRangeStart = monthRange(trendStart.year, trendStart.monthIndex).start;
 
-  const now = new Date();
-  const today = isoDate(now);
-  const weekEnd = isoDate(new Date(now.getTime() + 6 * 86_400_000));
-  const horizon = isoDate(new Date(now.getTime() + CASH_FLOW_PREVIEW_DAYS * 86_400_000));
+  const weekEnd = addDaysISO(today, 6);
+  const horizon = addDaysISO(today, CASH_FLOW_PREVIEW_DAYS);
   const firstName = displayName?.trim().split(/\s+/)[0] ?? "";
 
   const { data: anyAccount } = await supabase.from("accounts").select("id").eq("household_id", householdId).limit(1);
@@ -233,7 +228,7 @@ export default async function MesPage({ searchParams }: { searchParams: Promise<
     fetchMonthTransactions(supabase, householdId, trendRangeStart, end, categoriesScope),
     getCategoryColorMap(supabase, householdId),
     getCategoryIconMap(supabase, householdId),
-    getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS, balanceScope),
+    getCashFlowProjection(supabase, householdId, CASH_FLOW_PREVIEW_DAYS, balanceScope, today),
     fetchPending(supabase, householdId, transactionsScope, horizon),
     getAccountBalances(supabase, householdId, balanceScope),
     supabase
@@ -261,7 +256,7 @@ export default async function MesPage({ searchParams }: { searchParams: Promise<
   const MonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
   const prevMonthName = new Date(prev.year, prev.monthIndex, 1).toLocaleDateString("pt-BR", { month: "long" });
   const selected = monthParam(year, monthIndex);
-  const thisMonth = monthParam(now.getFullYear(), now.getMonth());
+  const thisMonth = today.slice(0, 7);
 
   // Uma frase que diz como o mês foi, em vez de só "Dashboard".
   const headline =

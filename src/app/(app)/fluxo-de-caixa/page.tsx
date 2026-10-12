@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { addDaysISO } from "@/lib/today";
 import { buildCashFlowInsight, getCashFlowProjection } from "@/lib/cash-flow";
 import { accountScope } from "@/lib/visibility";
 import { formatCents } from "@/lib/money";
@@ -29,7 +30,7 @@ export default async function FluxoDeCaixaPage({
     PERIODS.find((p) => p.days === parsedDays) ?? PERIODS.find((p) => p.days === DEFAULT_DAYS)!;
   const horizonDays = selectedPeriod.days;
 
-  const { householdId, memberId, currency } = await getCurrentMember();
+  const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
 
   const {
@@ -49,6 +50,7 @@ export default async function FluxoDeCaixaPage({
     householdId,
     horizonDays,
     await accountScope(supabase, householdId, memberId, "balance"),
+    today,
   );
 
   const insight = buildCashFlowInsight({
@@ -60,10 +62,9 @@ export default async function FluxoDeCaixaPage({
     periodLabel: selectedPeriod.label,
   });
 
-  const today = new Date();
-  const horizonDate = new Date();
-  horizonDate.setDate(today.getDate() + horizonDays);
-  const rangeLabel = `${dateFormatter.format(today)} – ${dateFormatter.format(horizonDate)}`;
+  const todayDate = new Date(`${today}T12:00:00`);
+  const horizonDate = new Date(`${addDaysISO(today, horizonDays)}T12:00:00`);
+  const rangeLabel = `${dateFormatter.format(todayDate)} – ${dateFormatter.format(horizonDate)}`;
 
   const KPI_TONES = {
     blue: { bg: "#EEF0FF", fg: "#5B6CFF" },

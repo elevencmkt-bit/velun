@@ -288,6 +288,14 @@ check "quitada: texto sai da observação pra coluna" "$(admin "select bank_desc
 check "quitada sem observação: observação fica vazia" "$(admin "select bank_description||' | '||coalesce(notes, 'vazia') from transactions where id='e3000000-0000-0000-0000-000000000004'")" "Card Purchase Toyota Fin 6012 800-874-8822 TX 75024 9889 | vazia"
 check "rodar de novo não muda nada" "$(psql -h $D -p 54329 -U postgres -q -f $D/backfill.sql >/dev/null; admin "select count(*) from transactions where import_id='10000000-0000-0000-0000-00000000000a' and bank_description is not null")" "4"
 
+echo "país e fuso da casa:"
+check "casa existente fica nos EUA, fuso de Orlando" "$(admin "select country||' · '||timezone from households where id='11111111-0000-0000-0000-000000000001'")" "US · America/New_York"
+as_user $LEVI "update households set country = 'BR', timezone = 'America/Sao_Paulo', currency = 'BRL' where id = '11111111-0000-0000-0000-000000000001';" >/dev/null
+check "membro troca país, fuso e moeda" "$(admin "select country||' · '||timezone||' · '||currency from households where id='11111111-0000-0000-0000-000000000001'")" "BR · America/Sao_Paulo · BRL"
+check "fuso inexistente é recusado" "$(as_user $LEVI "update households set timezone = 'Lua/Base' where id = '11111111-0000-0000-0000-000000000001';" | grep -o 'time zone' | head -1)" "time zone"
+check "país fora da lista é recusado" "$(as_user $LEVI "update households set country = 'XX' where id = '11111111-0000-0000-0000-000000000001';" | grep -o 'violates check' | head -1)" "violates check"
+check "ninguém mexe na casa dos outros" "$(as_user $LEVI "update households set timezone = 'America/Chicago' where id = '22222222-0000-0000-0000-000000000002' returning id;" | grep -c 2222)" "0"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL

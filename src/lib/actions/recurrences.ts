@@ -79,8 +79,8 @@ export async function createRecurrence(formData: FormData) {
 }
 
 export async function deactivateRecurrence(recurrenceId: string) {
+  const { today } = await getCurrentMember();
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
 
   const { error: updateError } = await supabase
     .from("recurrences")
