@@ -68,7 +68,7 @@ export function TransactionFilters({
         onValueChange={(v) => setParam("account", v)}
       >
         <SelectTrigger className="min-w-0 flex-1 sm:w-44 sm:flex-none">
-          <Landmark className="h-3.5 w-3.5 text-(--text-muted)" />
+          <Landmark className="h-3.5 w-3.5 text-(--text-muted) max-sm:hidden" />
           <SelectValue placeholder="Todas as contas" />
         </SelectTrigger>
         <SelectContent>
@@ -86,7 +86,7 @@ export function TransactionFilters({
         onValueChange={(v) => setParam("category", v)}
       >
         <SelectTrigger className="min-w-0 flex-1 sm:w-48 sm:flex-none">
-          <Tag className="h-3.5 w-3.5 text-(--text-muted)" />
+          <Tag className="h-3.5 w-3.5 text-(--text-muted) max-sm:hidden" />
           <SelectValue placeholder="Todas as categorias" />
         </SelectTrigger>
         <SelectContent>
