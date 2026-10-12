@@ -10,6 +10,9 @@ import { GlobalSearch } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
 import { fetchVisibilityNotifications } from "@/lib/notifications";
 import { UserMenu } from "@/components/user-menu";
+import { HideValuesButton } from "@/components/hide-values-button";
+import { HIDE_VALUES_COOKIE } from "@/lib/hide-values";
+import { cookies } from "next/headers";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Mesma conferência de sessão e mesmo cadastro que a página usa: o
@@ -17,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // dividem uma ida ao Supabase em vez de fazer cada um a sua.
   const member = await getCurrentMember();
   const supabase = await createClient();
+  const hideValues = (await cookies()).get(HIDE_VALUES_COOKIE)?.value === "1";
 
   const [{ data: accounts }, { data: categories }, notifications] = await Promise.all([
     // Só contas em que dá pra lançar: a do casal e as próprias. A conta
@@ -45,7 +49,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-(--paper) text-(--ink)">
+    <div
+      id="app-root"
+      data-hide-values={hideValues ? "" : undefined}
+      className="flex h-dvh overflow-hidden bg-(--paper) text-(--ink)"
+    >
       <Sidebar />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-(--border-primary) bg-white/90 px-4 backdrop-blur md:h-[68px] md:px-7">
@@ -63,6 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="hidden md:block">
               <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
             </div>
+            <HideValuesButton initialHidden={hideValues} />
             <NotificationBell notifications={notifications} />
             <UserMenu
               displayName={member.displayName}

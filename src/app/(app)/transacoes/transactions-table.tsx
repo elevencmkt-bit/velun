@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { Check, Lock } from "lucide-react";
@@ -24,6 +24,7 @@ import {
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import type { AccountOption, CategoryOption, TransactionRow } from "./types";
+import { Money } from "@/components/money";
 
 const NO_CATEGORY = "__none__";
 
@@ -197,7 +198,7 @@ export function TransactionsTable({
                 style={{ color: dayNet < 0 ? "var(--expense)" : "var(--income)" }}
               >
                 {dayNet < 0 ? "-" : "+"}
-                {formatCents(Math.abs(dayNet), currency)}
+                <Money cents={Math.abs(dayNet)} currency={currency} />
               </span>
             </div>
             {dayRows.map((row) => {
@@ -320,7 +321,7 @@ export function TransactionsTable({
                     }}
                   >
                     {row.direction === "out" ? "-" : "+"}
-                    {formatCents(row.amount_cents, currency)}
+                    <Money cents={row.amount_cents} currency={currency} />
                   </span>
 
                   {/* Ações. Confirmar aparece sempre que há o que confirmar

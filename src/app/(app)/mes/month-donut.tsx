@@ -2,6 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { formatCents, type CurrencyCode } from "@/lib/money";
+import { Money } from "@/components/money";
 
 export type DonutSlice = { name: string; amount_cents: number; color: string };
 
@@ -57,7 +58,7 @@ export function MonthDonut({
             className="font-bold tabular-nums text-(--text-primary)"
             style={{ fontSize: compact ? 13 : 16 }}
           >
-            {formatCents(total, currency)}
+            <Money cents={total} currency={currency} />
           </span>
           <span className="text-[11px] text-(--text-muted)">Total</span>
         </div>
@@ -76,7 +77,7 @@ export function MonthDonut({
               </span>
             )}
             <span className="w-20 text-right font-semibold tabular-nums text-(--text-primary)">
-              {formatCents(slice.amount_cents, currency)}
+              <Money cents={slice.amount_cents} currency={currency} />
             </span>
           </li>
         ))}

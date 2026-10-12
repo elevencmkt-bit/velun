@@ -28,6 +28,7 @@ import { MonthDonut } from "./month-donut";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
 import { ForecastCard } from "./forecast-card";
+import { Money } from "@/components/money";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
@@ -133,7 +134,7 @@ function StatCard({
         </div>
         <div className="flex min-w-0 flex-col gap-1 sm:gap-1.5">
           <span className="text-kpi-label">{label}</span>
-          <span className="text-kpi-value" style={{ color: valueColor }}>
+          <span className="money text-kpi-value" style={{ color: valueColor }}>
             {value}
           </span>
           {delta}
@@ -335,13 +336,13 @@ export default async function MesPage({
               <div className="flex flex-col">
                 <span className="text-kpi-label">Saldo atual</span>
                 <span className="font-semibold tabular-nums text-(--text-primary)">
-                  {formatCents(cashFlow.currentTotal, currency)}
+                  <Money cents={cashFlow.currentTotal} currency={currency} />
                 </span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-kpi-label">Em {CASH_FLOW_PREVIEW_DAYS} dias</span>
                 <span className="font-semibold tabular-nums text-(--text-primary)">
-                  {formatCents(cashFlow.finalPoint.balance_cents, currency)}
+                  <Money cents={cashFlow.finalPoint.balance_cents} currency={currency} />
                 </span>
               </div>
             </div>
@@ -389,7 +390,7 @@ export default async function MesPage({
                       }}
                     >
                       {row.direction === "out" ? "-" : "+"}
-                      {formatCents(row.amount_cents, currency)}
+                      <Money cents={row.amount_cents} currency={currency} />
                     </span>
                   </div>
                 ))}
@@ -432,7 +433,7 @@ export default async function MesPage({
                       }}
                     >
                       {row.direction === "out" ? "-" : "+"}
-                      {formatCents(row.amount_cents, currency)}
+                      <Money cents={row.amount_cents} currency={currency} />
                     </span>
                   </div>
                 ))}

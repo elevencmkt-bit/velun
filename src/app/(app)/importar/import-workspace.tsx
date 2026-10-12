@@ -16,7 +16,7 @@ import {
   type ActionResult,
 } from "@/lib/actions/imports";
 import { extractPdfText } from "@/lib/import/extract-pdf-text";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Money } from "@/components/money";
 
 type Account = { id: string; name: string; isPersonal: boolean };
 type Category = { id: string; name: string; kind: string };
@@ -623,7 +624,7 @@ export function ImportWorkspace({
                     style={{ color: row.direction === "in" ? "var(--income)" : "var(--expense)" }}
                   >
                     {row.direction === "in" ? "+" : "-"}
-                    {formatCents(row.amountCents, currency)}
+                    <Money cents={row.amountCents} currency={currency} />
                   </td>
                 </tr>
               ))}
@@ -633,7 +634,7 @@ export function ImportWorkspace({
       </Card>
 
       <p className="text-sm text-(--text-muted)">
-        Marcados somam {formatCents(includedTotal, currency)} no período.
+        Marcados somam <Money cents={includedTotal} currency={currency} /> no período.
       </p>
 
       {/* Lançamento confirmado à mão que divide valor com linhas do
@@ -675,7 +676,7 @@ export function ImportWorkspace({
                     style={{ color: d.direction === "in" ? "var(--income)" : "var(--expense)" }}
                   >
                     {d.direction === "in" ? "+" : "-"}
-                    {formatCents(d.amountCents, currency)}
+                    <Money cents={d.amountCents} currency={currency} />
                   </span>
                 </div>
               ))}
@@ -722,7 +723,7 @@ export function ImportWorkspace({
                       }}
                     >
                       {forecast.direction === "in" ? "+" : "-"}
-                      {formatCents(forecast.amountCents, currency)}
+                      <Money cents={forecast.amountCents} currency={currency} />
                     </span>
                     <Button
                       variant="ghost"

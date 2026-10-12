@@ -2,11 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
 import { getCategoryColorMap } from "@/lib/category-colors";
-import { formatCents } from "@/lib/money";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecurrenceForm } from "./recurrence-form";
 import { PendingList, type PendingRow } from "./pending-list";
 import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
+import { Money } from "@/components/money";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -158,7 +158,7 @@ export default async function AVencerPage() {
                 className="font-semibold tabular-nums"
                 style={{ color: "var(--expense)" }}
               >
-                {formatCents(totalToPay, currency)}
+                <Money cents={totalToPay} currency={currency} />
               </span>
             </CardHeader>
             <CardContent>
@@ -178,7 +178,7 @@ export default async function AVencerPage() {
                 className="font-semibold tabular-nums"
                 style={{ color: "var(--income)" }}
               >
-                {formatCents(totalToReceive, currency)}
+                <Money cents={totalToReceive} currency={currency} />
               </span>
             </CardHeader>
             <CardContent>

@@ -110,6 +110,7 @@ export default async function FluxoDeCaixaPage({
       iconFg: KPI_TONES.purple.fg,
       label: "Dias no negativo",
       value: `${negativeDays} ${negativeDays === 1 ? "dia" : "dias"}`,
+      isMoney: false,
       valueColor: negativeDays > 0 ? "var(--expense)" : undefined,
       meta: negativeDays > 0 ? `${negativeDaysPct}% do período` : "Sem dias no negativo",
     },
@@ -186,7 +187,7 @@ export default async function FluxoDeCaixaPage({
                 className="text-[19px] leading-[1.1] font-extrabold sm:text-[24px] tracking-[-0.025em] tabular-nums"
                 style={{ color: kpi.valueColor ?? "var(--text-primary)" }}
               >
-                {kpi.value}
+                <span className={kpi.isMoney === false ? undefined : "money"}>{kpi.value}</span>
               </p>
               {kpi.meta ? <span className="mt-2 block text-[11px] text-(--text-light)">{kpi.meta}</span> : null}
             </div>

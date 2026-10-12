@@ -303,3 +303,13 @@
 }
 
 
+
+/* Ocultar valores (o olho do topo). Borra todo valor em dinheiro — os
+   marcados com .money e os eixos e balões dos gráficos — sem mudar o
+   tamanho de nada, então a tela não pula ao ligar e desligar. */
+#app-root[data-hide-values] .money,
+#app-root[data-hide-values] .recharts-yAxis .recharts-cartesian-axis-tick-value,
+#app-root[data-hide-values] .recharts-tooltip-wrapper {
+  filter: blur(7px);
+  user-select: none;
+}

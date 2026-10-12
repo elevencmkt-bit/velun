@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Check, Info, Lightbulb, TrendingDown } from "lucide-react";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import type { CategorySlice, ReportInsight } from "@/lib/reports";
+import { Money } from "@/components/money";
 
 const RANK_GRADIENTS = [
   "linear-gradient(90deg, #FF6B81, #F04469)",
@@ -90,7 +91,7 @@ export function TopCategoriesCard({
                   />
                 </div>
                 <span className="text-right text-[13px] font-semibold tabular-nums text-(--text-secondary)">
-                  {formatCents(row.amount_cents, currency)}
+                  <Money cents={row.amount_cents} currency={currency} />
                 </span>
                 <span className="text-right text-[13px] font-semibold tabular-nums text-(--text-secondary)">
                   {percent}%

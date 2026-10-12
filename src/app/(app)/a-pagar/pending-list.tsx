@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import { markTransactionPaid } from "@/lib/actions/transactions";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/category-badge";
 import type { CategoryColorPair } from "@/lib/category-colors";
+import { Money } from "@/components/money";
 
 export type PendingRow = {
   id: string;
@@ -113,7 +114,7 @@ export function PendingList({
                 }}
               >
                 {row.direction === "out" ? "-" : "+"}
-                {formatCents(row.amount_cents, currency)}
+                <Money cents={row.amount_cents} currency={currency} />
               </span>
               {row.can_edit ? (
                 <Button

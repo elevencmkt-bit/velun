@@ -1,7 +1,8 @@
 import { CalendarClock, Check, ChartNoAxesColumnIncreasing, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import type { CurrencyCode } from "@/lib/money";
 import type { CashFlowInsight, UpcomingEvent } from "@/lib/cash-flow";
+import { Money } from "@/components/money";
 
 function formatEventDate(date: string) {
   const d = new Date(`${date}T00:00:00`);
@@ -76,7 +77,7 @@ export function UpcomingEventsCard({
                   style={{ color: isIncome ? "var(--income)" : "var(--expense)" }}
                 >
                   {isIncome ? "+" : "-"}
-                  {formatCents(event.amount_cents, currency)}
+                  <Money cents={event.amount_cents} currency={currency} />
                 </span>
               </div>
             );
@@ -112,7 +113,7 @@ function ImpactRow({
         <div className="h-full rounded-full" style={{ width: `${percent}%`, background: gradient }} />
       </div>
       <span className="text-right text-[11px] font-semibold tabular-nums text-(--text-secondary)">
-        {formatCents(amount, currency)}
+        <Money cents={amount} currency={currency} />
       </span>
     </div>
   );
@@ -180,8 +181,8 @@ export function ImpactsCard({
         className="mt-2 rounded-xl border px-4 py-3.5 text-[10.5px] leading-[1.4]"
         style={{ background: "#F7F8FF", borderColor: "#ECEFFD", color: "var(--text-secondary)" }}
       >
-        Neste período: entradas de {formatCents(totalIncome, currency)} e saídas de{" "}
-        {formatCents(totalExpense, currency)}, resultado de {formatCents(netResult, currency)}.
+        Neste período: entradas de <Money cents={totalIncome} currency={currency} /> e saídas de{" "}
+        <Money cents={totalExpense} currency={currency} />, resultado de <Money cents={netResult} currency={currency} />.
       </div>
     </article>
   );
