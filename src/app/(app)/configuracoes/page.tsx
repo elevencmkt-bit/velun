@@ -9,6 +9,7 @@ import { DangerZone } from "./danger-zone";
 import { InviteManager } from "./invite-manager";
 import { HouseholdSettingsForm } from "./household-settings-form";
 import { themedBg, themedFg } from "@/lib/theme-color";
+import { AppearancePicker } from "./appearance-picker";
 
 const BENEFITS = [
   { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
@@ -27,7 +28,7 @@ function MemberRow({
 }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="flex items-center gap-3 rounded-[14px] bg-white/80 p-2.5">
+    <div className="flex items-center gap-3 rounded-[14px] bg-(--bg-surface)/80 p-2.5">
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
@@ -145,12 +146,24 @@ export default async function ConfiguracoesPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-card-title">Aparência</h2>
+            <p className="mt-1 text-sm text-(--text-muted)">
+              Tema claro ou escuro. &ldquo;Sistema&rdquo; segue o do seu celular ou computador. Vale só neste aparelho.
+            </p>
+          </div>
+          <AppearancePicker />
+        </CardContent>
+      </Card>
+
       {/* Pessoas da casa: o diferencial do Velun, por isso o degradê azul. */}
       <section
         className="overflow-hidden rounded-[20px]"
         style={{
           background:
-            "radial-gradient(circle at 38% 15%, rgba(91,108,255,0.10), transparent 34%), linear-gradient(135deg, #FFFFFF 0%, #F9FAFF 58%, #F4F6FF 100%)",
+            "radial-gradient(circle at 38% 15%, rgba(91,108,255,0.10), transparent 34%), linear-gradient(135deg, var(--bg-surface) 0%, light-dark(#F9FAFF, #191D28) 58%, light-dark(#F4F6FF, #1B2030) 100%)",
           boxShadow: "var(--shadow-card)",
         }}
       >
@@ -172,7 +185,7 @@ export default async function ConfiguracoesPage() {
               ))}
               <a
                 href="#convite"
-                className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-(--border-strong) p-2.5 text-(--primary) transition-colors hover:bg-white/60"
+                className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-(--border-strong) p-2.5 text-(--primary) transition-colors hover:bg-(--bg-surface)/60"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--primary-light)">
                   <Plus className="h-[18px] w-[18px]" />
@@ -190,12 +203,12 @@ export default async function ConfiguracoesPage() {
 
         <div
           className="grid grid-cols-1 border-t sm:grid-cols-3"
-          style={{ borderColor: "rgba(230,234,242,.85)", backgroundColor: "rgba(255,255,255,.35)" }}
+          style={{ borderColor: "var(--border-primary)", backgroundColor: "light-dark(rgba(255,255,255,.35), rgba(255,255,255,.02))" }}
         >
           {BENEFITS.map((benefit, i) => (
             <div
               key={benefit.label}
-              className={`flex min-h-[58px] items-center gap-3 border-[rgba(230,234,242,.8)] px-5 py-3 md:px-7 ${
+              className={`flex min-h-[58px] items-center gap-3 border-(--border-primary) px-5 py-3 md:px-7 ${
                 i > 0 ? "border-t sm:border-t-0 sm:border-l" : ""
               }`}
             >

@@ -59,7 +59,8 @@ function Preview() {
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-white lg:flex-row">
+    // Login fica sempre claro (a arte foi feita pro fundo branco).
+    <div data-force-light className="flex min-h-dvh flex-col bg-white lg:flex-row">
       <aside className="relative overflow-hidden bg-(--primary) text-white lg:flex lg:w-[46%] lg:max-w-[720px] lg:flex-col lg:justify-between lg:p-14">
         <Motif className="pointer-events-none absolute -top-24 -right-28 h-[420px] w-[420px] opacity-[0.14] lg:-top-32 lg:-right-40 lg:h-[680px] lg:w-[680px]" />
 
