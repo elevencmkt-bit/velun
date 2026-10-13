@@ -99,6 +99,8 @@ export function AccountForm({
   const [type, setType] = useState(account?.type ?? defaultType ?? "checking");
   const isCard = type === "credit_card";
   const [cardColor, setCardColor] = useState(account?.card_color ?? "ink");
+  // Saldo inicial negativo (conta que começa no vermelho). Cartão não usa: lá o campo já é "quanto deve".
+  const [negative, setNegative] = useState((account?.opening_balance_cents ?? 0) < 0 && account?.type !== "credit_card");
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,6 +114,7 @@ export function AccountForm({
           await createAccount(formData);
         }
         formRef.current?.reset();
+        if (!account) setNegative(false);
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -325,22 +328,65 @@ export function AccountForm({
             <Label htmlFor="opening_balance">
               {isCard ? "Quanto você deve hoje neste cartão" : "Saldo inicial"}
             </Label>
-            <Input
-              id="opening_balance"
-              name="opening_balance"
-              type="text"
-              inputMode="decimal"
-              defaultValue={
-                account
-                  ? ((isCard ? -account.opening_balance_cents : account.opening_balance_cents) / 100).toFixed(2)
-                  : "0"
-              }
-              placeholder="0.00"
-            />
+            {isCard ? null : (
+              <input type="hidden" name="opening_balance_sign" value={negative ? "negative" : "positive"} />
+            )}
+            <div className="flex gap-2">
+              {isCard ? null : (
+                // O teclado numérico do celular não tem "−": o sinal fica num botão.
+                <div role="radiogroup" aria-label="Sinal do saldo" className="flex shrink-0 gap-1 rounded-[12px] bg-(--bg-track) p-1">
+                  {[
+                    { value: false, label: "+", title: "Positivo" },
+                    { value: true, label: "−", title: "Negativo" },
+                  ].map((o) => (
+                    <button
+                      key={o.title}
+                      type="button"
+                      role="radio"
+                      aria-checked={negative === o.value}
+                      aria-label={o.title}
+                      title={o.title}
+                      onClick={() => setNegative(o.value)}
+                      className={`flex h-10 w-11 items-center justify-center rounded-[9px] text-[20px] font-bold transition-colors ${
+                        negative === o.value
+                          ? o.value
+                            ? "bg-(--bg-surface) text-(--expense-dark) shadow-[0_1px_3px_rgba(16,24,40,.1)]"
+                            : "bg-(--bg-surface) text-(--income-dark) shadow-[0_1px_3px_rgba(16,24,40,.1)]"
+                          : "text-(--text-muted)"
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Input
+                id="opening_balance"
+                name="opening_balance"
+                type="text"
+                inputMode="decimal"
+                defaultValue={
+                  account
+                    ? (Math.abs(account.opening_balance_cents) / 100).toFixed(2)
+                    : "0"
+                }
+                onChange={(e) => {
+                  // Quem digita "-" no computador também está dizendo "negativo".
+                  if (!isCard && /^\s*[-−]/.test(e.target.value)) {
+                    setNegative(true);
+                    e.target.value = e.target.value.replace(/^\s*[-−]/, "");
+                  }
+                }}
+                placeholder="0.00"
+                className={!isCard && negative ? "text-(--expense-dark)" : undefined}
+              />
+            </div>
             {isCard ? (
               <p className="text-xs text-(--text-muted)">
                 Só o que já estava na fatura antes de você começar a lançar as compras aqui.
               </p>
+            ) : negative ? (
+              <p className="text-xs text-(--text-muted)">A conta começa no vermelho, devendo esse valor ao banco.</p>
             ) : null}
           </div>
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}

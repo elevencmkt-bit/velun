@@ -36,7 +36,13 @@ function readAccountFields(formData: FormData, memberId: string) {
   }
 
   const isCard = type === "credit_card";
-  const openingCents = parseToCents(openingBalanceInput || "0");
+  // O teclado numérico do celular não tem o sinal de menos: o formulário
+  // manda o sinal à parte ("Negativo"). Um "-" digitado no computador
+  // também vale.
+  const negative =
+    formData.get("opening_balance_sign") === "negative" || /^\s*[-−]/.test(openingBalanceInput);
+  const openingAbs = Math.abs(parseToCents(openingBalanceInput.replace(/^\s*[-−]/, "") || "0"));
+  const openingCents = negative ? -openingAbs : openingAbs;
 
   return {
     name,
