@@ -21,10 +21,10 @@ import type {
 } from "./types";
 
 const TABS: { key: StatusKey | "all"; label: string; badge: string }[] = [
-  { key: "all", label: "Todas", badge: "bg-[#EAECF0] text-[#475467]" },
-  { key: "late", label: "Atrasadas", badge: "bg-[#FEE4E2] text-[#B42318]" },
-  { key: "pending", label: "Pendentes", badge: "bg-[#FEF0C7] text-[#B54708]" },
-  { key: "confirmed", label: "Confirmadas", badge: "bg-[#EAECF0] text-[#475467]" },
+  { key: "all", label: "Todas", badge: "bg-(--bg-strong) text-(--text-secondary)" },
+  { key: "late", label: "Atrasadas", badge: "bg-(--danger-badge) text-(--danger-text)" },
+  { key: "pending", label: "Pendentes", badge: "bg-(--warning-badge) text-(--warning-dark)" },
+  { key: "confirmed", label: "Confirmadas", badge: "bg-(--bg-strong) text-(--text-secondary)" },
 ];
 
 export function TransactionsWorkspace({
@@ -116,7 +116,7 @@ export function TransactionsWorkspace({
             className={`h-12 gap-2 rounded-[16px] px-4 text-[14px] font-semibold shadow-(--shadow-card) ${
               selectionMode
                 ? "bg-(--primary-soft) text-(--primary) hover:bg-(--primary-soft)"
-                : "bg-white text-(--text-secondary) hover:bg-white hover:text-(--text-primary)"
+                : "bg-(--bg-surface) text-(--text-secondary) hover:bg-(--bg-surface) hover:text-(--text-primary)"
             }`}
           >
             {selectionMode ? (
@@ -230,7 +230,7 @@ export function TransactionsWorkspace({
       <Card className="max-md:[--card-spacing:--spacing(4)]">
         <CardContent className="flex flex-col gap-4 md:gap-5 md:pt-1">
           <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-            <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:w-fit md:shrink-0 md:gap-1 md:rounded-[14px] md:bg-[#F4F5F8] md:p-1 md:px-1">
+            <div role="tablist" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:w-fit md:shrink-0 md:gap-1 md:rounded-[14px] md:bg-(--bg-track) md:p-1 md:px-1">
               {TABS.map((t) => {
                 const on = activeStatus === t.key;
                 return (
@@ -242,14 +242,14 @@ export function TransactionsWorkspace({
                     onClick={() => router.push(tabHref(t.key))}
                     className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-colors md:rounded-[11px] ${
                       on
-                        ? "bg-(--text-primary) text-white md:bg-(--bg-surface) md:text-(--text-primary) md:shadow-[0_1px_3px_rgba(16,24,40,.08)]"
-                        : "bg-[#F4F5F8] text-(--text-muted) md:bg-transparent"
+                        ? "bg-(--bg-inverse) text-white md:bg-(--bg-surface) md:text-(--text-primary) md:shadow-[0_1px_3px_rgba(16,24,40,.08)]"
+                        : "bg-(--bg-track) text-(--text-muted) md:bg-transparent"
                     }`}
                   >
                     {t.label}
                     <span
                       className={`rounded-full px-1.5 py-px text-[11px] font-bold ${
-                        on && t.key === "all" ? "max-md:bg-white/20 max-md:text-white md:bg-[#EAECF0] md:text-[#475467]" : t.badge
+                        on && t.key === "all" ? "max-md:bg-white/20 max-md:text-white md:bg-(--bg-strong) md:text-(--text-secondary)" : t.badge
                       }`}
                     >
                       {counts[t.key]}

@@ -72,7 +72,7 @@ function GroupCard({ group, currency }: { group: Group; currency: CurrencyCode }
     <section
       className="rounded-[20px] p-5 md:p-6"
       style={{
-        background: overdue ? "#FFF7F8" : "#FFFFFF",
+        background: overdue ? "var(--danger-soft)" : "#FFFFFF",
         boxShadow: overdue ? "none" : "var(--shadow-card)",
       }}
     >
@@ -143,7 +143,7 @@ function GroupCard({ group, currency }: { group: Group; currency: CurrencyCode }
               {row.bill ? (
                 <Link
                   href={row.bill.href}
-                  className="flex h-9 shrink-0 items-center rounded-xl bg-[#F1F3F7] px-3 text-[13px] font-semibold text-(--text-primary) transition-colors hover:bg-(--primary-light) hover:text-(--primary-hover)"
+                  className="flex h-9 shrink-0 items-center rounded-xl bg-(--bg-hover) px-3 text-[13px] font-semibold text-(--text-primary) transition-colors hover:bg-(--primary-light) hover:text-(--primary-hover)"
                 >
                   Ver fatura
                 </Link>
@@ -153,7 +153,7 @@ function GroupCard({ group, currency }: { group: Group; currency: CurrencyCode }
                   disabled={isPending}
                   onClick={() => settle(row.id)}
                   aria-label={out ? `Marcar ${row.description} como paga` : `Marcar ${row.description} como recebida`}
-                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-[#F1F3F7] px-3 text-[13px] font-semibold text-(--text-primary) transition-colors hover:bg-(--primary-light) hover:text-(--primary-hover) disabled:opacity-60 max-sm:w-9 max-sm:justify-center max-sm:px-0"
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-(--bg-hover) px-3 text-[13px] font-semibold text-(--text-primary) transition-colors hover:bg-(--primary-light) hover:text-(--primary-hover) disabled:opacity-60 max-sm:w-9 max-sm:justify-center max-sm:px-0"
                 >
                   <Check className="h-4 w-4 sm:hidden" />
                   <span className="max-sm:hidden">{busyId === row.id ? "…" : out ? "Pagar" : "Recebi"}</span>
@@ -185,7 +185,7 @@ export function UpcomingGroups({ groups, currency }: { groups: Group[]; currency
   const nonEmpty = groups.filter((g) => g.rows.length > 0);
   if (nonEmpty.length === 0) {
     return (
-      <section className="rounded-[20px] bg-white p-6 text-sm text-(--text-muted)" style={{ boxShadow: "var(--shadow-card)" }}>
+      <section className="rounded-[20px] bg-(--bg-surface) p-6 text-sm text-(--text-muted)" style={{ boxShadow: "var(--shadow-card)" }}>
         Nada vencendo nos próximos 30 dias.
       </section>
     );

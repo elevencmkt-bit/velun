@@ -136,7 +136,7 @@ export function CategoryBreakdown({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-card-title max-sm:hidden">Por categoria</h2>
         <div className="flex gap-2">
-        <div role="tablist" className="flex flex-1 gap-1 rounded-[13px] bg-[#F4F5F8] p-1 sm:flex-none">
+        <div role="tablist" className="flex flex-1 gap-1 rounded-[13px] bg-(--bg-track) p-1 sm:flex-none">
           <button type="button" role="tab" aria-selected={tab === "expense"} className={tabClass(tab === "expense")} onClick={() => { setTab("expense"); setShowAll(false); }}>
             Despesas
           </button>
@@ -144,7 +144,7 @@ export function CategoryBreakdown({
             Receitas
           </button>
         </div>
-        <div role="radiogroup" aria-label="Mostrar em" className="flex gap-1 rounded-[13px] bg-[#F4F5F8] p-1">
+        <div role="radiogroup" aria-label="Mostrar em" className="flex gap-1 rounded-[13px] bg-(--bg-track) p-1">
           <button type="button" role="radio" aria-checked={unit === "value"} aria-label="Valor" className={unitClass(unit === "value")} onClick={() => chooseUnit("value")}>
             $
           </button>
@@ -204,7 +204,7 @@ export function CategoryBreakdown({
                 key={r.name}
                 onClick={() => openCategory(r)}
                 aria-label={`Ver lançamentos de ${r.name}`}
-                className={`-mx-2 grid min-h-[44px] w-[calc(100%+16px)] grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 rounded-[10px] border-b border-(--border-soft) px-2 text-left transition-colors last:border-0 hover:bg-[#F5F6FF] md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_96px_110px] md:border-0 ${
+                className={`-mx-2 grid min-h-[44px] w-[calc(100%+16px)] grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 rounded-[10px] border-b border-(--border-soft) px-2 text-left transition-colors last:border-0 hover:bg-(--primary-soft) md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_96px_110px] md:border-0 ${
                   !showAll && i >= MOBILE_LIMIT ? "max-md:hidden" : ""
                 }`}
               >
@@ -212,7 +212,7 @@ export function CategoryBreakdown({
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: r.color }} />
                   <span className="truncate">{r.name}</span>
                 </span>
-                <span className="h-2 overflow-hidden rounded-full bg-[#F2F4F7] max-md:hidden">
+                <span className="h-2 overflow-hidden rounded-full bg-(--bg-hover) max-md:hidden">
                   <span
                     className="block h-full rounded-full"
                     style={{ width: `${Math.max(2, Math.round((r.amount_cents / max) * 100))}%`, background: r.color }}

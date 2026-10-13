@@ -95,7 +95,7 @@ function ChartTooltip({
       style={{
         background: "var(--bg-surface)",
         borderColor: "var(--border-primary)",
-        boxShadow: "0 4px 14px rgba(16,24,40,.08)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       <div className="mb-1 font-semibold text-(--text-primary) first-letter:uppercase">{dateLabel}</div>
@@ -176,7 +176,7 @@ export function ProjectionChart({
             strokeDasharray="6 6"
             label={{ value: "Hoje", position: "insideTopLeft", fill: "#5B6CFF", fontSize: 11, fontWeight: 600 }}
           />
-          <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="5 5" strokeOpacity={0.8} />
+          <ReferenceLine y={0} stroke="var(--text-light)" strokeDasharray="5 5" strokeOpacity={0.8} />
           {points.some((p) => p.with_overdue_cents !== undefined) ? (
             <Line
               type="basis"

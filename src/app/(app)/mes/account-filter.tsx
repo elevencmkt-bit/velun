@@ -33,7 +33,7 @@ export function AccountFilter({
       <SelectTrigger
         aria-label="Conta"
         className={`h-12! max-w-[240px] gap-2 rounded-[16px] border-0 px-3.5 text-[14px] font-semibold shadow-(--shadow-card) ${
-          value ? "bg-(--primary-soft) text-(--primary)" : "bg-white text-(--text-primary)"
+          value ? "bg-(--primary-soft) text-(--primary)" : "bg-(--bg-surface) text-(--text-primary)"
         }`}
       >
         <SelectValue />

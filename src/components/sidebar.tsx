@@ -15,7 +15,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden h-full w-[248px] shrink-0 flex-col justify-between bg-white md:flex">
+    <aside className="hidden h-full w-[248px] shrink-0 flex-col justify-between bg-(--bg-surface) md:flex">
       <div className="flex flex-col gap-7 px-4 pt-7">
         <Link href="/mes" className="flex items-center gap-2.5 px-2" aria-label="Velun — início">
           <Image src="/velun-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-[9px]" />

@@ -112,7 +112,7 @@ export function CardStack({
               className={`h-1.5 rounded-full transition-all ${
                 i === front
                   ? "w-5 bg-(--text-primary)"
-                  : "w-1.5 bg-[#C9CFDA] hover:bg-(--text-light)"
+                  : "w-1.5 bg-(--border-strong) hover:bg-(--text-light)"
               }`}
             />
           ))}

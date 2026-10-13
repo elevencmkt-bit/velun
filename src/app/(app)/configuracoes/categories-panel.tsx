@@ -36,7 +36,7 @@ export function CategoriesPanel({
             Passe o mouse numa categoria pra editar ou apagar.
           </p>
         </div>
-        <div role="tablist" className="order-3 flex w-full gap-1 rounded-xl bg-[#F4F5F8] p-1 sm:order-2 sm:w-auto">
+        <div role="tablist" className="order-3 flex w-full gap-1 rounded-xl bg-(--bg-track) p-1 sm:order-2 sm:w-auto">
           <button type="button" role="tab" aria-selected={tab === "expense"} className={tabClass(tab === "expense")} onClick={() => setTab("expense")}>
             Despesas <span className="text-xs text-(--text-light)">{expense.length}</span>
           </button>

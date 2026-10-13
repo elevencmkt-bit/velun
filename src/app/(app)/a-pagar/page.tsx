@@ -297,7 +297,7 @@ export default async function AVencerPage({
         </div>
         <nav
           aria-label="Filtro"
-          className="flex max-w-full gap-0.5 overflow-x-auto rounded-[14px] bg-white p-1 [scrollbar-width:none] max-lg:self-start sm:gap-1"
+          className="flex max-w-full gap-0.5 overflow-x-auto rounded-[14px] bg-(--bg-surface) p-1 [scrollbar-width:none] max-lg:self-start sm:gap-1"
         >
           {TABS.map((tab) => {
             const active = tab.key === view;
@@ -310,7 +310,7 @@ export default async function AVencerPage({
                 aria-current={active ? "page" : undefined}
                 className={`flex h-9 shrink-0 items-center rounded-[11px] px-3 text-[13px] font-semibold transition-colors sm:px-4 sm:text-[14px] ${
                   active
-                    ? "bg-(--text-primary) text-white"
+                    ? "bg-(--bg-inverse) text-white"
                     : "text-(--text-muted) hover:text-(--text-primary)"
                 }`}
               >
@@ -371,7 +371,7 @@ export default async function AVencerPage({
       ) : (
         <>
           <section
-            className="rounded-[20px] bg-white p-5 md:p-7"
+            className="rounded-[20px] bg-(--bg-surface) p-5 md:p-7"
             style={{ boxShadow: "var(--shadow-card)" }}
           >
             <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
@@ -525,7 +525,7 @@ export default async function AVencerPage({
                 />
               ) : null}
               <section
-                className="rounded-[20px] bg-white p-5 md:p-6"
+                className="rounded-[20px] bg-(--bg-surface) p-5 md:p-6"
                 style={{ boxShadow: "var(--shadow-card)" }}
               >
                 <h2 className="text-card-title">Recorrências</h2>

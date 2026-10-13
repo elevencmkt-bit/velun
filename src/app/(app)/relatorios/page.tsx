@@ -26,7 +26,7 @@ function CardSurface({ children, className = "" }: { children: ReactNode; classN
   return (
     <div
       className={`rounded-[20px] ${className}`}
-      style={{ background: "#FFFFFF", boxShadow: "var(--shadow-card)" }}
+      style={{ background: "var(--bg-surface)", boxShadow: "var(--shadow-card)" }}
     >
       {children}
     </div>
@@ -162,10 +162,10 @@ export default async function RelatoriosPage({
       </div>
 
       {showUncategorized && !isPeriodEmpty ? (
-        <div className="flex flex-col gap-3 rounded-[16px] bg-[#FFF6E5] px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
+        <div className="flex flex-col gap-3 rounded-[16px] bg-(--warning-banner) px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <Tag className="mt-0.5 h-5 w-5 shrink-0 text-[#B54708]" />
-            <p className="text-sm leading-relaxed text-[#7A2E0E]">
+            <Tag className="mt-0.5 h-5 w-5 shrink-0 text-(--warning-dark)" />
+            <p className="text-sm leading-relaxed text-(--warning-ink)">
               <b>
                 {uncategorizedShare}% das despesas de {monthName} estão sem categoria (
                 <Money cents={uncategorized} currency={currency} />
@@ -237,7 +237,7 @@ export default async function RelatoriosPage({
             <Link
               href={`/relatorios?month=${monthParam(prev.year, prev.monthIndex)}${viewQuery}`}
               className="rounded-full border px-4 py-2 text-[12px] font-semibold text-(--text-secondary)"
-              style={{ borderColor: "#E8ECF4" }}
+              style={{ borderColor: "var(--border-primary)" }}
             >
               Mudar período
             </Link>

@@ -30,6 +30,7 @@ import { DeleteTransactionButton } from "@/components/delete-transaction-button"
 import type { AccountOption, CategoryOption, TransactionRow } from "./types";
 import { Money } from "@/components/money";
 import { CategoryOptions } from "./category-options";
+import { themedPair } from "@/lib/theme-color";
 
 const NO_CATEGORY = "__none__";
 
@@ -340,9 +341,11 @@ export function TransactionsTable({
                 row.direction,
                 row.category_name ? categoryIcons[row.category_name] : null,
               );
-              const iconColors = row.category_name
-                ? (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR)
-                : MUTED_CATEGORY_COLOR;
+              const iconColors = themedPair(
+                row.category_name
+                  ? (categoryColors[row.category_name] ?? MUTED_CATEGORY_COLOR)
+                  : MUTED_CATEGORY_COLOR,
+              );
 
               // O que é, de onde, categoria, situação e quanto. A categoria
               // é uma etiqueta na cor dela (que troca rápido no computador);
@@ -350,9 +353,9 @@ export function TransactionsTable({
               // âmbar se ainda vai vencer. No celular, tocar na linha abre
               // a edição.
               const status = row.is_overdue
-                ? { label: "Atrasada", cls: "bg-[#FEE4E2] text-[#B42318]" }
+                ? { label: "Atrasada", cls: "bg-(--danger-badge) text-(--danger-text)" }
                 : row.status === "pending"
-                  ? { label: "Pendente", cls: "bg-[#FEF0C7] text-[#B54708]" }
+                  ? { label: "Pendente", cls: "bg-(--warning-badge) text-(--warning-dark)" }
                   : null;
               const catColor = row.category_name ? iconColors.fg : "var(--text-light)";
 
@@ -507,7 +510,7 @@ export function TransactionsTable({
                             disabled={isPending}
                             aria-label={`Confirmar ${row.description}`}
                             title="Confirmar: já caiu na conta"
-                            className="flex h-8 w-8 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#D0D5DD] bg-white text-[12px] font-semibold text-(--text-secondary) transition-colors hover:border-(--primary) hover:text-(--primary) disabled:opacity-50 md:w-[108px]"
+                            className="flex h-8 w-8 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-(--border-strong) bg-(--bg-surface) text-[12px] font-semibold text-(--text-secondary) transition-colors hover:border-(--primary) hover:text-(--primary) disabled:opacity-50 md:w-[108px]"
                             onClick={() =>
                               startTransition(async () => {
                                 await markTransactionPaid(row.id);
@@ -588,7 +591,7 @@ export function TransactionsTable({
       {toast ? (
         <div
           role="status"
-          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-(--text-primary) px-4 py-3 text-sm text-white shadow-lg md:bottom-8"
+          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-(--bg-inverse) px-4 py-3 text-sm text-white shadow-lg md:bottom-8"
         >
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#AEB9FF]" />
           <span>{toast}</span>

@@ -1,4 +1,5 @@
 import { MUTED_CATEGORY_COLOR, type CategoryColorPair } from "@/lib/category-colors";
+import { themedPair } from "@/lib/theme-color";
 
 // Pills de categoria (UI Style Specs, seção 17): fundo suave, texto
 // saturado, sem parecer botão — nada de dot ou borda. A cor já vem
@@ -15,7 +16,7 @@ export function CategoryBadge({
     return <span className="text-xs text-(--text-light)">Sem categoria</span>;
   }
 
-  const pair = color ?? MUTED_CATEGORY_COLOR;
+  const pair = themedPair(color ?? MUTED_CATEGORY_COLOR);
 
   return (
     <span

@@ -221,7 +221,7 @@ export function ClickableAccountRow({
   return (
     <div
       className={`group relative -mx-2 flex min-h-[72px] items-center gap-3 rounded-[14px] px-2 py-3 transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-(--border-soft) last:after:hidden md:gap-3.5 ${
-        clickable ? "cursor-pointer hover:bg-[#F7F8FA]" : ""
+        clickable ? "cursor-pointer hover:bg-(--bg-subtle)" : ""
       }`}
       onClick={(e) => {
         if (!clickable) return;

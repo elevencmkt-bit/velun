@@ -23,7 +23,7 @@ export function GlobalSearch() {
       <input
         name="q"
         placeholder="Buscar transações..."
-        className="h-11 w-full rounded-[14px] border border-transparent bg-white pl-10 pr-3 text-[13px] text-(--text-secondary) outline-none transition-colors placeholder:text-(--text-light) focus:bg-white focus:[border-color:#A4A8FF] focus:[box-shadow:0_0_0_3px_rgba(81,88,246,.10)]"
+        className="h-11 w-full rounded-[14px] border border-transparent bg-(--bg-surface) pl-10 pr-3 text-[13px] text-(--text-secondary) outline-none transition-colors placeholder:text-(--text-light) focus:bg-(--bg-surface) focus:[border-color:#A4A8FF] focus:[box-shadow:0_0_0_3px_rgba(81,88,246,.10)]"
       />
     </form>
   );

@@ -417,8 +417,8 @@ export function ImportWorkspace({
           aria-pressed={on}
           className={`flex h-16 w-full items-center gap-3 rounded-[16px] border-[1.5px] bg-(--bg-surface) px-3.5 text-left transition-colors ${
             on
-              ? "border-(--primary) bg-[#F5F6FF] shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
-              : "border-[#EAECF0] hover:border-[#C7D0FF]"
+              ? "border-(--primary) bg-(--primary-soft) shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
+              : "border-(--border-primary) hover:border-(--primary-border)"
           }`}
         >
           <AccountAvatar institution={a.institution} type={a.type} size={38} />
@@ -488,10 +488,10 @@ export function ImportWorkspace({
                 }}
                 className={`flex items-center gap-3 rounded-[18px] border-2 border-dashed px-4 transition-colors max-md:h-[76px] md:h-[200px] md:flex-col md:justify-center md:gap-2.5 md:px-6 md:text-center ${
                   !chosen
-                    ? "cursor-not-allowed border-[#E4E7EC] bg-[#F9FAFB]"
+                    ? "cursor-not-allowed border-(--border-primary) bg-(--bg-subtle)"
                     : dragging
-                      ? "cursor-pointer border-(--primary) bg-[#EEF1FF]"
-                      : "cursor-pointer border-[#C7D0FF] bg-[#F8F9FF] hover:bg-[#F3F5FF]"
+                      ? "cursor-pointer border-(--primary) bg-(--primary-light)"
+                      : "cursor-pointer border-(--primary-border) bg-(--primary-soft) hover:bg-(--primary-soft)"
                 }`}
               >
                 <input
@@ -503,7 +503,7 @@ export function ImportWorkspace({
                 />
                 {!chosen ? (
                   <>
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F2F4F7] text-(--text-light) md:h-[52px] md:w-[52px] md:rounded-[16px]">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-(--bg-hover) text-(--text-light) md:h-[52px] md:w-[52px] md:rounded-[16px]">
                       <Lock className="h-5 w-5 md:h-6 md:w-6" />
                     </span>
                     <span className="min-w-0">
@@ -544,16 +544,16 @@ export function ImportWorkspace({
               </label>
               <div className="mt-3 flex flex-wrap items-center gap-2 max-md:hidden">
                 <span className="text-xs text-(--text-light)">O Velun lê:</span>
-                <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
+                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
                   Extrato Regions
                 </span>
-                <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
+                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
                   Extrato Nomad
                 </span>
-                <span className="inline-flex h-7 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary)">
+                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
                   Fatura Nubank
                 </span>
-                <span className="inline-flex h-7 items-center rounded-full border-[1.5px] border-dashed border-[#D0D5DD] px-2.5 text-xs font-semibold text-(--text-light)">
+                <span className="inline-flex h-7 items-center rounded-full border-[1.5px] border-dashed border-(--border-strong) px-2.5 text-xs font-semibold text-(--text-light)">
                   mais bancos em breve
                 </span>
               </div>
@@ -587,7 +587,7 @@ export function ImportWorkspace({
               ],
             ].map(([title, text], i) => (
               <div key={title} className="flex items-start gap-3.5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--primary-light) text-[13px] font-extrabold text-[#4257CB]">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--primary-light) text-[13px] font-extrabold text-(--primary-hover)">
                   {i + 1}
                 </span>
                 <div>
@@ -596,8 +596,8 @@ export function ImportWorkspace({
                 </div>
               </div>
             ))}
-            <div className="flex items-start gap-2.5 rounded-[14px] bg-[#F5F6FF] p-3.5 text-[13px] leading-relaxed text-(--text-secondary)">
-              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#4257CB]" />
+            <div className="flex items-start gap-2.5 rounded-[14px] bg-(--primary-soft) p-3.5 text-[13px] leading-relaxed text-(--text-secondary)">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-(--primary-hover)" />
               <span>
                 O arquivo é lido no seu navegador e <b>não sai da sua máquina</b>. Só os lançamentos que você aprovar
                 são salvos.
@@ -634,7 +634,7 @@ export function ImportWorkspace({
                       </span>
                     </div>
                   </div>
-                  <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
+                  <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
                     {entry.transactionCount === 1 ? "1 lançamento" : `${entry.transactionCount} lançamentos`}
                   </span>
 
@@ -1101,7 +1101,7 @@ export function ImportWorkspace({
       {toast ? (
         <div
           role="status"
-          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-(--text-primary) px-4 py-3 text-sm text-white shadow-lg md:bottom-8"
+          className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-md items-start gap-2.5 rounded-2xl bg-(--bg-inverse) px-4 py-3 text-sm text-white shadow-lg md:bottom-8"
         >
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#AEB9FF]" />
           <span>{toast}</span>

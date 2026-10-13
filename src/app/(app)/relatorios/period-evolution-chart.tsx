@@ -46,7 +46,7 @@ function ChartTooltip({
   return (
     <div
       className="min-w-[170px] rounded-lg border p-3 text-xs shadow-lg"
-      style={{ background: "#FFFFFF", borderColor: "#E8ECF4", boxShadow: "0 4px 14px rgba(16,24,40,.08)" }}
+      style={{ background: "var(--bg-surface)", borderColor: "var(--border-primary)", boxShadow: "var(--shadow-md)" }}
     >
       <div className="mb-1.5 font-semibold text-(--text-primary) first-letter:uppercase">{dateLabel}</div>
       <div className="flex flex-col gap-1">
@@ -91,13 +91,13 @@ export function PeriodEvolutionChart({
     <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barGap={1} barCategoryGap="20%">
-          <CartesianGrid stroke="#EEF1F5" vertical={false} />
+          <CartesianGrid stroke="var(--border-soft)" vertical={false} />
           <XAxis
             dataKey="label"
             interval="preserveStartEnd"
             minTickGap={8}
             tick={{ fontSize: 11, fill: "var(--text-muted)" }}
-            axisLine={{ stroke: "#E8ECF4" }}
+            axisLine={{ stroke: "var(--border-primary)" }}
             tickLine={false}
           />
           <YAxis
@@ -107,7 +107,7 @@ export function PeriodEvolutionChart({
             tickLine={false}
             width={72}
           />
-          <ReferenceLine y={0} stroke="#D5DAE3" />
+          <ReferenceLine y={0} stroke="var(--border-strong)" />
           <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ fill: "rgba(83,109,254,0.06)" }} />
           <Bar dataKey="income_cents" fill="#22C55E" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
           <Bar dataKey="expense_cents" fill="#F04469" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />

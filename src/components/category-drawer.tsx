@@ -14,6 +14,7 @@ import { categoryInsight } from "@/lib/category-insight";
 import { getCategoryIcon } from "@/lib/category-icons";
 import type { CurrencyCode } from "@/lib/money";
 import { fitsDirection } from "@/lib/category-kind";
+import { themedFg } from "@/lib/theme-color";
 
 export type CategoryDrawerQuery = {
   /** "2026-09" */
@@ -118,7 +119,7 @@ export function CategoryDrawer({
   const icon = createElement(getCategoryIcon(query?.name ?? null, dir, matched?.icon ?? null), {
     className: "h-5 w-5",
   });
-  const accent = query?.color ?? "#475467";
+  const accent = themedFg(query?.color ?? "#475467");
   const delta = detail ? detail.totalCents - detail.prevCents : 0;
   // Gasto que sobe é ruim; receita que sobe é boa.
   const deltaGood = dir === "out" ? delta <= 0 : delta >= 0;
@@ -142,14 +143,14 @@ export function CategoryDrawer({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="flex flex-col gap-0 overflow-hidden bg-white p-0 data-open:zoom-in-100 data-closed:zoom-out-100 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:h-[88dvh] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[24px] max-sm:rounded-b-none sm:top-0 sm:right-0 sm:left-auto sm:h-dvh sm:w-[460px] sm:max-w-[460px] sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:rounded-l-[24px]"
+        className="flex flex-col gap-0 overflow-hidden bg-(--bg-surface) p-0 data-open:zoom-in-100 data-closed:zoom-out-100 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:h-[88dvh] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[24px] max-sm:rounded-b-none sm:top-0 sm:right-0 sm:left-auto sm:h-dvh sm:w-[460px] sm:max-w-[460px] sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:rounded-l-[24px]"
       >
-        <div className="flex flex-col gap-4 border-b border-[#F2F4F7] px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
+        <div className="flex flex-col gap-4 border-b border-(--border-soft) px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <span
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
-                style={{ backgroundColor: `color-mix(in srgb, ${accent} 12%, white)`, color: accent }}
+                style={{ backgroundColor: `color-mix(in srgb, ${accent} 12%, var(--bg-surface))`, color: accent }}
               >
                 {icon}
               </span>
@@ -167,7 +168,7 @@ export function CategoryDrawer({
               type="button"
               aria-label="Fechar"
               onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F2F4F7] text-(--text-secondary) hover:bg-[#E4E7EC]"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-(--bg-hover) text-(--text-secondary) hover:bg-(--bg-strong)"
             >
               <X className="h-[18px] w-[18px]" />
             </button>
@@ -176,7 +177,7 @@ export function CategoryDrawer({
           {detail ? (
             <>
               <div className="grid grid-cols-3 gap-2.5">
-                <div className="rounded-[14px] bg-[#F9FAFB] p-3">
+                <div className="rounded-[14px] bg-(--bg-subtle) p-3">
                   <div className="text-xs text-(--text-muted)">Total</div>
                   <div className="text-[17px] font-extrabold tabular-nums">
                     <Money cents={detail.totalCents} currency={currency} />
@@ -184,14 +185,14 @@ export function CategoryDrawer({
                 </div>
                 <div
                   className="rounded-[14px] p-3"
-                  style={{ backgroundColor: delta === 0 ? "#F9FAFB" : deltaGood ? "#ECFDF3" : "#FEF3F2" }}
+                  style={{ backgroundColor: delta === 0 ? "var(--bg-subtle)" : deltaGood ? "var(--success-soft)" : "var(--danger-soft)" }}
                 >
-                  <div className="text-xs" style={{ color: delta === 0 ? "var(--text-muted)" : deltaGood ? "#067647" : "#B42318" }}>
+                  <div className="text-xs" style={{ color: delta === 0 ? "var(--text-muted)" : deltaGood ? "var(--success-text)" : "var(--danger-text)" }}>
                     vs {prevName}
                   </div>
                   <div
                     className="text-[17px] font-extrabold tabular-nums"
-                    style={{ color: delta === 0 ? "var(--text-primary)" : deltaGood ? "#067647" : "#B42318" }}
+                    style={{ color: delta === 0 ? "var(--text-primary)" : deltaGood ? "var(--success-text)" : "var(--danger-text)" }}
                   >
                     {delta === 0 ? "igual" : (
                       <>
@@ -201,7 +202,7 @@ export function CategoryDrawer({
                     )}
                   </div>
                 </div>
-                <div className="rounded-[14px] bg-[#F9FAFB] p-3">
+                <div className="rounded-[14px] bg-(--bg-subtle) p-3">
                   <div className="text-xs text-(--text-muted)">Lançamentos</div>
                   <div className="text-[17px] font-extrabold tabular-nums">{detail.rows.length}</div>
                 </div>
@@ -250,7 +251,7 @@ export function CategoryDrawer({
                     {dayTitle(g.date)}
                   </div>
                   {g.rows.map((r) => (
-                    <div key={r.id} className="flex min-h-[58px] items-center gap-3 border-b border-[#F2F4F7] py-2 last:border-0">
+                    <div key={r.id} className="flex min-h-[58px] items-center gap-3 border-b border-(--border-soft) py-2 last:border-0">
                       <AccountAvatar institution={r.institution} type={r.account_type} size={30} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-(--text-primary)">{r.description}</div>
@@ -264,7 +265,7 @@ export function CategoryDrawer({
                         >
                           <SelectTrigger
                             aria-label={`Categoria de ${r.description}`}
-                            className="h-8! max-w-[132px] rounded-full border-[1.5px] border-[#E4E7EC] px-2.5 text-xs font-semibold text-(--text-secondary)"
+                            className="h-8! max-w-[132px] rounded-full border-[1.5px] border-(--border-primary) px-2.5 text-xs font-semibold text-(--text-secondary)"
                           >
                             <SelectValue placeholder="Sem categoria" />
                           </SelectTrigger>
@@ -290,7 +291,7 @@ export function CategoryDrawer({
                 </div>
               ))}
               {detail && detail.hiddenCents > 0 ? (
-                <p className="mt-4 rounded-[12px] bg-[#F9FAFB] px-3 py-2.5 text-xs leading-relaxed text-(--text-muted)">
+                <p className="mt-4 rounded-[12px] bg-(--bg-subtle) px-3 py-2.5 text-xs leading-relaxed text-(--text-muted)">
                   Mais <Money cents={detail.hiddenCents} currency={currency} /> de contas pessoais que mostram só o
                   total por categoria.
                 </p>
@@ -299,12 +300,12 @@ export function CategoryDrawer({
           )}
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-[#F2F4F7] px-5 pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
+        <div className="flex flex-col gap-2 border-t border-(--border-soft) px-5 pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
           {note ? <p className="text-xs font-medium text-(--text-secondary)">{note}</p> : null}
           <Link
             href={transactionsHref}
             onClick={onClose}
-            className="flex h-12 items-center justify-center gap-2 rounded-[14px] bg-(--primary-soft) text-sm font-bold text-(--primary) hover:bg-[#EEF1FF]"
+            className="flex h-12 items-center justify-center gap-2 rounded-[14px] bg-(--primary-soft) text-sm font-bold text-(--primary) hover:bg-(--primary-light)"
           >
             Abrir em Transações <ArrowUpRight className="h-4 w-4" />
           </Link>

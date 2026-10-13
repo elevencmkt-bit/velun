@@ -96,7 +96,7 @@ export function RecurrencesList({
         {rows.map((row) => (
           <div
             key={row.id}
-            className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-[#F9FAFB] sm:grid-cols-[1fr_84px_64px_96px]"
+            className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-(--border-soft) px-1 py-2.5 transition-colors last:border-0 hover:bg-(--bg-subtle) sm:grid-cols-[1fr_84px_64px_96px]"
           >
             <span className="flex min-w-0 flex-col">
               <span className="text-table-body truncate text-(--text-primary)">

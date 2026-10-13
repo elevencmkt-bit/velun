@@ -53,7 +53,7 @@ export function MobileNav() {
             className="absolute inset-0 bg-black/30"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white px-4 pt-3 pb-[calc(96px+env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(17,19,24,0.12)]">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-(--bg-surface) px-4 pt-3 pb-[calc(96px+env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(17,19,24,0.12)]">
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="text-[15px] font-semibold text-(--text-primary)">Mais</span>
               <button
