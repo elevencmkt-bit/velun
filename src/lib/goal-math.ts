@@ -78,3 +78,52 @@ export function monthEnds(from: string, to: string): string[] {
   return out;
 }
 
+
+/**
+ * Previsão pelo ritmo de verdade: com `ratePerMonth` (média recente), em
+ * que mês o que falta acaba. Null se o ritmo não ajuda (zero ou contra).
+ */
+export function projectFinish(today: string, missingCents: number, ratePerMonth: number): string | null {
+  if (missingCents <= 0 || !(ratePerMonth > 0)) return null;
+  const months = Math.ceil(missingCents / ratePerMonth);
+  if (months > 1200) return null;
+  const [y, m] = today.split("-").map(Number);
+  const total = y * 12 + (m - 1) + months;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
+/** Mesma data N dias antes (AAAA-MM-DD). */
+export function daysBefore(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Próximas datas de uma transferência mensal no dia `day`, a partir de
+ * amanhã, até `until` (inclusive) ou `max` meses.
+ */
+export function monthlyDates(today: string, day: number, until: string | null, max: number): string[] {
+  const out: string[] = [];
+  let [y, m] = today.split("-").map(Number);
+  const todayDay = Number(today.slice(8));
+  if (day <= todayDay) {
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  while (out.length < max) {
+    const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const date = `${y}-${String(m).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
+    if (until && date > until) break;
+    out.push(date);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
+}

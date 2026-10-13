@@ -3,7 +3,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { accountScope } from "@/lib/visibility";
 import { getAccountBalances } from "@/lib/balances";
 import { monthRange } from "@/lib/month";
-import { debtPace, monthEnds, savePace, type Pace } from "@/lib/goal-math";
+import { daysBefore, debtPace, monthEnds, projectFinish, savePace, type Pace } from "@/lib/goal-math";
 
 export { debtPace, elapsedFraction, monthEnds, monthsUntil, savePace } from "@/lib/goal-math";
 export type { Pace } from "@/lib/goal-math";
@@ -28,6 +28,8 @@ export type GoalRow = {
   category_id: string | null;
   start_cents: number;
   created_at: string;
+  /** Transferência mensal programada (meta que segue conta). */
+  schedule: { from_account_id: string; amount_cents: number; day: number; groups: string[] } | null;
 };
 
 export type GoalDeposit = {
@@ -70,6 +72,14 @@ export type GoalView = GoalRow & {
   perMonthCents: number | null;
   /** Dívida: saldo devedor no fim de cada mês, do começo até hoje. */
   history: { date: string; cents: number }[];
+  /** Valores anotados com data à frente: só contam quando o dia chegar. */
+  scheduledCents: number;
+  /** Quanto andou por mês, em média, nos últimos 3 meses (null: pouco tempo pra medir). */
+  recentRateCents: number | null;
+  /** No ritmo recente, em que mês chega lá ("2028-03"). */
+  projectedMonth: string | null;
+  /** Transferência programada: de onde, quanto, próxima e quantas faltam. */
+  plan: { fromName: string; amountCents: number; day: number; next: string | null; remaining: number } | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,7 +98,7 @@ export async function loadGoals(params: {
     // limite: metas de uma casa são poucas
     .from("goals")
     .select(
-      "id, owner_id, visibility, kind, name, target_cents, target_date, tracking, account_id, category_id, start_cents, created_at",
+      "id, owner_id, visibility, kind, name, target_cents, target_date, tracking, account_id, category_id, start_cents, created_at, schedule",
     )
     .eq("household_id", householdId)
     .eq("is_archived", false)
@@ -172,10 +182,15 @@ export async function loadGoals(params: {
     for (const r of rows) spentByCategory.set(r.category_id, (spentByCategory.get(r.category_id) ?? 0) + r.amount_cents);
   }
 
-  // Dívida seguindo conta: saldo no fim de cada mês, pro gráfico.
-  const debtAccounts = goals
-    .filter((g) => g.kind === "debt" && g.tracking === "account" && g.account_id && visibleBalance.has(g.account_id))
-    .map((g) => g.account_id!);
+  // Metas que seguem conta: o histórico de saldo da conta serve pro
+  // gráfico da dívida e pro ritmo dos últimos 3 meses.
+  const debtAccounts = [
+    ...new Set(
+      goals
+        .filter((g) => g.kind !== "limit" && g.tracking === "account" && g.account_id && visibleBalance.has(g.account_id))
+        .map((g) => g.account_id!),
+    ),
+  ];
   const accountTx = new Map<string, { date: string; signed: number }[]>();
   const opening = new Map<string, number>();
   if (debtAccounts.length > 0) {
@@ -198,6 +213,22 @@ export async function loadGoals(params: {
       accountTx.set(r.account_id, list);
     }
     for (const a of openRows ?? []) opening.set(a.id as string, (a.opening_balance_cents as number) ?? 0);
+  }
+
+  // Transferências programadas ainda pendentes (a perna que entra na conta da meta).
+  const planGroups = goals.flatMap((g) => g.schedule?.groups ?? []);
+  const pendingLegs: { transfer_group_id: string; date: string; account_id: string }[] = [];
+  if (planGroups.length > 0) {
+    const { data } = await supabase
+      // limite: no máximo 36 por meta programada
+      .from("transactions")
+      .select("transfer_group_id, date, account_id")
+      .eq("household_id", householdId)
+      .eq("status", "pending")
+      .eq("direction", "in")
+      .in("transfer_group_id", planGroups.slice(0, 300))
+      .order("date");
+    pendingLegs.push(...((data ?? []) as typeof pendingLegs));
   }
 
   const memberName = new Map((members ?? []).map((m) => [m.id as string, String(m.display_name).trim().split(/\s+/)[0]]));
@@ -254,11 +285,50 @@ export async function loadGoals(params: {
       .map((t) => ({ id: t.id, date: t.date, description: t.description, account_name: accountName.get(t.account_id) ?? "", amount_cents: t.amount_cents }));
   }
 
+  const d90 = daysBefore(today, 90);
+  function balanceOn(accountId: string, date: string) {
+    return (opening.get(accountId) ?? 0) + (accountTx.get(accountId) ?? []).filter((t) => t.date <= date).reduce((n, t) => n + t.signed, 0);
+  }
+  /**
+   * Quanto a meta andou por mês nos últimos 3 meses. Conta: variação do
+   * saldo. Valores anotados: soma do período ÷ meses (meta com menos de 3
+   * semanas ainda não tem ritmo pra medir).
+   */
+  function recentRate(g: GoalRow, own: GoalDeposit[]): number | null {
+    if (g.tracking === "account" && g.account_id) {
+      if (!visibleBalance.has(g.account_id) || (!accountTx.has(g.account_id) && !opening.has(g.account_id))) return null;
+      const then = balanceOn(g.account_id, d90);
+      const now = balanceOn(g.account_id, today);
+      const moved = g.kind === "debt" ? Math.max(0, -then) - Math.max(0, -now) : now - then;
+      return Math.round(moved / 3);
+    }
+    const createdOn = g.created_at.slice(0, 10);
+    const from = createdOn > d90 ? createdOn : d90;
+    const days = (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000;
+    if (days < 21) return null;
+    const sum = own.filter((d) => d.date > from && d.date <= today).reduce((n, d) => n + d.amount_cents, 0);
+    return Math.round(sum / Math.max(1, days / 30.4));
+  }
+  function planFor(g: GoalRow): GoalView["plan"] {
+    if (!g.schedule || !g.account_id) return null;
+    const groups = new Set(g.schedule.groups);
+    const legs = pendingLegs.filter((l) => groups.has(l.transfer_group_id) && l.account_id === g.account_id);
+    return {
+      fromName: accountName.get(g.schedule.from_account_id) ?? "outra conta",
+      amountCents: g.schedule.amount_cents,
+      day: g.schedule.day,
+      next: legs[0]?.date ?? null,
+      remaining: legs.length,
+    };
+  }
+
   return goals.map((g) => {
     const mine = g.owner_id === memberId;
     const createdOn = g.created_at.slice(0, 10);
     const own = deposits.filter((d) => d.goal_id === g.id);
-    const depositSum = own.reduce((n, d) => n + d.amount_cents, 0);
+    // Anotado com data à frente ainda não conta: fica como agendado.
+    const depositSum = own.filter((d) => d.date <= today).reduce((n, d) => n + d.amount_cents, 0);
+    const scheduledCents = own.filter((d) => d.date > today).reduce((n, d) => n + d.amount_cents, 0);
     const followsAccount = g.tracking === "account" && g.account_id !== null;
     const hidden = followsAccount && !visibleBalance.has(g.account_id!);
     const balance = followsAccount ? (balances.get(g.account_id!) ?? 0) : 0;
@@ -280,16 +350,23 @@ export async function loadGoals(params: {
       perMonthCents: null,
       history: [],
       suggestions: suggestionsFor(g),
+      scheduledCents,
+      recentRateCents: null,
+      projectedMonth: null,
+      plan: planFor(g),
     };
     if (hidden) return base;
 
     if (g.kind === "save") {
       const target = g.target_cents ?? 0;
       const saved = followsAccount ? balance : g.start_cents + depositSum;
+      const rate = recentRate(g, own);
       return {
         ...base,
         savedCents: saved,
         progress: target > 0 ? Math.max(0, saved / target) : 0,
+        recentRateCents: rate,
+        projectedMonth: rate !== null ? projectFinish(today, target - saved, rate) : null,
         ...savePace({ startCents: g.start_cents, savedCents: saved, targetCents: target, createdOn, targetDate: g.target_date, today }),
       };
     }
@@ -317,10 +394,13 @@ export async function loadGoals(params: {
       }));
     }
     history.unshift({ date: createdOn, cents: g.start_cents });
+    const rate = recentRate(g, own);
     return {
       ...base,
       remainingCents: remaining,
       progress: Math.min(1, Math.max(0, (start - remaining) / start)),
+      recentRateCents: rate,
+      projectedMonth: rate !== null ? projectFinish(today, remaining, rate) : null,
       history,
       ...debtPace({ startCents: g.start_cents, remainingCents: remaining, createdOn, targetDate: g.target_date, today }),
     };

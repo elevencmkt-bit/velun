@@ -466,31 +466,67 @@ export async function deleteTransaction(transactionId: string) {
   revalidatePath("/a-pagar");
 }
 
+// Transferência pendente (ex.: a programada de uma meta) confirma os dois
+// lados juntos: sair de uma conta sem entrar na outra deixaria o saldo
+// das duas errado.
+async function withTransferPairs(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[],
+): Promise<{ ids: string[]; groups: string[] }> {
+  const { data } = await supabase
+    // limite: as linhas que a pessoa marcou
+    .from("transactions")
+    .select("transfer_group_id")
+    .in("id", ids)
+    .not("transfer_group_id", "is", null);
+  const groups = [...new Set((data ?? []).map((r) => r.transfer_group_id as string))];
+  return { ids, groups };
+}
+
 export async function markTransactionPaid(transactionId: string) {
   const supabase = await createClient();
+  const { groups } = await withTransferPairs(supabase, [transactionId]);
   const { error } = await supabase
     .from("transactions")
     .update({ status: "cleared" })
     .eq("id", transactionId);
 
   if (error) throw new Error(error.message);
+  if (groups.length > 0) {
+    const { error: pairError } = await supabase
+      .from("transactions")
+      .update({ status: "cleared" })
+      .in("transfer_group_id", groups)
+      .eq("status", "pending");
+    if (pairError) throw new Error(pairError.message);
+  }
 
   revalidatePath("/a-pagar");
   revalidatePath("/transacoes");
   revalidatePath("/contas");
   revalidatePath("/mes");
+  revalidatePath("/metas");
 }
 
 export async function bulkMarkPaid(transactionIds: string[]) {
   if (transactionIds.length === 0) return;
 
   const supabase = await createClient();
+  const { groups } = await withTransferPairs(supabase, transactionIds);
   const { error } = await supabase
     .from("transactions")
     .update({ status: "cleared" })
     .in("id", transactionIds);
 
   if (error) throw new Error(error.message);
+  if (groups.length > 0) {
+    const { error: pairError } = await supabase
+      .from("transactions")
+      .update({ status: "cleared" })
+      .in("transfer_group_id", groups)
+      .eq("status", "pending");
+    if (pairError) throw new Error(pairError.message);
+  }
 
   revalidatePath("/a-pagar");
   revalidatePath("/transacoes");

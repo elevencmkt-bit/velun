@@ -1,6 +1,6 @@
 // Rodar: npx tsx scripts/check-goals.ts
 import assert from "node:assert/strict";
-import { debtPace, elapsedFraction, monthEnds, monthsUntil, savePace } from "../src/lib/goal-math";
+import { daysBefore, debtPace, elapsedFraction, monthEnds, monthlyDates, monthsUntil, projectFinish, savePace } from "../src/lib/goal-math";
 
 // Outubro de 2026 até julho de 2027: 9 meses (o do mockup).
 assert.equal(monthsUntil("2026-10-13", "2027-07-31"), 9);
@@ -34,4 +34,15 @@ assert.equal(debtPace({ startCents: 360000, remainingCents: 0, createdOn: "2026-
 assert.deepEqual(monthEnds("2026-08-15", "2026-10-13"), ["2026-08-31", "2026-09-30", "2026-10-13"]);
 assert.deepEqual(monthEnds("2026-10-02", "2026-10-13"), ["2026-10-13"]);
 assert.deepEqual(monthEnds("2026-12-20", "2027-01-05"), ["2026-12-31", "2027-01-05"]);
+// Previsão pelo ritmo: faltam $49.500, guardando $1.200/mês → 42 meses.
+assert.equal(projectFinish("2026-10-13", 4950000, 120000), "2030-04");
+assert.equal(projectFinish("2026-10-13", 100, 0), null);
+assert.equal(projectFinish("2026-10-13", 100, -5), null);
+assert.equal(projectFinish("2026-12-01", 100, 100), "2027-01");
+assert.equal(daysBefore("2026-10-13", 90), "2026-07-15");
+
+// Transferência todo dia 5: hoje é 13, então começa em novembro.
+assert.deepEqual(monthlyDates("2026-10-13", 5, "2027-01-31", 36), ["2026-11-05", "2026-12-05", "2027-01-05"]);
+assert.deepEqual(monthlyDates("2026-10-13", 20, null, 2), ["2026-10-20", "2026-11-20"]);
+assert.deepEqual(monthlyDates("2026-01-13", 31, null, 2), ["2026-01-31", "2026-02-28"], "dia 31 em fevereiro cai no 28");
 console.log("check-goals: ok");

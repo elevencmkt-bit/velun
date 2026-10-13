@@ -1,4 +1,4 @@
-import { CircleDollarSign, CreditCard, Lock, TrendingDown } from "lucide-react";
+import { CircleDollarSign, CreditCard, Lock, TrendingDown, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
@@ -9,7 +9,7 @@ import { formatCents, type CurrencyCode } from "@/lib/money";
 import { monthRange } from "@/lib/month";
 import { Money } from "@/components/money";
 import { NewGoalDialog, type GoalAccountOption, type GoalCategoryOption } from "./new-goal-dialog";
-import { DepositButton, EditGoalButton, type GoalActionData } from "./goal-actions";
+import { DepositButton, EditGoalButton, ScheduleButton, SchedulePlan, type GoalActionData } from "./goal-actions";
 import { GoalSuggestions } from "./goal-suggestions";
 
 const RING_COLORS = ["var(--primary)", "#27C499", "#A78BFA", "#FF8A5C"];
@@ -127,6 +127,44 @@ function DebtChart({ goal, currency }: { goal: GoalView; currency: CurrencyCode 
         </text>
       ))}
     </svg>
+  );
+}
+
+/**
+ * Previsão pelo ritmo de verdade (média dos últimos 3 meses), ao lado da
+ * conta de "quanto guardar por mês". Diz se a data combinada é realista.
+ */
+function RecentPace({ goal, currency, verb }: { goal: GoalView; currency: CurrencyCode; verb: string }) {
+  const rate = goal.recentRateCents;
+  if (rate === null) return null;
+  if (rate <= 0) {
+    return (
+      <p className="flex items-start gap-2 rounded-[14px] bg-(--warning-banner) px-3.5 py-2.5 text-[13px] leading-relaxed text-(--warning-ink)">
+        <TrendingUp className="mt-0.5 h-4 w-4 shrink-0" />
+        {goal.kind === "debt" ? "Nos últimos 3 meses a dívida não diminuiu." : "Nos últimos 3 meses o valor não cresceu."}
+      </p>
+    );
+  }
+  const late = goal.target_date && goal.projectedMonth ? goal.projectedMonth > goal.target_date.slice(0, 7) : false;
+  return (
+    <p
+      className={`flex items-start gap-2 rounded-[14px] px-3.5 py-2.5 text-[13px] leading-relaxed ${
+        late ? "bg-(--warning-banner) text-(--warning-ink)" : "bg-(--success-soft) text-(--success-text)"
+      }`}
+    >
+      <TrendingUp className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>
+        No seu ritmo dos últimos 3 meses (~<Money cents={rate} currency={currency} />/mês),{" "}
+        {goal.projectedMonth ? (
+          <>
+            {verb} em <b className="font-semibold">{monthYear(`${goal.projectedMonth}-01`)}</b>
+            {late ? ", depois da data combinada." : "."}
+          </>
+        ) : (
+          "leva mais de 100 anos."
+        )}
+      </span>
+    </p>
   );
 }
 
@@ -326,13 +364,23 @@ export default async function MetasPage() {
                           {g.monthsLeft ? ` · faltam ${g.monthsLeft} ${g.monthsLeft === 1 ? "mês" : "meses"}` : ""}
                         </div>
                       ) : null}
+                      {g.scheduledCents > 0 ? (
+                        <div className="text-xs text-(--text-muted)">
+                          + <Money cents={g.scheduledCents} currency={currency} /> anotado com data à frente (conta quando o dia chegar)
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
+                {!g.hidden && g.pace !== "done" ? <RecentPace goal={g} currency={currency} verb="chega lá" /> : null}
+                {g.plan ? <SchedulePlan goalId={g.id} plan={g.plan} currency={currency} canEdit={g.canEdit} /> : null}
                 {g.suggestions.length > 0 ? <GoalSuggestions goalId={g.id} kind={g.kind} suggestions={g.suggestions} currency={currency} /> : null}
                 {g.canEdit ? (
                   <div className="flex flex-wrap gap-2 border-t border-(--border-soft) pt-3.5">
                     {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} currency={currency} /> : null}
+                    {g.tracking === "account" && !g.plan && g.pace !== "done" ? (
+                      <ScheduleButton goal={g} accounts={accounts} suggestedCents={g.perMonthCents} currency={currency} />
+                    ) : null}
                     <EditGoalButton goal={actionData(g, memberId)} currency={currency} />
                   </div>
                 ) : null}
@@ -451,6 +499,7 @@ export default async function MetasPage() {
                       </div>
                     </>
                   )}
+                  {!g.hidden && g.pace !== "done" ? <RecentPace goal={g} currency={currency} verb="zera" /> : null}
                   {g.suggestions.length > 0 ? <GoalSuggestions goalId={g.id} kind={g.kind} suggestions={g.suggestions} currency={currency} /> : null}
                   {g.canEdit ? (
                     <div className="mt-1 flex flex-wrap gap-2">
