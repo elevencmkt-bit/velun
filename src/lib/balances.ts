@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import type { AccountScope } from "@/lib/visibility";
 
 // Princípio 5 da spec: nada de saldo mágico — todo saldo deriva das
@@ -27,14 +28,25 @@ export async function getAccountBalances(
     balances.set(account.id, account.opening_balance_cents);
   }
 
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select("account_id, amount_cents, direction")
-    .eq("household_id", householdId)
-    .eq("status", "cleared")
-    .in("account_id", scope.ids);
+  // Em páginas: o Supabase corta cada consulta em 1000 linhas, e uma
+  // conta com um ano de extrato já passa disso — o saldo sairia errado
+  // sem aviso.
+  const transactions = await fetchAll<{
+    account_id: string;
+    amount_cents: number;
+    direction: "in" | "out";
+  }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("account_id, amount_cents, direction")
+      .eq("household_id", householdId)
+      .eq("status", "cleared")
+      .in("account_id", scope.ids)
+      .order("id")
+      .range(from, to),
+  );
 
-  for (const t of transactions ?? []) {
+  for (const t of transactions) {
     const delta = t.direction === "in" ? t.amount_cents : -t.amount_cents;
     balances.set(t.account_id, (balances.get(t.account_id) ?? 0) + delta);
   }

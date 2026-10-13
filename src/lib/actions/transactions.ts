@@ -9,6 +9,7 @@ import { clampedDate } from "@/lib/credit-card";
 import { rememberMerchantName } from "@/lib/merchant-names";
 import { merchantKey, rememberMerchantCategory } from "@/lib/merchant-categories";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createRecurrenceFromAnchor } from "@/lib/materialize-occurrences";
 import type { RecurrenceFrequency } from "@/lib/recurrence";
 
@@ -356,18 +357,26 @@ async function spreadCategory(
   if (!params.categoryId || targets.size === 0) return 0;
 
   const directions = [...new Set([...targets.values()].map((t) => t.direction))];
-  const { data: candidates, error } = await supabase
-    .from("transactions")
-    .select("id, bank_description, direction")
-    .eq("household_id", params.householdId)
-    .is("category_id", null)
-    .is("transfer_group_id", null)
-    .not("bank_description", "is", null)
-    .in("direction", directions);
-  if (error) throw new Error(error.message);
+  // Em páginas: depois de importar um ano, sem categoria passa de 1000.
+  const candidates = await fetchAll<{
+    id: string;
+    bank_description: string;
+    direction: "in" | "out";
+  }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("id, bank_description, direction")
+      .eq("household_id", params.householdId)
+      .is("category_id", null)
+      .is("transfer_group_id", null)
+      .not("bank_description", "is", null)
+      .in("direction", directions)
+      .order("id")
+      .range(from, to),
+  );
 
   const sourceIds = new Set(params.sourceIds);
-  const ids = (candidates ?? [])
+  const ids = candidates
     .filter(
       (c) =>
         !sourceIds.has(c.id as string) &&
@@ -376,14 +385,19 @@ async function spreadCategory(
     .map((c) => c.id as string);
   if (ids.length === 0) return 0;
 
-  // RLS decide o que dá pra mexer; conta o que de fato mudou.
-  const { data: updated, error: updError } = await supabase
-    .from("transactions")
-    .update({ category_id: params.categoryId })
-    .in("id", ids)
-    .select("id");
-  if (updError) throw new Error(updError.message);
-  return updated?.length ?? 0;
+  // RLS decide o que dá pra mexer; conta o que de fato mudou. Em lotes,
+  // pra lista de ids não estourar o tamanho da requisição.
+  let changed = 0;
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: updated, error: updError } = await supabase
+      .from("transactions")
+      .update({ category_id: params.categoryId })
+      .in("id", ids.slice(i, i + 200))
+      .select("id");
+    if (updError) throw new Error(updError.message);
+    changed += updated?.length ?? 0;
+  }
+  return changed;
 }
 
 export async function updateTransactionCategory(

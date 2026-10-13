@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { accountScope } from "@/lib/visibility";
 import {
   buildStatements,
@@ -72,16 +73,29 @@ export async function loadCards(
     .map((c) => c.payment_account_id as string | null)
     .filter(Boolean) as string[];
 
-  const [{ data: txs, error: txError }, { data: payers }, { data: members }] =
+  const [txs, { data: payers }, { data: members }] =
     await Promise.all([
-      supabase
-        .from("transactions")
-        .select(
-          "id, account_id, date, amount_cents, direction, transfer_group_id, installment_group_id",
-        )
-        .eq("household_id", householdId)
-        .in("account_id", ids)
-        .order("date"),
+      // Em páginas: histórico de cartão passa de 1000 linhas.
+      fetchAll<{
+        id: string;
+        account_id: string;
+        date: string;
+        amount_cents: number;
+        direction: "in" | "out";
+        transfer_group_id: string | null;
+        installment_group_id: string | null;
+      }>((from, to) =>
+        supabase
+          .from("transactions")
+          .select(
+            "id, account_id, date, amount_cents, direction, transfer_group_id, installment_group_id",
+          )
+          .eq("household_id", householdId)
+          .in("account_id", ids)
+          .order("date")
+          .order("id")
+          .range(from, to),
+      ),
       paymentIds.length > 0
         ? supabase.from("accounts").select("id, name").in("id", paymentIds)
         : Promise.resolve({ data: [] as { id: string; name: string }[] }),
@@ -90,7 +104,6 @@ export async function loadCards(
         .select("id, display_name")
         .eq("household_id", householdId),
     ]);
-  if (txError) throw new Error(txError.message);
 
   const payerNames = new Map(
     (payers ?? []).map((p) => [p.id as string, p.name as string]),
@@ -232,12 +245,23 @@ export async function cardBillsForScope(
   if (!cards || cards.length === 0)
     return { cardIds, bills: [] as ReturnType<typeof cardBills> };
 
-  const { data: txs } = await supabase
-    .from("transactions")
-    .select("id, account_id, date, amount_cents, direction, transfer_group_id")
-    .eq("household_id", householdId)
-    .in("account_id", [...cardIds])
-    .order("date");
+  const txs = await fetchAll<{
+    id: string;
+    account_id: string;
+    date: string;
+    amount_cents: number;
+    direction: "in" | "out";
+    transfer_group_id: string | null;
+  }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("id, account_id, date, amount_cents, direction, transfer_group_id")
+      .eq("household_id", householdId)
+      .in("account_id", [...cardIds])
+      .order("date")
+      .order("id")
+      .range(from, to),
+  );
 
   const summaries = cards.map((card) => {
     const closeDay = (card.statement_close_day as number | null) ?? 28;
