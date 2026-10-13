@@ -16,19 +16,17 @@ export function ReportViewToggle({ view }: { view: ReportView }) {
     router.push(`/relatorios?${params.toString()}`);
   }
 
+  // Mesma altura e cara do seletor de mês ao lado: caixa branca com
+  // sombra; a opção escolhida ganha o azul claro da marca.
+  const item =
+    "h-[38px] flex-none rounded-[12px] px-4 text-[14px] font-semibold text-(--text-muted) hover:text-(--text-secondary) data-active:bg-(--primary-soft)! data-active:text-(--primary)! data-active:shadow-none! data-active:border-transparent!";
   return (
     <Tabs value={view} onValueChange={onChange}>
-      <TabsList className="h-10 rounded-full border border-(--border-primary) bg-(--bg-subtle) p-1">
-        <TabsTrigger
-          value="realizado"
-          className="rounded-full px-3.5 text-(--text-secondary) data-active:bg-primary data-active:text-primary-foreground data-active:shadow-[0_2px_5px_rgba(81,88,246,.20)]"
-        >
+      <TabsList className="h-12 gap-1 rounded-[16px] bg-white p-[5px] shadow-(--shadow-card)">
+        <TabsTrigger value="realizado" className={item}>
           Realizado
         </TabsTrigger>
-        <TabsTrigger
-          value="a-vencer"
-          className="rounded-full px-3.5 text-(--text-secondary) data-active:bg-primary data-active:text-primary-foreground data-active:shadow-[0_2px_5px_rgba(81,88,246,.20)]"
-        >
+        <TabsTrigger value="a-vencer" className={item}>
           A vencer
         </TabsTrigger>
       </TabsList>
