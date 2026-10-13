@@ -234,6 +234,8 @@ export default async function RelatoriosPage({
             currency={currency}
             emptyExpense={expenseEmpty}
             emptyIncome={incomeEmpty}
+            month={monthQS}
+            status={status}
           />
 
           <CardSurface className="p-4 md:p-6">
