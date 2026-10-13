@@ -31,7 +31,7 @@ import { AccountAvatar } from "@/components/account-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthSelector } from "@/components/month-selector";
 import { WhereList } from "./where-list";
-import { AccountFilter } from "./account-filter";
+import { AccountFilter } from "@/components/account-filter";
 import { Money } from "@/components/money";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";

@@ -17,6 +17,7 @@ import {
 import { MonthSelector } from "@/components/month-selector";
 import { ReportViewToggle, type ReportView } from "./report-view-toggle";
 import { ReportPdfButton } from "./report-pdf-button";
+import { AccountFilter } from "@/components/account-filter";
 import { CategoryBreakdown } from "./category-breakdown";
 import { PeriodEvolutionChart } from "./period-evolution-chart";
 import { InsightVelunCard } from "./bottom-cards";
@@ -36,11 +37,11 @@ function CardSurface({ children, className = "" }: { children: ReactNode; classN
 export default async function RelatoriosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; view?: string }>;
+  searchParams: Promise<{ month?: string; view?: string; account?: string }>;
 }) {
   const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
-  const { month, view: viewParam } = await searchParams;
+  const { month, view: viewParam, account: accountParam } = await searchParams;
   const view: ReportView = viewParam === "a-vencer" ? "a-vencer" : "realizado";
   const { year, monthIndex } = parseMonthParam(month, today);
 
@@ -53,7 +54,13 @@ export default async function RelatoriosPage({
 
   // Relatórios agregam por categoria, então entram as contas pessoais a
   // partir de `categories_only`. Uma promise só, reusada pelas duas buscas.
-  const categoriesScope = accountScope(supabase, householdId, memberId, "categories");
+  const fullScope = accountScope(supabase, householdId, memberId, "categories");
+  // Filtro de conta (?account=): só estreita o que já entra no relatório.
+  const categoriesScope = fullScope.then((scope) =>
+    accountParam && scope.ids.includes(accountParam)
+      ? { ids: [accountParam], excludedCount: 0 }
+      : scope,
+  );
 
   const [rows, prevRows, colorMap, { data: pdfAccounts }] = await Promise.all([
     categoriesScope.then((scope) =>
@@ -64,10 +71,10 @@ export default async function RelatoriosPage({
     ),
     getCategoryColorMap(supabase, householdId),
     // Contas que podem entrar no PDF: as mesmas que entram nos totais.
-    categoriesScope.then((scope) =>
+    fullScope.then((scope) =>
       supabase
         .from("accounts")
-        .select("id, name")
+        .select("id, name, type, institution")
         .eq("household_id", householdId)
         .in("id", scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"])
         .order("sort_order")
@@ -108,7 +115,9 @@ export default async function RelatoriosPage({
     prevName,
   });
 
-  const viewQuery = view === "a-vencer" ? "&view=a-vencer" : "";
+  const accountFilter =
+    accountParam && (pdfAccounts ?? []).some((a) => a.id === accountParam) ? accountParam : null;
+  const viewQuery = `${view === "a-vencer" ? "&view=a-vencer" : ""}${accountFilter ? `&account=${accountFilter}` : ""}`;
   const monthQS = monthParam(year, monthIndex);
   const expenseEmpty = view === "a-vencer" ? "Nenhuma despesa pendente neste mês." : "Nenhuma despesa neste mês.";
   const incomeEmpty = view === "a-vencer" ? "Nenhuma receita pendente neste mês." : "Nenhuma receita neste mês.";
@@ -145,10 +154,23 @@ export default async function RelatoriosPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {(pdfAccounts ?? []).length > 1 ? (
+            <AccountFilter
+              value={accountFilter}
+              accounts={(pdfAccounts ?? []).map((a) => ({
+                id: a.id as string,
+                name: a.name as string,
+                type: a.type as string,
+                institution: (a.institution as string | null) ?? null,
+              }))}
+            />
+          ) : null}
           <ReportPdfButton
+            key={accountFilter ?? "todas"}
             month={monthQS}
             today={today}
             accounts={(pdfAccounts ?? []).map((a) => ({ id: a.id as string, name: a.name as string }))}
+            initialAccounts={accountFilter ? [accountFilter] : null}
           />
           <ReportViewToggle view={view} />
           <MonthSelector
@@ -175,7 +197,7 @@ export default async function RelatoriosPage({
             </p>
           </div>
           <Link
-            href={`/transacoes?month=${monthQS}&category=none`}
+            href={`/transacoes?month=${monthQS}&category=none${accountFilter ? `&account=${accountFilter}` : ""}`}
             className="flex h-9 shrink-0 items-center self-start rounded-[11px] bg-[#B54708] px-3.5 text-[13px] font-semibold whitespace-nowrap text-white max-md:ml-8 md:self-auto"
           >
             Categorizar agora
@@ -253,6 +275,7 @@ export default async function RelatoriosPage({
             emptyExpense={expenseEmpty}
             emptyIncome={incomeEmpty}
             month={monthQS}
+            accountId={accountFilter}
             status={status}
             prevTotalExpense={totalExpensePrev}
             prevTotalIncome={totalIncomePrev}
