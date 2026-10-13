@@ -92,17 +92,21 @@ export function TransactionsWorkspace({
         <div className="flex items-center gap-3">
           <MonthSelector label={monthLabel} prevHref={prevHref} nextHref={nextHref} />
           <Button
-            variant={selectionMode ? "secondary" : "outline"}
-            size="sm"
+            variant="ghost"
             onClick={() => setSelectionMode((v) => !v)}
+            className={`h-12 gap-2 rounded-[16px] px-4 text-[14px] font-semibold shadow-(--shadow-card) ${
+              selectionMode
+                ? "bg-(--primary-soft) text-(--primary) hover:bg-(--primary-soft)"
+                : "bg-white text-(--text-secondary) hover:bg-white hover:text-(--text-primary)"
+            }`}
           >
             {selectionMode ? (
               <>
-                <X className="h-3.5 w-3.5" /> Cancelar
+                <X className="h-4 w-4" /> Cancelar
               </>
             ) : (
               <>
-                <ListChecks className="h-3.5 w-3.5" /> Selecionar
+                <ListChecks className="h-4 w-4" /> Selecionar
               </>
             )}
           </Button>
