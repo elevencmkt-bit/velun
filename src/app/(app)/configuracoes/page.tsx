@@ -8,6 +8,7 @@ import { CategoriesPanel } from "./categories-panel";
 import { DangerZone } from "./danger-zone";
 import { InviteManager } from "./invite-manager";
 import { HouseholdSettingsForm } from "./household-settings-form";
+import { themedBg, themedFg } from "@/lib/theme-color";
 
 const BENEFITS = [
   { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
@@ -171,7 +172,7 @@ export default async function ConfiguracoesPage() {
               ))}
               <a
                 href="#convite"
-                className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-[#D0D5DD] p-2.5 text-(--primary) transition-colors hover:bg-white/60"
+                className="flex items-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-(--border-strong) p-2.5 text-(--primary) transition-colors hover:bg-white/60"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--primary-light)">
                   <Plus className="h-[18px] w-[18px]" />
@@ -200,7 +201,7 @@ export default async function ConfiguracoesPage() {
             >
               <div
                 className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px]"
-                style={{ backgroundColor: benefit.bg, color: benefit.fg }}
+                style={{ backgroundColor: themedBg(benefit.bg, benefit.fg), color: themedFg(benefit.fg) }}
               >
                 <benefit.icon className="h-4 w-4" />
               </div>

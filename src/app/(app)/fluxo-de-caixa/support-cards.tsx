@@ -137,8 +137,8 @@ export function PeriodSummaryCard({
         </div>
       </div>
       {note ? (
-        <div className="rounded-[16px] bg-[#F5F6FF] p-4 text-sm leading-relaxed text-(--text-secondary)">
-          <div className="mb-1 text-xs font-bold text-[#4257CB]">Fique de olho</div>
+        <div className="rounded-[16px] bg-(--primary-soft) p-4 text-sm leading-relaxed text-(--text-secondary)">
+          <div className="mb-1 text-xs font-bold text-(--primary-hover)">Fique de olho</div>
           {note}
         </div>
       ) : null}

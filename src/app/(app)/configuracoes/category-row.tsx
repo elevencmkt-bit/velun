@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { themedFg } from "@/lib/theme-color";
 
 export type CategoryRowData = {
   id: string;
@@ -86,12 +87,12 @@ export function CategoryRow({
     });
   }
 
-  const tint = effectiveColor ?? "var(--text-light)";
+  const tint = effectiveColor ? themedFg(effectiveColor) : "var(--text-light)";
 
   // Bloco da categoria. No computador, editar e apagar aparecem ao passar
   // o mouse; no celular, um toque abre a edição, que também tem o excluir.
   return (
-    <div className="group relative flex h-12 min-w-0 items-center gap-2 rounded-[14px] bg-[#F7F8FA] pr-1.5 pl-1.5 md:gap-2.5 transition-colors hover:bg-[#F0F2F6]">
+    <div className="group relative flex h-12 min-w-0 items-center gap-2 rounded-[14px] bg-(--bg-subtle) pr-1.5 pl-1.5 md:gap-2.5 transition-colors hover:bg-(--bg-hover)">
       <button
         type="button"
         onClick={() => setEditOpen(true)}

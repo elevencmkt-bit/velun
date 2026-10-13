@@ -51,6 +51,10 @@
 }
 
 :root {
+  /* Avisa o navegador qual é o tema: campos nativos, barras de rolagem e
+     a função light-dark() (cores de categoria e banco) seguem isto. */
+  color-scheme: light;
+
   /* UI Style Specs — Dashboard Financeiro (seção 30, tokens do usuário) */
 
   /* Background */
@@ -95,6 +99,24 @@
 
   --purple: #7f56d9;
   --purple-soft: #f4f3ff;
+
+  /* Tons que antes estavam fixos nas telas (viraram token pro tema escuro). */
+  --bg-track: #f4f5f8; /* trilho de abas, campos dentro de cartão */
+  --bg-hover: #f2f4f7;
+  --bg-strong: #eaecf0;
+  --bg-inverse: #111318; /* avisos escuros (toast), aba ativa no celular */
+  --text-body: #344054;
+  --border-strong: #d0d5dd;
+  --primary-border: #c7d0ff;
+  --danger-text: #b42318;
+  --danger-ink: #7a271a;
+  --danger-soft: #fef3f2;
+  --danger-badge: #fee4e2;
+  --warning-ink: #7a2e0e;
+  --warning-badge: #fef0c7;
+  --warning-banner: #fff6e5;
+  --success-text: #067647;
+  --success-soft: #ecfdf3;
 
   /* Shadows — quase imperceptíveis (seção 22) */
   --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.03);

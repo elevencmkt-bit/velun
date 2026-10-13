@@ -39,7 +39,7 @@ export function WhereList({
             key={slice.name}
             onClick={() => open(slice.name, color)}
             aria-label={`Ver lançamentos de ${slice.name}`}
-            className="-mx-2 rounded-[10px] px-2 py-1 text-left transition-colors hover:bg-[#F5F6FF]"
+            className="-mx-2 rounded-[10px] px-2 py-1 text-left transition-colors hover:bg-(--primary-soft)"
           >
             <div className="flex justify-between gap-2 text-[13px]">
               <span className="truncate">{slice.name}</span>

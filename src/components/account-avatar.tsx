@@ -1,5 +1,6 @@
 import { Wallet } from "lucide-react";
 import { ACCOUNT_TYPE_ICONS } from "@/lib/account-types";
+import { themedPair } from "@/lib/theme-color";
 
 // Bolinha de cada conta. Com instituição preenchida, mostra as iniciais
 // dela numa cor fixa por banco — o mesmo banco tem sempre a mesma cor, e
@@ -44,7 +45,7 @@ export function AccountAvatar({
 }) {
   const label = institution?.trim();
   if (label) {
-    const color = colorFor(label);
+    const color = themedPair(colorFor(label));
     return (
       <div
         aria-hidden

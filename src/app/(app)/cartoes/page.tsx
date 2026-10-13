@@ -15,6 +15,7 @@ import { Money } from "@/components/money";
 import { Button } from "@/components/ui/button";
 import { AccountForm } from "../contas/account-form";
 import { PayBillDialog } from "./pay-bill-dialog";
+import { themedPair } from "@/lib/theme-color";
 
 function shortDate(date: string) {
   return new Date(`${date}T12:00:00`)
@@ -121,7 +122,7 @@ export default async function CartoesPage({
       <div className="flex flex-col gap-6 md:gap-7">
         {header}
         <section
-          className="flex flex-col items-center gap-5 rounded-[20px] bg-white px-6 py-10 text-center md:flex-row md:gap-10 md:px-10 md:text-left"
+          className="flex flex-col items-center gap-5 rounded-[20px] bg-(--bg-surface) px-6 py-10 text-center md:flex-row md:gap-10 md:px-10 md:text-left"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <div className="w-full max-w-[300px] shrink-0">
@@ -259,7 +260,7 @@ export default async function CartoesPage({
 
       <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
         <section
-          className="min-w-0 rounded-[20px] bg-white p-5 md:p-6 lg:col-span-8"
+          className="min-w-0 rounded-[20px] bg-(--bg-surface) p-5 md:p-6 lg:col-span-8"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -277,7 +278,7 @@ export default async function CartoesPage({
                     aria-current={active ? "page" : undefined}
                     className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[11px] px-3 text-[13px] font-semibold transition-colors ${
                       active
-                        ? "bg-white text-(--text-primary) shadow-sm"
+                        ? "bg-(--bg-surface) text-(--text-primary) shadow-sm"
                         : "text-(--text-muted) hover:text-(--text-primary)"
                     }`}
                   >
@@ -331,9 +332,11 @@ export default async function CartoesPage({
                   out ? "out" : "in",
                   category ? (iconMap.get(category) ?? null) : null,
                 );
-                const colors = category
-                  ? (colorMap.get(category) ?? MUTED_CATEGORY_COLOR)
-                  : MUTED_CATEGORY_COLOR;
+                const colors = themedPair(
+                  category
+                    ? (colorMap.get(category) ?? MUTED_CATEGORY_COLOR)
+                    : MUTED_CATEGORY_COLOR,
+                );
                 return (
                   <div
                     key={row.id}
@@ -389,7 +392,7 @@ export default async function CartoesPage({
 
         <div className="flex min-w-0 flex-col gap-4 md:gap-6 lg:col-span-4">
           <section
-            className="rounded-[20px] bg-white p-5 md:p-6"
+            className="rounded-[20px] bg-(--bg-surface) p-5 md:p-6"
             style={{ boxShadow: "var(--shadow-card)" }}
           >
             <div className="flex items-center justify-between gap-2">

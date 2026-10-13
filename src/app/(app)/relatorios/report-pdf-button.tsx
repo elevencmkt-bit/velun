@@ -59,21 +59,21 @@ export function ReportPdfButton({ month, today, accounts }: { month: string; tod
 
   const seg = (on: boolean) =>
     `flex h-11 flex-1 items-center justify-center rounded-[12px] text-[14px] font-semibold transition-colors ${
-      on ? "bg-white text-(--primary) shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
+      on ? "bg-(--bg-surface) text-(--primary) shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
     }`;
   const opt = (on: boolean) =>
     `flex w-full items-start gap-3 rounded-[14px] border-[1.5px] p-3.5 text-left transition-colors ${
-      on ? "border-(--primary) bg-(--primary-soft)" : "border-[#E4E7EC] bg-white hover:border-[#C7D0FF]"
+      on ? "border-(--primary) bg-(--primary-soft)" : "border-(--border-primary) bg-(--bg-surface) hover:border-(--primary-border)"
     }`;
   const radio = (on: boolean) =>
-    `mt-0.5 h-[18px] w-[18px] shrink-0 rounded-full ${on ? "border-[5px] border-(--primary)" : "border-2 border-[#D0D5DD]"}`;
+    `mt-0.5 h-[18px] w-[18px] shrink-0 rounded-full ${on ? "border-[5px] border-(--primary)" : "border-2 border-(--border-strong)"}`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button
           type="button"
-          className="flex h-12 items-center gap-2 rounded-[16px] bg-white px-4 text-[14px] font-semibold text-(--text-secondary) shadow-(--shadow-card) hover:text-(--text-primary)"
+          className="flex h-12 items-center gap-2 rounded-[16px] bg-(--bg-surface) px-4 text-[14px] font-semibold text-(--text-secondary) shadow-(--shadow-card) hover:text-(--text-primary)"
         >
           <FileDown className="h-[18px] w-[18px] text-(--primary)" />
           Baixar PDF
@@ -81,7 +81,7 @@ export function ReportPdfButton({ month, today, accounts }: { month: string; tod
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-white p-5 sm:max-w-[520px] sm:p-7"
+        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-(--bg-surface) p-5 sm:max-w-[520px] sm:p-7"
       >
         <div className="flex items-center justify-between">
           <DialogTitle className="text-[21px] font-extrabold tracking-[-0.02em] text-(--text-primary)">
@@ -91,15 +91,15 @@ export function ReportPdfButton({ month, today, accounts }: { month: string; tod
             type="button"
             aria-label="Fechar"
             onClick={() => setOpen(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#F2F4F7] text-(--text-secondary) hover:bg-[#E4E7EC]"
+            className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-(--bg-hover) text-(--text-secondary) hover:bg-(--bg-strong)"
           >
             <X className="h-[18px] w-[18px]" />
           </button>
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-semibold text-[#344054]">Período</span>
-          <div role="radiogroup" aria-label="Período" className="flex gap-1.5 rounded-[16px] bg-[#F2F4F7] p-[5px]">
+          <span className="text-[13px] font-semibold text-(--text-body)">Período</span>
+          <div role="radiogroup" aria-label="Período" className="flex gap-1.5 rounded-[16px] bg-(--bg-hover) p-[5px]">
             <button type="button" role="radio" aria-checked={kind === "month"} className={seg(kind === "month")} onClick={() => setKind("month")}>
               {monthTitle(month)}
             </button>
@@ -119,7 +119,7 @@ export function ReportPdfButton({ month, today, accounts }: { month: string; tod
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-semibold text-[#344054]">O que vai no PDF</span>
+          <span className="text-[13px] font-semibold text-(--text-body)">O que vai no PDF</span>
           <div role="radiogroup" aria-label="Conteúdo" className="flex flex-col gap-2">
             <button type="button" role="radio" aria-checked={full} className={opt(full)} onClick={() => setFull(true)}>
               <span className={radio(full)} />
@@ -142,7 +142,7 @@ export function ReportPdfButton({ month, today, accounts }: { month: string; tod
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold text-[#344054]">Contas</span>
+          <span className="text-[13px] font-semibold text-(--text-body)">Contas</span>
           {accounts.map((a) => {
             const on = selected.has(a.id);
             return (
@@ -163,7 +163,7 @@ export function ReportPdfButton({ month, today, accounts }: { month: string; tod
               >
                 <span
                   className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] ${
-                    on ? "bg-(--primary)" : "border-2 border-[#D0D5DD] bg-white"
+                    on ? "bg-(--primary)" : "border-2 border-(--border-strong) bg-(--bg-surface)"
                   }`}
                 >
                   {on ? (

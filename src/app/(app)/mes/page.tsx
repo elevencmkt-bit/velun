@@ -37,6 +37,7 @@ import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
 import { cardBills, loadCards } from "@/lib/cards";
 import { CardStack } from "@/components/card-stack";
+import { themedPair } from "@/lib/theme-color";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
@@ -686,7 +687,7 @@ export default async function MesPage({
                   className={`-mx-2 flex min-h-[60px] items-center gap-3 rounded-[14px] px-2 transition-colors ${
                     account.id === accountFilter
                       ? "bg-(--primary-soft)"
-                      : "hover:bg-[#F7F8FA]"
+                      : "hover:bg-(--bg-subtle)"
                   }`}
                 >
                   <AccountAvatar
@@ -836,9 +837,11 @@ export default async function MesPage({
                     ? (iconMap.get(row.category_name) ?? null)
                     : null,
                 );
-                const colors = row.category_name
-                  ? (colorMap.get(row.category_name) ?? MUTED_CATEGORY_COLOR)
-                  : MUTED_CATEGORY_COLOR;
+                const colors = themedPair(
+                  row.category_name
+                    ? (colorMap.get(row.category_name) ?? MUTED_CATEGORY_COLOR)
+                    : MUTED_CATEGORY_COLOR,
+                );
                 return (
                   <div
                     key={row.id}

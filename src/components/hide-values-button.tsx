@@ -30,7 +30,7 @@ export function HideValuesButton({ initialHidden }: { initialHidden: boolean }) 
       aria-pressed={hidden}
       aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
       title={hidden ? "Mostrar valores" : "Ocultar valores"}
-      className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-(--text-muted) transition-colors hover:text-(--text-primary) md:h-11 md:w-11"
+      className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-(--bg-surface) text-(--text-muted) transition-colors hover:text-(--text-primary) md:h-11 md:w-11"
     >
       <Icon className="h-[19px] w-[19px]" strokeWidth={1.9} />
     </button>

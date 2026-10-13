@@ -49,10 +49,10 @@ export function MonthSelector({
   }
 
   const arrow =
-    "flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-(--text-secondary) transition-colors hover:bg-[#F2F4F7] hover:text-(--text-primary)";
+    "flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-(--text-secondary) transition-colors hover:bg-(--bg-hover) hover:text-(--text-primary)";
 
   return (
-    <div className="flex h-12 items-center gap-1 rounded-[16px] bg-white px-1.5 shadow-(--shadow-card)">
+    <div className="flex h-12 items-center gap-1 rounded-[16px] bg-(--bg-surface) px-1.5 shadow-(--shadow-card)">
       <Link href={prevHref} className={arrow} aria-label="Mês anterior">
         <ChevronLeft className="h-[18px] w-[18px]" />
       </Link>
@@ -68,7 +68,7 @@ export function MonthSelector({
           <button
             type="button"
             aria-label="Escolher mês e ano"
-            className="flex h-9 min-w-[150px] items-center justify-center gap-2 rounded-[12px] px-2 text-[14px] font-semibold text-(--text-primary) transition-colors hover:bg-[#F2F4F7] data-[state=open]:bg-[#F2F4F7]"
+            className="flex h-9 min-w-[150px] items-center justify-center gap-2 rounded-[12px] px-2 text-[14px] font-semibold text-(--text-primary) transition-colors hover:bg-(--bg-hover) data-[state=open]:bg-(--bg-hover)"
           >
             <CalendarDays className="h-[18px] w-[18px] text-(--primary)" />
             <span className="inline-block whitespace-nowrap first-letter:uppercase">{label}</span>
@@ -111,7 +111,7 @@ export function MonthSelector({
                       ? "bg-(--primary) text-white"
                       : isNow
                         ? "bg-(--primary-soft) text-(--primary) hover:bg-(--primary-soft)"
-                        : "text-(--text-secondary) hover:bg-[#F2F4F7] hover:text-(--text-primary)"
+                        : "text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)"
                   }`}
                 >
                   {name}
@@ -135,7 +135,7 @@ export function MonthSelector({
                 className={`rounded-[10px] px-2.5 py-1.5 text-[13px] font-semibold transition-colors ${
                   allPeriod.active
                     ? "bg-(--primary) text-white"
-                    : "text-(--text-secondary) hover:bg-[#F2F4F7] hover:text-(--text-primary)"
+                    : "text-(--text-secondary) hover:bg-(--bg-hover) hover:text-(--text-primary)"
                 }`}
               >
                 Todo o período

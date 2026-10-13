@@ -2,6 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, Check, Equal, Plus, Sparkles, TrendingDown
 import type { CurrencyCode } from "@/lib/money";
 import type { InsightPart, ReportInsight } from "@/lib/reports";
 import { Money } from "@/components/money";
+import { themedBg, themedFg } from "@/lib/theme-color";
 
 function Parts({
   parts,
@@ -63,7 +64,7 @@ export function InsightVelunCard({
 
       <div
         className="mt-4 flex items-start gap-3 rounded-[14px] px-4 py-3.5 text-[15px] leading-relaxed"
-        style={warning ? { background: "#FFF6E5", color: "#7A2E0E" } : { background: "#E9FBF2", color: "#0B6E4F" }}
+        style={warning ? { background: themedBg("#FFF6E5", "#F79009"), color: themedFg("#7A2E0E") } : { background: themedBg("#E9FBF2", "#27C499"), color: themedFg("#0B6E4F") }}
       >
         {warning ? (
           <TrendingDown className="mt-0.5 h-5 w-5 shrink-0" />
@@ -78,7 +79,9 @@ export function InsightVelunCard({
       {insight.items.length > 0 ? (
         <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3.5 md:grid-cols-2">
           {insight.items.map((item, i) => {
-            const { Icon, bg, fg } = iconFor(item);
+            const { Icon, bg: bg0, fg: fg0 } = iconFor(item);
+            const bg = themedBg(bg0, fg0);
+            const fg = themedFg(fg0);
             return (
               <div key={i} className="flex items-start gap-2.5">
                 <span

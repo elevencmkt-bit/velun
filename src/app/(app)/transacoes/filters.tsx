@@ -273,7 +273,7 @@ export function TransactionFilters({
               className={`flex h-10 items-center justify-center rounded-[10px] border text-[13px] font-semibold transition-colors ${
                 allPeriod
                   ? "border-(--primary) bg-(--primary-soft) text-(--primary)"
-                  : "border-input bg-white text-(--text-secondary) hover:border-(--primary) hover:text-(--primary)"
+                  : "border-input bg-(--bg-surface) text-(--text-secondary) hover:border-(--primary) hover:text-(--primary)"
               }`}
             >
               Todo o período

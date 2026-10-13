@@ -103,10 +103,10 @@ export default async function FluxoDeCaixaPage({
       </div>
 
       {overdue.count > 0 ? (
-        <div className="flex flex-col gap-3 rounded-[16px] bg-[#FEF3F2] px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
+        <div className="flex flex-col gap-3 rounded-[16px] bg-(--danger-soft) px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#B42318]" />
-            <p className="text-sm leading-relaxed text-[#7A271A]">
+            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-(--danger-text)" />
+            <p className="text-sm leading-relaxed text-(--danger-ink)">
               <b>
                 {overdue.count} {overdue.count === 1 ? "lançamento atrasado" : "lançamentos atrasados"} (
                 {signed(overdue.netOutCents)})
@@ -120,14 +120,14 @@ export default async function FluxoDeCaixaPage({
             <Link
               href={href({ atrasados: !includeOverdue })}
               className={`flex h-9 items-center rounded-[11px] px-3.5 text-[13px] font-semibold whitespace-nowrap ${
-                includeOverdue ? "bg-white text-[#B42318]" : "bg-[#B42318] text-white"
+                includeOverdue ? "bg-(--bg-surface) text-(--danger-text)" : "bg-[#B42318] text-white"
               }`}
             >
               {includeOverdue ? "Tirar da projeção" : "Incluir na projeção"}
             </Link>
             <Link
               href="/transacoes?status=late"
-              className="flex h-9 items-center px-2 text-[13px] font-semibold whitespace-nowrap text-[#B42318]"
+              className="flex h-9 items-center px-2 text-[13px] font-semibold whitespace-nowrap text-(--danger-text)"
             >
               Ver em Transações →
             </Link>
@@ -185,7 +185,7 @@ export default async function FluxoDeCaixaPage({
             <h2 className="text-card-title">Saldo projetado</h2>
             <p className="mt-0.5 text-[13px] text-(--text-muted)">{rangeLabel}</p>
           </div>
-          <div className="flex gap-1 rounded-[13px] bg-[#F4F5F8] p-1" role="tablist" aria-label="Período da projeção">
+          <div className="flex gap-1 rounded-[13px] bg-(--bg-track) p-1" role="tablist" aria-label="Período da projeção">
             {PERIODS.map((p) => (
               <Link
                 key={p.days}

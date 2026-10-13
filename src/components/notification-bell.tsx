@@ -63,7 +63,7 @@ export function NotificationBell({
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
-          className="relative flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-(--text-muted) transition-colors hover:text-(--text-primary) md:h-11 md:w-11"
+          className="relative flex h-10 w-10 items-center justify-center rounded-[14px] bg-(--bg-surface) text-(--text-muted) transition-colors hover:text-(--text-primary) md:h-11 md:w-11"
           aria-label={
             unreadCount > 0
               ? `Notificações, ${unreadCount} não lidas`
@@ -101,7 +101,7 @@ export function NotificationBell({
                     type="button"
                     disabled={isPending}
                     onClick={() => decide(r.id, false)}
-                    className="h-8 rounded-[10px] bg-[#F4F5F8] px-3 text-xs font-semibold text-(--text-secondary) disabled:opacity-50"
+                    className="h-8 rounded-[10px] bg-(--bg-track) px-3 text-xs font-semibold text-(--text-secondary) disabled:opacity-50"
                   >
                     Recusar
                   </button>

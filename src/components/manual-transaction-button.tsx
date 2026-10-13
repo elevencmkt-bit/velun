@@ -19,6 +19,7 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { fitsDirection } from "@/lib/category-kind";
+import { themedBg, themedFg, themedPair } from "@/lib/theme-color";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
 type Category = {
@@ -36,9 +37,9 @@ const LAST_ACCOUNT_KEY = "velun:last-account";
 // Cor de cada tipo: o tipo escolhido pinta a aba, o bloco do valor e a
 // categoria marcada, pra não ter dúvida do que se está lançando.
 const TONE: Record<Mode, { bg: string; fg: string; strong: string; label: string; sign: string }> = {
-  out: { bg: "#FEF3F2", fg: "#B42318", strong: "#D92D20", label: "saída", sign: "−" },
-  in: { bg: "#ECFDF3", fg: "#067647", strong: "#079455", label: "entrada", sign: "+" },
-  transfer: { bg: "#EEF1FF", fg: "#3538CD", strong: "#536DFE", label: "transferência", sign: "" },
+  out: { bg: themedBg("#FEF3F2", "#F04438"), fg: themedFg("#B42318"), strong: themedFg("#D92D20"), label: "saída", sign: "−" },
+  in: { bg: themedBg("#ECFDF3", "#12B76A"), fg: themedFg("#067647"), strong: themedFg("#079455"), label: "entrada", sign: "+" },
+  transfer: { bg: themedBg("#EEF1FF", "#536DFE"), fg: themedFg("#3538CD"), strong: themedFg("#536DFE"), label: "transferência", sign: "" },
 };
 
 const MODES: { value: Mode; label: string; Icon: typeof ArrowUpRight }[] = [
@@ -93,7 +94,7 @@ function AccountPicker({
               className={`flex h-14 items-center gap-2.5 rounded-[14px] border-[1.5px] px-3 text-left transition-colors ${
                 on
                   ? "border-(--primary) bg-(--primary-soft) shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
-                  : "border-[#E4E7EC] bg-white hover:border-[#C7D0FF]"
+                  : "border-(--border-primary) bg-(--bg-surface) hover:border-(--primary-border)"
               }`}
             >
               <AccountAvatar institution={a.institution ?? null} type={a.type ?? "checking"} size={32} />
@@ -128,7 +129,7 @@ function ToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-3 border-t border-[#F2F4F7] py-3.5 text-left"
+      className="flex w-full items-center justify-between gap-3 border-t border-(--border-soft) py-3.5 text-left"
     >
       <span>
         <span className="block text-sm font-semibold text-(--text-primary)">{title}</span>
@@ -136,10 +137,10 @@ function ToggleRow({
       </span>
       <span
         aria-hidden
-        className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-(--primary)" : "bg-[#D0D5DD]"}`}
+        className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-(--primary)" : "bg-(--border-strong)"}`}
       >
         <span
-          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-all ${checked ? "left-[21px]" : "left-[3px]"}`}
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-(--bg-surface) shadow-sm transition-all ${checked ? "left-[21px]" : "left-[3px]"}`}
         />
       </span>
     </button>
@@ -311,7 +312,7 @@ export function ManualTransactionButton({
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-white p-5 sm:max-w-[540px] sm:p-7"
+        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-(--bg-surface) p-5 sm:max-w-[540px] sm:p-7"
       >
         <div className="flex items-center justify-between">
           <DialogTitle className="text-[21px] font-extrabold tracking-[-0.02em] text-(--text-primary)">
@@ -321,14 +322,14 @@ export function ManualTransactionButton({
             type="button"
             aria-label="Fechar"
             onClick={() => setOpen(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#F2F4F7] text-(--text-secondary) hover:bg-[#E4E7EC]"
+            className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-(--bg-hover) text-(--text-secondary) hover:bg-(--bg-strong)"
           >
             <X className="h-[18px] w-[18px]" />
           </button>
         </div>
 
         <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
-          <div role="tablist" aria-label="Tipo" className="flex gap-1.5 rounded-[16px] bg-[#F2F4F7] p-[5px]">
+          <div role="tablist" aria-label="Tipo" className="flex gap-1.5 rounded-[16px] bg-(--bg-hover) p-[5px]">
             {MODES.map(({ value, label, Icon }) => {
               const on = value === mode;
               return (
@@ -342,7 +343,7 @@ export function ManualTransactionButton({
                     setCategoryId("");
                   }}
                   className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[12px] text-[14px] font-semibold transition-colors sm:text-[15px] ${
-                    on ? "bg-white shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
+                    on ? "bg-(--bg-surface) shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
                   }`}
                   style={on ? { color: TONE[value].fg } : undefined}
                 >
@@ -379,13 +380,13 @@ export function ManualTransactionButton({
 
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="date" className="text-[13px] font-semibold text-[#344054]">
+              <Label htmlFor="date" className="text-[13px] font-semibold text-(--text-body)">
                 Data
               </Label>
               <DateInput id="date" name="date" defaultValue={localToday()} required className="[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px]" />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="description" className="text-[13px] font-semibold text-[#344054]">
+              <Label htmlFor="description" className="text-[13px] font-semibold text-(--text-body)">
                 Descrição
               </Label>
               <Input
@@ -401,7 +402,7 @@ export function ManualTransactionButton({
           {mode === "transfer" ? (
             <>
               <div className="flex flex-col gap-2">
-                <span className="text-[13px] font-semibold text-[#344054]">Sai de</span>
+                <span className="text-[13px] font-semibold text-(--text-body)">Sai de</span>
                 <AccountPicker
                   label="Sai de"
                   accounts={accounts}
@@ -413,7 +414,7 @@ export function ManualTransactionButton({
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <span className="text-[13px] font-semibold text-[#344054]">Vai pra</span>
+                <span className="text-[13px] font-semibold text-(--text-body)">Vai pra</span>
                 <AccountPicker
                   label="Vai pra"
                   accounts={accounts}
@@ -425,18 +426,18 @@ export function ManualTransactionButton({
             </>
           ) : (
             <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-semibold text-[#344054]">Conta</span>
+              <span className="text-[13px] font-semibold text-(--text-body)">Conta</span>
               <AccountPicker label="Conta" accounts={accounts} value={accountId} onChange={setAccountId} />
             </div>
           )}
 
           {mode !== "transfer" ? (
             <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-semibold text-[#344054]">Categoria</span>
+              <span className="text-[13px] font-semibold text-(--text-body)">Categoria</span>
               <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
                 {categoriesForDirection.map((c) => {
                   const on = c.id === categoryId;
-                  const color = colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" };
+                  const color = themedPair(colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" });
                   const Icon = getCategoryIcon(c.name, mode === "in" ? "in" : "out", c.icon ?? null);
                   return (
                     <button
@@ -446,7 +447,7 @@ export function ManualTransactionButton({
                       aria-checked={on}
                       onClick={() => setCategoryId(on ? "" : c.id)}
                       className={`inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] pr-3.5 pl-2 text-sm transition-colors ${
-                        on ? "font-semibold" : "border-[#E4E7EC] bg-white font-medium text-[#344054] hover:border-[#C7D0FF]"
+                        on ? "font-semibold" : "border-(--border-primary) bg-(--bg-surface) font-medium text-(--text-body) hover:border-(--primary-border)"
                       }`}
                       style={on ? { borderColor: color.fg, backgroundColor: color.bg, color: color.fg } : undefined}
                     >
@@ -483,7 +484,7 @@ export function ManualTransactionButton({
                   <button
                     type="button"
                     onClick={() => setNewCategoryOpen(true)}
-                    className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-[#C7D0FF] px-3.5 text-sm font-semibold text-(--primary) hover:bg-(--primary-soft)"
+                    className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-(--primary-border) px-3.5 text-sm font-semibold text-(--primary) hover:bg-(--primary-soft)"
                   >
                     <Plus className="h-4 w-4" />
                     Nova categoria
@@ -495,7 +496,7 @@ export function ManualTransactionButton({
 
           {mode === "out" && isCard ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="installments" className="text-[13px] font-semibold text-[#344054]">
+              <Label htmlFor="installments" className="text-[13px] font-semibold text-(--text-body)">
                 Parcelas
               </Label>
               <Select name="installments" value={installments} onValueChange={setInstallments}>
@@ -519,7 +520,7 @@ export function ManualTransactionButton({
 
           {notesOpen ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="notes" className="text-[13px] font-semibold text-[#344054]">
+              <Label htmlFor="notes" className="text-[13px] font-semibold text-(--text-body)">
                 Nota
               </Label>
               <Input id="notes" name="notes" autoFocus className="h-12 rounded-[12px] text-[15px]" />
@@ -551,7 +552,7 @@ export function ManualTransactionButton({
               {makeRecurring ? (
                 <div className="grid grid-cols-2 gap-3.5 pb-1">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="recurrence_frequency" className="text-[13px] font-semibold text-[#344054]">
+                    <Label htmlFor="recurrence_frequency" className="text-[13px] font-semibold text-(--text-body)">
                       Frequência
                     </Label>
                     <Select name="recurrence_frequency" value={recurrenceFrequency} onValueChange={setRecurrenceFrequency}>
@@ -566,7 +567,7 @@ export function ManualTransactionButton({
                     </Select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="recurrence_ends_on" className="text-[13px] font-semibold text-[#344054]">
+                    <Label htmlFor="recurrence_ends_on" className="text-[13px] font-semibold text-(--text-body)">
                       Repetir até (opcional)
                     </Label>
                     <DateInput

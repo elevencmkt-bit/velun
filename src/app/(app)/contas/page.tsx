@@ -138,7 +138,7 @@ export default async function ContasPage() {
     const trailing = (
       <>
         {chip ? (
-          <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
+          <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
             {a.visibility === "hidden" && isMine ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             {chip}
           </span>
@@ -242,12 +242,12 @@ export default async function ContasPage() {
                     {g.items.map(row)}
                   </section>
                 ) : (
-                  <p className="rounded-[16px] border-[1.5px] border-dashed border-[#D0D5DD] px-4 py-3.5 text-[13px] text-(--text-muted)">
+                  <p className="rounded-[16px] border-[1.5px] border-dashed border-(--border-strong) px-4 py-3.5 text-[13px] text-(--text-muted)">
                     Nenhuma conta aqui ainda.
                   </p>
                 )}
                 {g.title === "Minhas" && !partner ? (
-                  <p className="mt-3.5 rounded-[16px] border-[1.5px] border-dashed border-[#D0D5DD] px-4 py-3.5 text-[13px] leading-relaxed text-(--text-muted)">
+                  <p className="mt-3.5 rounded-[16px] border-[1.5px] border-dashed border-(--border-strong) px-4 py-3.5 text-[13px] leading-relaxed text-(--text-muted)">
                     Quando quem divide a casa entrar, as contas dela aparecem aqui também — só com o que ela liberar pra você.
                   </p>
                 ) : null}

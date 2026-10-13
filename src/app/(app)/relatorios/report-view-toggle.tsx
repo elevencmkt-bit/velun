@@ -22,7 +22,7 @@ export function ReportViewToggle({ view }: { view: ReportView }) {
     "h-[38px] flex-none rounded-[12px] px-4 text-[14px] font-semibold text-(--text-muted) hover:text-(--text-secondary) data-active:bg-(--primary-soft)! data-active:text-(--primary)! data-active:shadow-none! data-active:border-transparent!";
   return (
     <Tabs value={view} onValueChange={onChange}>
-      <TabsList className="h-12 gap-1 rounded-[16px] bg-white p-[5px] shadow-(--shadow-card)">
+      <TabsList className="h-12 gap-1 rounded-[16px] bg-(--bg-surface) p-[5px] shadow-(--shadow-card)">
         <TabsTrigger value="realizado" className={item}>
           Realizado
         </TabsTrigger>
