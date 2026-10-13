@@ -1,36 +1,34 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, Plus, X } from "lucide-react";
 import { updateTransaction } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateInput } from "@/components/date-input";
-import { fitsDirection } from "@/lib/category-kind";
+import { AccountPicker, TONE, ToggleRow } from "@/components/manual-transaction-button";
 import { GoalLinkField } from "@/components/goal-link-field";
+import { buildCategoryColorMap } from "@/lib/category-colors";
+import { getCategoryIcon } from "@/lib/category-icons";
+import { amountToCents, normalizeAmount } from "@/lib/amount-input";
+import { fitsDirection } from "@/lib/category-kind";
+import { themedPair } from "@/lib/theme-color";
 
-type Account = { id: string; name: string };
-type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean };
+type Account = { id: string; name: string; type?: string; institution?: string | null };
+type Category = {
+  id: string;
+  name: string;
+  kind: "income" | "expense";
+  is_transfer?: boolean;
+  color?: string | null;
+  icon?: string | null;
+};
 
 export type EditableTransaction = {
   id: string;
@@ -46,6 +44,16 @@ export type EditableTransaction = {
   recurrence_id: string | null;
 };
 
+const MODES = [
+  { value: "out" as const, label: "Saída", Icon: ArrowUpRight },
+  { value: "in" as const, label: "Entrada", Icon: ArrowDownLeft },
+];
+
+const fieldLabel = "text-[13px] font-semibold text-(--text-body)";
+
+// Mesma cara da caixa de "Novo lançamento": tipo com cor, valor em
+// destaque, contas e categorias em botões. Aqui não tem transferência
+// (transferência se edita pelos dois lados) nem parcelamento.
 export function EditTransactionDialog({
   transaction,
   accounts,
@@ -65,32 +73,53 @@ export function EditTransactionDialog({
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const [direction, setDirection] = useState<"in" | "out">(transaction.direction);
+  const [amount, setAmount] = useState((transaction.amount_cents / 100).toFixed(2).replace(".", ","));
+  const [accountId, setAccountId] = useState(transaction.account_id);
   const [categoryId, setCategoryId] = useState(transaction.category_id ?? "");
   const [categories, setCategories] = useState(initialCategories);
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [notesOpen, setNotesOpen] = useState(Boolean(transaction.notes));
+  const [pending, setPending] = useState(transaction.status === "pending");
   const [makeRecurring, setMakeRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
-  const categoriesForDirection = categories.filter(
-    (c) => fitsDirection(c, direction === "in" ? "in" : "out"),
+  const tone = TONE[direction];
+  const colors = useMemo(
+    () => buildCategoryColorMap(categories.map((c) => ({ name: c.name, kind: c.kind, color: c.color ?? null }))),
+    [categories],
   );
+  const categoriesForDirection = categories.filter((c) => fitsDirection(c, direction));
+  // A conta atual sempre aparece, mesmo se não estiver na lista.
+  const accountChoices = accounts.some((a) => a.id === transaction.account_id)
+    ? accounts
+    : [...accounts, { id: transaction.account_id, name: "Conta atual" }];
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (amountToCents(amount) <= 0) {
+      setError("Coloque o valor.");
+      return;
+    }
     const formData = new FormData(event.currentTarget);
+    formData.set("amount", normalizeAmount(amount));
     formData.set("direction", direction);
+    formData.set("account_id", accountId);
+    formData.set("category_id", categoryId);
+    if (pending) formData.set("is_pending", "on");
+    else formData.delete("is_pending");
+    if (makeRecurring) formData.set("make_recurring", "on");
     startTransition(async () => {
       try {
         await updateTransaction(transaction.id, formData);
         setOpen(false);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao salvar transação.");
+        setError(err instanceof Error ? err.message : "Erro ao salvar.");
       }
     });
   }
@@ -98,13 +127,14 @@ export function EditTransactionDialog({
   function onCreateCategory() {
     const name = newCategoryName.trim();
     if (!name) return;
+    const kind = direction === "in" ? "income" : "expense";
     startTransition(async () => {
       try {
         const formData = new FormData();
         formData.set("name", name);
-        formData.set("kind", direction === "in" ? "income" : "expense");
+        formData.set("kind", kind);
         const id = await createCategory(formData);
-        setCategories((prev) => [...prev, { id, name, kind: direction === "in" ? "income" : "expense" }]);
+        setCategories((prev) => [...prev, { id, name, kind }]);
         setCategoryId(id);
         setNewCategoryName("");
         setNewCategoryOpen(false);
@@ -129,159 +159,202 @@ export function EditTransactionDialog({
           </Button>
         </DialogTrigger>
       ) : null}
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Editar transação</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <Tabs
-            value={direction}
-            onValueChange={(v) => {
-              setDirection(v as "in" | "out");
-              setCategoryId("");
-            }}
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-(--bg-surface) p-5 sm:max-w-[540px] sm:p-7"
+      >
+        <div className="flex items-center justify-between">
+          <DialogTitle className="text-[21px] font-extrabold tracking-[-0.02em] text-(--text-primary)">
+            Editar lançamento
+          </DialogTitle>
+          <button
+            type="button"
+            aria-label="Fechar"
+            onClick={() => setOpen(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-(--bg-hover) text-(--text-secondary) hover:bg-(--bg-strong)"
           >
-            <TabsList className="w-full">
-              <TabsTrigger value="out" className="flex-1">
-                Saída
-              </TabsTrigger>
-              <TabsTrigger value="in" className="flex-1">
-                Entrada
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <X className="h-[18px] w-[18px]" />
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="date">Data</Label>
-              <DateInput id="date" name="date" defaultValue={transaction.date} required />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">Valor (USD)</Label>
-              <Input
-                id="amount"
-                name="amount"
+        <form onSubmit={onSubmit} className="flex flex-col gap-5">
+          <div role="tablist" aria-label="Tipo" className="flex gap-1.5 rounded-[16px] bg-(--bg-hover) p-[5px]">
+            {MODES.map(({ value, label, Icon }) => {
+              const on = value === direction;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => {
+                    setDirection(value);
+                    // Categoria de despesa não serve pra entrada (e vice-versa).
+                    const current = categories.find((c) => c.id === categoryId);
+                    if (current && !fitsDirection(current, value)) setCategoryId("");
+                  }}
+                  className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[12px] text-[15px] font-semibold transition-colors ${
+                    on ? "bg-(--bg-surface) shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
+                  }`}
+                  style={on ? { color: TONE[value].fg } : undefined}
+                >
+                  <Icon className="h-4 w-4" strokeWidth={2.4} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-col gap-1 rounded-[18px] px-5 py-4" style={{ backgroundColor: tone.bg }}>
+            <label htmlFor="edit-amount" className="text-[13px] font-semibold" style={{ color: tone.fg }}>
+              Valor
+            </label>
+            <div className="flex items-baseline gap-1.5">
+              <span className="shrink-0 text-[28px] font-bold whitespace-nowrap" style={{ color: tone.strong }}>
+                {tone.sign}$
+              </span>
+              <input
+                id="edit-amount"
                 type="text"
                 inputMode="decimal"
-                defaultValue={(transaction.amount_cents / 100).toFixed(2)}
-                required
+                autoComplete="off"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full min-w-0 border-0 bg-transparent p-0 text-[38px] font-extrabold tracking-[-0.03em] tabular-nums outline-none"
+                style={{ color: tone.fg }}
               />
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-date" className={fieldLabel}>
+                Data
+              </Label>
+              <DateInput
+                id="edit-date"
+                name="date"
+                defaultValue={transaction.date}
+                required
+                className="[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px]"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-description" className={fieldLabel}>
+                Descrição
+              </Label>
+              <Input
+                id="edit-description"
+                name="description"
+                required
+                defaultValue={transaction.description}
+                className="h-12 rounded-[12px] text-[15px]"
+              />
+            </div>
+          </div>
+          {transaction.bank_description && transaction.bank_description !== transaction.description ? (
+            <p className="-mt-3 rounded-[12px] bg-(--bg-subtle) px-3.5 py-2.5 text-xs leading-relaxed text-(--text-muted)">
+              Como veio do banco: <span className="text-(--text-secondary)">{transaction.bank_description}</span>
+              <br />
+              Se você renomear, as próximas importações já trazem esse nome.
+            </p>
+          ) : null}
+
           <div className="flex flex-col gap-2">
-            <Label htmlFor="account_id">Conta</Label>
-            <Select name="account_id" defaultValue={transaction.account_id} required>
-              <SelectTrigger id="account_id">
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <span className={fieldLabel}>Conta</span>
+            <AccountPicker label="Conta" accounts={accountChoices} value={accountId} onChange={setAccountId} />
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="category_id">Categoria</Label>
-            <Select name="category_id" value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger id="category_id">
-                <SelectValue placeholder="Sem categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoriesForDirection.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {newCategoryOpen ? (
-              <div className="flex gap-2">
-                <Input
-                  autoFocus
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Nome da nova categoria"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      onCreateCategory();
-                    }
-                  }}
-                />
-                <Button type="button" size="sm" onClick={onCreateCategory} disabled={isPending}>
-                  Criar
-                </Button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="w-fit text-left text-sm text-(--text-muted) underline-offset-2 hover:underline"
-                onClick={() => setNewCategoryOpen(true)}
-              >
-                + nova categoria
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Input
-              id="description"
-              name="description"
-              required
-              defaultValue={transaction.description}
-            />
-            {transaction.bank_description && transaction.bank_description !== transaction.description ? (
-              <p className="text-xs break-words text-(--text-muted)">
-                Como veio do banco: {transaction.bank_description}
-                <br />
-                Se você renomear, as próximas importações já trazem esse nome.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="notes">Notas (opcional)</Label>
-            <Input id="notes" name="notes" defaultValue={transaction.notes ?? ""} />
+            <span className={fieldLabel}>Categoria</span>
+            <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
+              {categoriesForDirection.map((c) => {
+                const on = c.id === categoryId;
+                const color = themedPair(colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" });
+                const Icon = getCategoryIcon(c.name, direction, c.icon ?? null);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setCategoryId(on ? "" : c.id)}
+                    className={`inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] pr-3.5 pl-2 text-sm transition-colors ${
+                      on ? "font-semibold" : "border-(--border-primary) bg-(--bg-surface) font-medium text-(--text-body) hover:border-(--primary-border)"
+                    }`}
+                    style={on ? { borderColor: color.fg, backgroundColor: color.bg, color: color.fg } : undefined}
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: color.bg, color: color.fg }}>
+                      <Icon className="h-3.5 w-3.5" strokeWidth={2.4} />
+                    </span>
+                    {c.name}
+                  </button>
+                );
+              })}
+              {newCategoryOpen ? (
+                <div className="flex w-full gap-2">
+                  <Input
+                    autoFocus
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Nome da nova categoria"
+                    className="h-10 rounded-[12px]"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCreateCategory();
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={onCreateCategory} disabled={isPending} className="h-10 rounded-[12px]">
+                    Criar
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNewCategoryOpen(true)}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-(--primary-border) px-3.5 text-sm font-semibold text-(--primary) hover:bg-(--primary-soft)"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova categoria
+                </button>
+              )}
+            </div>
           </div>
 
           {transaction.status === "cleared" ? <GoalLinkField transactionId={transaction.id} /> : null}
 
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox name="is_pending" defaultChecked={transaction.status === "pending"} />
-            Ainda não caiu (pendente)
-          </label>
+          {notesOpen ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-notes" className={fieldLabel}>
+                Nota
+              </Label>
+              <Input id="edit-notes" name="notes" defaultValue={transaction.notes ?? ""} className="h-12 rounded-[12px] text-[15px]" />
+            </div>
+          ) : (
+            <button type="button" onClick={() => setNotesOpen(true)} className="w-fit text-sm font-semibold text-(--primary) hover:underline">
+              + Adicionar nota
+            </button>
+          )}
 
-          <div className="flex flex-col gap-3 rounded-md border border-(--border-soft) p-3">
+          <div className="flex flex-col">
+            <ToggleRow checked={pending} onChange={setPending} title="Ainda não caiu" hint="Fica como pendente até você confirmar" />
             {transaction.recurrence_id ? (
-              <p className="text-sm text-(--text-muted)">
+              <p className="border-t border-(--border-soft) py-3.5 text-sm text-(--text-muted)">
                 Esse lançamento já faz parte de uma recorrência.
               </p>
             ) : (
               <>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    name="make_recurring"
-                    checked={makeRecurring}
-                    onCheckedChange={(checked) => setMakeRecurring(checked === true)}
-                  />
-                  Repetir esse lançamento
-                </label>
+                <ToggleRow checked={makeRecurring} onChange={setMakeRecurring} title="Repetir esse lançamento" hint="Toda semana, mês ou ano" />
                 {makeRecurring ? (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3.5 pb-1">
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="recurrence_frequency">Frequência</Label>
-                      <Select
-                        name="recurrence_frequency"
-                        value={recurrenceFrequency}
-                        onValueChange={setRecurrenceFrequency}
-                      >
-                        <SelectTrigger id="recurrence_frequency">
+                      <Label htmlFor="edit-recurrence-frequency" className={fieldLabel}>
+                        Frequência
+                      </Label>
+                      <Select name="recurrence_frequency" value={recurrenceFrequency} onValueChange={setRecurrenceFrequency}>
+                        <SelectTrigger id="edit-recurrence-frequency" className="h-12! w-full rounded-[12px] text-[15px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -292,8 +365,14 @@ export function EditTransactionDialog({
                       </Select>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="recurrence_ends_on">Repetir até (opcional)</Label>
-                      <DateInput id="recurrence_ends_on" name="recurrence_ends_on" />
+                      <Label htmlFor="edit-recurrence-ends" className={fieldLabel}>
+                        Repetir até (opcional)
+                      </Label>
+                      <DateInput
+                        id="edit-recurrence-ends"
+                        name="recurrence_ends_on"
+                        className="[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px]"
+                      />
                     </div>
                   </div>
                 ) : null}
@@ -301,7 +380,7 @@ export function EditTransactionDialog({
             )}
           </div>
 
-          {error ? <p className="text-sm text-(--out)">{error}</p> : null}
+          {error ? <p className="text-sm font-medium text-(--expense-dark)">{error}</p> : null}
 
           {/* Excluir mora aqui também: no celular a lista não mostra a
               lixeira, e editar é o único caminho até o lançamento. */}
@@ -312,8 +391,12 @@ export function EditTransactionDialog({
               variant="text"
               onDeleted={() => setOpen(false)}
             />
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Salvando..." : "Salvar alterações"}
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="h-[54px] rounded-[14px] px-7 text-base font-bold shadow-[0_8px_20px_rgba(83,109,254,.3)]"
+            >
+              {isPending ? "Salvando…" : "Salvar alterações"}
             </Button>
           </div>
         </form>

@@ -108,13 +108,13 @@ export default async function TransacoesPage({
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, owner_id")
+      .select("id, name, owner_id, type, institution")
       .eq("household_id", householdId)
       .in("id", visibleIds)
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind, is_transfer")
+      .select("id, name, kind, is_transfer, color, icon")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -265,7 +265,12 @@ export default async function TransacoesPage({
       }))}
       editableAccounts={(accounts ?? [])
         .filter((a) => writableIds.has(a.id as string))
-        .map((a) => ({ id: a.id as string, name: a.name as string }))}
+        .map((a) => ({
+          id: a.id as string,
+          name: a.name as string,
+          type: a.type as string,
+          institution: (a.institution as string | null) ?? null,
+        }))}
       scopeNote={scopeLabel(scope)}
       categories={categories ?? []}
       members={(members ?? []).map((m) => ({ id: m.id, name: m.display_name }))}

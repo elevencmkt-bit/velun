@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Target } from "lucide-react";
+import { Check, Target } from "lucide-react";
 import {
   goalLinksForTransaction,
   linkTransactionToGoal,
@@ -47,7 +47,7 @@ export function GoalLinkField({ transactionId }: { transactionId: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="flex items-center gap-1.5 text-sm font-medium text-(--text-body)">
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold text-(--text-body)">
         <Target className="h-4 w-4 text-(--primary)" /> Conta pra uma meta?
       </span>
       <div className="flex flex-wrap gap-2">
@@ -60,15 +60,15 @@ export function GoalLinkField({ transactionId }: { transactionId: string }) {
               aria-pressed={on}
               disabled={isPending}
               onClick={() => toggle(g.id)}
-              className={`inline-flex h-9 items-center rounded-full border-[1.5px] px-3.5 text-[13px] transition-colors disabled:opacity-60 ${
+              className={`inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-sm transition-colors disabled:opacity-60 ${
                 on
                   ? "border-(--primary) bg-(--primary-soft) font-semibold text-(--primary-hover)"
                   : "border-(--border-primary) font-medium text-(--text-body) hover:border-(--primary-border)"
               }`}
             >
-              {on ? "✓ " : ""}
+              {on ? <Check className="h-4 w-4" strokeWidth={2.6} /> : null}
               {g.name}
-              <span className="ml-1.5 text-xs font-normal text-(--text-muted)">{g.kind === "debt" ? "pagamento" : "guardado"}</span>
+              <span className="text-xs font-normal text-(--text-muted)">{g.kind === "debt" ? "· pagamento" : "· guardar"}</span>
             </button>
           );
         })}
