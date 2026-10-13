@@ -16,6 +16,7 @@ import {
 } from "@/lib/reports";
 import { MonthSelector } from "@/components/month-selector";
 import { ReportViewToggle, type ReportView } from "./report-view-toggle";
+import { ReportPdfButton } from "./report-pdf-button";
 import { CategoryBreakdown } from "./category-breakdown";
 import { PeriodEvolutionChart } from "./period-evolution-chart";
 import { InsightVelunCard } from "./bottom-cards";
@@ -54,7 +55,7 @@ export default async function RelatoriosPage({
   // partir de `categories_only`. Uma promise só, reusada pelas duas buscas.
   const categoriesScope = accountScope(supabase, householdId, memberId, "categories");
 
-  const [rows, prevRows, colorMap] = await Promise.all([
+  const [rows, prevRows, colorMap, { data: pdfAccounts }] = await Promise.all([
     categoriesScope.then((scope) =>
       fetchMonthTransactions(supabase, householdId, start, end, scope, status),
     ),
@@ -62,6 +63,16 @@ export default async function RelatoriosPage({
       fetchMonthTransactions(supabase, householdId, prevRange.start, prevRange.end, scope, status),
     ),
     getCategoryColorMap(supabase, householdId),
+    // Contas que podem entrar no PDF: as mesmas que entram nos totais.
+    categoriesScope.then((scope) =>
+      supabase
+        .from("accounts")
+        .select("id, name")
+        .eq("household_id", householdId)
+        .in("id", scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"])
+        .order("sort_order")
+        .order("name"),
+    ),
   ]);
 
   const current = excludeTransfers(rows);
@@ -134,6 +145,11 @@ export default async function RelatoriosPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <ReportPdfButton
+            month={monthQS}
+            today={today}
+            accounts={(pdfAccounts ?? []).map((a) => ({ id: a.id as string, name: a.name as string }))}
+          />
           <ReportViewToggle view={view} />
           <MonthSelector
             label={monthLabel(year, monthIndex)}
