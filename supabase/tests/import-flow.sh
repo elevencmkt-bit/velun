@@ -102,14 +102,14 @@ insert into staged_transactions (import_id, date, description, amount_cents, dir
   ('10000000-0000-0000-0000-000000000004', '2026-09-10', 'Mercado', 15000, 'out', 'fp-m');
 insert into net_worth_snapshots (household_id, account_id, date, balance_cents) values
   ('11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', '2026-09-30', 1234500);
-insert into goals (household_id, name, target_cents, linked_account_id) values
-  ('11111111-0000-0000-0000-000000000001', 'Fundo secreto', 500000, 'acc00000-0000-0000-0000-000000000001'),
-  ('11111111-0000-0000-0000-000000000001', 'Viagem da família', 300000, null);
+insert into goals (household_id, owner_id, visibility, kind, name, target_cents, tracking, account_id) values
+  ('11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', 'shared', 'save', 'Fundo secreto', 500000, 'account', 'acc00000-0000-0000-0000-000000000001'),
+  ('11111111-0000-0000-0000-000000000001', null, 'hidden', 'save', 'Viagem da família', 300000, 'deposits', null);
 SQL
 check "esposa: só a importação da conjunta" "$(as_user $ESPOSA "select string_agg(file_path, ',' order by file_path) from imports;")" "conjunta.pdf"
 check "esposa: só a linha da conjunta" "$(as_user $ESPOSA "select string_agg(description, ',' order by description) from staged_transactions;")" "Mercado"
 check "esposa: não vê saldo da conta oculta" "$(as_user $ESPOSA "select count(*) from net_worth_snapshots;")" "0"
-check "esposa: só a meta da casa" "$(as_user $ESPOSA "select string_agg(name, ',' order by name) from goals;")" "Viagem da família"
+check "esposa: só a meta da casa (a dele segue conta oculta)" "$(as_user $ESPOSA "select string_agg(name, ',' order by name) from goals;")" "Viagem da família"
 as_user $ESPOSA "delete from imports where id = '10000000-0000-0000-0000-000000000003';" >/dev/null
 check "esposa não descarta a importação dele" "$(admin "select count(*) from imports where id='10000000-0000-0000-0000-000000000003'")" "1"
 check "Levi: vê as duas importações" "$(as_user $LEVI "select string_agg(file_path, ',' order by file_path) from imports;")" "conjunta.pdf,extrato-pessoal.pdf"
@@ -379,6 +379,33 @@ echo "categoria entre contas:"
 check "categoria nova não é de transferência por padrão" "$(admin "select is_transfer::text from categories where id='ca700000-0000-0000-0000-00000000000a'")" "false"
 as_user $LEVI "insert into categories (household_id, name, kind, color, is_transfer) values ('11111111-0000-0000-0000-000000000001', 'Transferência', 'expense', '#000', true);" >/dev/null
 check "dá pra criar a de transferência" "$(admin "select count(*) from categories where name='Transferência' and is_transfer")" "1"
+
+echo "metas:"
+as_user $LEVI "insert into goals (id, household_id, owner_id, kind, name, target_cents, target_date) values ('90000000-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000001', null, 'save', 'Viagem', 500000, '2027-07-31');" >/dev/null
+as_user $LEVI "insert into goals (id, household_id, owner_id, kind, name, target_cents) values ('90000000-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000001', '$LEVI', 'save', 'Reserva', 600000);" >/dev/null
+check "esposa vê a meta do casal, não a pessoal oculta dele" "$(as_user $ESPOSA "select string_agg(name, ',' order by name) from goals where name like 'Viagem%' or name = 'Reserva';")" "Viagem,Viagem da família"
+as_user $LEVI "update goals set visibility = 'shared' where id = '90000000-0000-0000-0000-000000000002';" >/dev/null
+check "liberada, ela vê" "$(as_user $ESPOSA "select count(*) from goals where name = 'Reserva';")" "1"
+as_user $ESPOSA "update goals set name = 'Mexi' where id = '90000000-0000-0000-0000-000000000002';" >/dev/null
+check "ela não mexe na meta pessoal dele" "$(admin "select name from goals where id='90000000-0000-0000-0000-000000000002'")" "Reserva"
+as_user $ESPOSA "insert into goal_deposits (household_id, goal_id, amount_cents) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000002', 1000);" >/dev/null
+check "nem guarda valor nela" "$(admin "select count(*) from goal_deposits where goal_id='90000000-0000-0000-0000-000000000002'")" "0"
+as_user $ESPOSA "insert into goal_deposits (household_id, goal_id, amount_cents) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', 2000);" >/dev/null
+check "na do casal, guarda" "$(admin "select sum(amount_cents) from goal_deposits where goal_id='90000000-0000-0000-0000-000000000001'")" "2000"
+as_user $ESPOSA "insert into goals (household_id, owner_id, kind, name, target_cents) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'save', 'No nome dele', 100);" >/dev/null
+check "ninguém cria meta no nome do outro" "$(admin "select count(*) from goals where name='No nome dele'")" "0"
+as_user $LEVI "insert into goals (household_id, kind, name, target_cents) values ('11111111-0000-0000-0000-000000000001', 'limit', 'Sem categoria', 100);" >/dev/null 2>&1
+check "limite precisa de categoria" "$(admin "select count(*) from goals where kind='limit'")" "0"
+as_user $LEVI "insert into goals (household_id, kind, name, target_cents, category_id) values ('11111111-0000-0000-0000-000000000001', 'limit', 'Outra casa', 100, 'ca700000-0000-0000-0000-0000000000f1');" >/dev/null 2>&1
+check "categoria de outra casa não entra" "$(admin "select count(*) from goals where name='Outra casa'")" "0"
+as_user $LEVI "update goals set visibility = 'hidden' where id = '90000000-0000-0000-0000-000000000002';" >/dev/null
+as_user $LEVI "insert into goal_deposits (household_id, goal_id, amount_cents) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000002', 5000);" >/dev/null
+check "oculta de novo, ela não vê os depósitos dele" "$(as_user $ESPOSA "select count(*) from goal_deposits;")" "1"
+
+as_user $LEVI "insert into goals (household_id, owner_id, kind, name, target_cents, tracking, account_id) values ('11111111-0000-0000-0000-000000000001', null, 'save', 'Casal na conta dele', 100, 'account', 'acc00000-0000-0000-0000-000000000001');" >/dev/null 2>&1
+check "meta do casal não segue conta pessoal" "$(admin "select count(*) from goals where name='Casal na conta dele'")" "0"
+as_user $LEVI "insert into goals (household_id, owner_id, kind, name, target_cents, tracking, account_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'save', 'Minha na minha', 100, 'account', 'acc00000-0000-0000-0000-000000000001');" >/dev/null 2>&1
+check "a minha segue a minha conta" "$(admin "select count(*) from goals where name='Minha na minha'")" "1"
 
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
