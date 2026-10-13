@@ -30,6 +30,7 @@ import { ACCOUNT_TYPE_LABELS } from "@/lib/account-types";
 import { AccountAvatar } from "@/components/account-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthSelector } from "@/components/month-selector";
+import { WhereList } from "./where-list";
 import { Money } from "@/components/money";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
@@ -750,37 +751,13 @@ export default async function MesPage({
                   Nenhuma despesa confirmada neste mês.
                 </p>
               ) : null}
-              {where.map((slice, i) => (
-                <div key={slice.name}>
-                  <div className="flex justify-between gap-2 text-[13px]">
-                    <span className="truncate">{slice.name}</span>
-                    <span className="font-semibold tabular-nums">
-                      <Money cents={slice.amount_cents} currency={currency} />
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1.5 rounded-full bg-(--bg-subtle)">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.max(4, (slice.amount_cents / whereMax) * 100)}%`,
-                        background: WHERE_COLORS[i % WHERE_COLORS.length],
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-              {uncategorized > 0 ? (
-                <div className="rounded-xl bg-(--bg-subtle) px-3 py-2.5 text-xs leading-relaxed text-(--text-muted)">
-                  <Money cents={uncategorized} currency={currency} /> sem
-                  categoria.{" "}
-                  <Link
-                    href={`/transacoes?month=${selected}&category=none`}
-                    className="font-semibold text-(--primary) hover:text-(--primary-hover)"
-                  >
-                    Categorizar
-                  </Link>
-                </div>
-              ) : null}
+              <WhereList
+                where={where}
+                colors={WHERE_COLORS}
+                uncategorized={uncategorized}
+                month={selected}
+                currency={currency}
+              />
             </div>
           </CardContent>
         </Card>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import type { CurrencyCode } from "@/lib/money";
 import { Money } from "@/components/money";
+import { CategoryDrawer, type CategoryDrawerQuery } from "@/components/category-drawer";
 
 export type BreakdownRow = {
   name: string;
@@ -45,6 +46,8 @@ export function CategoryBreakdown({
   currency,
   emptyExpense,
   emptyIncome,
+  month,
+  status,
 }: {
   expense: BreakdownRow[];
   income: BreakdownRow[];
@@ -53,12 +56,18 @@ export function CategoryBreakdown({
   currency: CurrencyCode;
   emptyExpense: string;
   emptyIncome: string;
+  /** "2026-09": o painel da categoria busca os lançamentos desse mês. */
+  month: string;
+  status: "cleared" | "pending";
 }) {
+  const [drawer, setDrawer] = useState<CategoryDrawerQuery | null>(null);
   const [tab, setTab] = useState<"expense" | "income">("expense");
   const [showAll, setShowAll] = useState(false);
   const rows = tab === "expense" ? expense : income;
   const total = rows.reduce((n, r) => n + r.amount_cents, 0);
   const max = rows[0]?.amount_cents ?? 1;
+  const openCategory = (r: BreakdownRow) =>
+    setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color });
 
   const tabClass = (on: boolean) =>
     `flex h-9 flex-1 items-center justify-center rounded-[10px] px-4 text-[13px] font-semibold transition-colors sm:flex-none ${
@@ -95,6 +104,11 @@ export function CategoryBreakdown({
                   paddingAngle={rows.length > 1 ? 1.5 : 0}
                   stroke="none"
                   isAnimationActive={false}
+                  className="cursor-pointer"
+                  onClick={(_, index) => {
+                    const r = rows[index];
+                    if (r) openCategory(r);
+                  }}
                 >
                   {rows.map((r) => (
                     <Cell key={r.name} fill={r.color} />
@@ -118,9 +132,12 @@ export function CategoryBreakdown({
               <span className="text-right">vs {prevLabel}</span>
             </div>
             {rows.map((r, i) => (
-              <div
+              <button
+                type="button"
                 key={r.name}
-                className={`grid min-h-[44px] grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 border-b border-(--border-soft) last:border-0 md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_96px_110px] md:border-0 ${
+                onClick={() => openCategory(r)}
+                aria-label={`Ver lançamentos de ${r.name}`}
+                className={`-mx-2 grid min-h-[44px] w-[calc(100%+16px)] grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 rounded-[10px] border-b border-(--border-soft) px-2 text-left transition-colors last:border-0 hover:bg-[#F5F6FF] md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_96px_110px] md:border-0 ${
                   !showAll && i >= MOBILE_LIMIT ? "max-md:hidden" : ""
                 }`}
               >
@@ -140,7 +157,7 @@ export function CategoryBreakdown({
                 <span className="text-right text-xs font-semibold whitespace-nowrap tabular-nums">
                   <Delta row={r} kind={tab} currency={currency} />
                 </span>
-              </div>
+              </button>
             ))}
             {rows.length > MOBILE_LIMIT && !showAll ? (
               <button
@@ -154,6 +171,7 @@ export function CategoryBreakdown({
           </div>
         </div>
       )}
+      <CategoryDrawer query={drawer} onClose={() => setDrawer(null)} currency={currency} />
     </section>
   );
 }
