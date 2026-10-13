@@ -37,6 +37,12 @@ Cancelado\t
 Saque
 Concluído\t
 26/02/2026 - 09:30 \t- US$ 40,00
+Compra PADARIA EXEMPLO
+Processando\t
+27/02/2026 - 22:40 \t- US$ 37,19
+Compra LOJA ESTRANHA
+Estornado\t
+25/02/2026 - 10:00 \t- US$ 15,00
 ${footer}
 ${header}
 Adicionou dinheiro
@@ -57,12 +63,15 @@ assert.equal(s.periodStart, "2026-02-01");
 assert.equal(s.periodEnd, "2026-03-01");
 assert.deepEqual(s.reportedBalance, { cents: 123456, date: "2026-03-20" });
 assert.equal(s.cancelledCount, 1);
+assert.equal(s.processingCount, 1, "processando entra");
+assert.deepEqual(s.unknownStatuses, { Estornado: 1 }, "situação desconhecida é contada, não sumida");
 assert.deepEqual(
   s.transactions.map((t) => [t.date, t.direction, t.amountCents, t.description]),
   [
     ["2026-02-02", "in", 200000, "Adicionou dinheiro"],
     ["2026-02-02", "out", 475, "Compra CAFE*EXEMPLO"],
     ["2026-02-26", "out", 4000, "Saque"],
+    ["2026-02-27", "out", 3719, "Compra PADARIA EXEMPLO"],
     ["2026-02-28", "out", 105040, "Compra MERCADO EXEMPLO"],
   ],
 );

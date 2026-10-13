@@ -11,7 +11,12 @@
 // As armadilhas:
 //
 // 1. Tem lançamento "Cancelado" no meio — compra recusada ou estornada
-//    antes de sair. Não mexeu no saldo, então fica de fora.
+//    antes de sair. Não mexeu no saldo, então fica de fora. Já
+//    "Processando" (compra autorizada que ainda não fechou) a Nomad JÁ
+//    desconta do saldo, então entra. Quando fechar, o próximo extrato
+//    traz a mesma linha como "Concluído" e ela cai como duplicata.
+//    Situação que não conhecemos não é jogada fora em silêncio: fica de
+//    fora, mas contada, e a revisão avisa.
 // 2. Valor no formato brasileiro ("US$ 1.218,20"), sinal na frente:
 //    "+" entrou, "-" saiu.
 // 3. O demonstrativo não traz saldo inicial nem final do período — só o
@@ -35,6 +40,10 @@ export type ParsedNomadStatement = ParsedStatement & {
   reportedBalance: { cents: number; date: string } | null;
   /** Quantos lançamentos cancelados foram deixados de fora. */
   cancelledCount: number;
+  /** Quantos ainda estão processando (entram, a Nomad já desconta). */
+  processingCount: number;
+  /** Situações desconhecidas que ficaram de fora, com quantos de cada. */
+  unknownStatuses: Record<string, number>;
 };
 
 function iso(year: number, month: number, day: number) {
@@ -61,7 +70,9 @@ export function looksLikeNomad(text: string) {
   );
 }
 
-const STATUS = /^(Conclu[íi]do|Cancelado|Pendente|Em processamento)$/i;
+const DONE = /^(Conclu[íi]do)$/i;
+const PROCESSING = /^(Processando|Pendente|Em processamento)$/i;
+const CANCELLED = /^(Cancelado)$/i;
 const DATE_AMOUNT = /^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*\d{2}:\d{2}\s+([+\-−])\s*US\$\s*([\d.]+,\d{2})$/;
 const NOISE = [
   /^Cliente:/i,
@@ -105,47 +116,52 @@ export function parseNomadStatementText(text: string): ParsedNomadStatement {
 
   const transactions: ParsedTransaction[] = [];
   let cancelledCount = 0;
-  let description: string | null = null;
-  let status: string | null = null;
+  let processingCount = 0;
+  const unknownStatuses: Record<string, number> = {};
+  // As linhas desde o último lançamento: a penúltima é o que foi, a
+  // última é a situação.
+  let pending: string[] = [];
 
   for (const line of lines) {
     if (NOISE.some((re) => re.test(line))) continue;
     if (/^\d{1,2} de [a-zçã]+ de \d{4} at[ée]/i.test(line)) continue;
 
-    if (STATUS.test(line)) {
-      status = line;
-      continue;
-    }
-
     const m = line.match(DATE_AMOUNT);
-    if (m) {
-      if (description && status) {
-        if (/^cancelado$/i.test(status)) {
-          cancelledCount += 1;
-        } else {
-          transactions.push({
-            date: iso(Number(m[3]), Number(m[2]), Number(m[1])),
-            // Texto como veio ("Compra PUBLIX #2022"): a impressão
-            // digital sai dele, e o nome limpo ("Publix") sai na
-            // limpeza, junto com os outros bancos.
-            description,
-            amountCents: brlStyleToCents(m[5]),
-            direction: m[4] === "+" ? "in" : "out",
-            mcc: null,
-          });
-        }
-      }
-      description = null;
-      status = null;
+    if (!m) {
+      pending.push(line);
       continue;
     }
 
-    // Qualquer outra linha é o começo de um lançamento.
-    description = line;
-    status = null;
+    const status = pending.at(-1) ?? null;
+    const description = pending.length >= 2 ? pending.at(-2)! : null;
+    pending = [];
+    if (!status || !description) continue;
+
+    if (CANCELLED.test(status)) {
+      cancelledCount += 1;
+      continue;
+    }
+    const isProcessing = PROCESSING.test(status);
+    if (!isProcessing && !DONE.test(status)) {
+      unknownStatuses[status] = (unknownStatuses[status] ?? 0) + 1;
+      continue;
+    }
+    if (isProcessing) processingCount += 1;
+
+    transactions.push({
+      date: iso(Number(m[3]), Number(m[2]), Number(m[1])),
+      // Texto como veio ("Compra PUBLIX #2022"): a impressão digital
+      // sai dele, e o nome limpo ("Publix") sai na limpeza, junto com
+      // os outros bancos.
+      description,
+      amountCents: brlStyleToCents(m[5]),
+      direction: m[4] === "+" ? "in" : "out",
+      mcc: null,
+    });
   }
 
-  if (transactions.length === 0 && cancelledCount === 0) {
+  const unknownCount = Object.values(unknownStatuses).reduce((a, b) => a + b, 0);
+  if (transactions.length === 0 && cancelledCount === 0 && unknownCount === 0) {
     throw new StatementParseError("Não achei lançamentos nesse demonstrativo da Nomad.");
   }
 
@@ -164,5 +180,7 @@ export function parseNomadStatementText(text: string): ParsedNomadStatement {
     dailyBalances: [],
     reportedBalance,
     cancelledCount,
+    processingCount,
+    unknownStatuses,
   };
 }
