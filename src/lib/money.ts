@@ -1,3 +1,4 @@
+import { normalizeAmount } from "@/lib/amount-input";
 // Princípio 6 da spec: dinheiro é inteiro. Todo valor circula em
 // amount_cents (BIGINT), nunca float. Estas são as únicas duas
 // funções que cruzam a fronteira entre centavos e texto exibido.
@@ -38,7 +39,10 @@ export function formatCents(cents: number, currency: CurrencyCode = "USD"): stri
 }
 
 export function parseToCents(input: string): number {
-  const normalized = input.replace(/[^0-9.-]/g, "");
+  // Aceita "85,15" e "85.15" (e "1.800,00" / "1,800.00"): antes a vírgula
+  // era apagada e "85,15" virava 8515.
+  const negative = /^\s*[-−]/.test(input);
+  const normalized = (negative ? "-" : "") + normalizeAmount(input);
   const value = Number.parseFloat(normalized);
   if (Number.isNaN(value)) {
     throw new Error(`Valor inválido: "${input}"`);
