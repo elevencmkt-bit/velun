@@ -42,7 +42,7 @@ export type ParsedStatement = {
   dailyBalances: { date: string; balanceCents: number }[];
 };
 
-type Section = "deposits" | "withdrawals" | "fees" | "daily" | "other";
+type Section = "deposits" | "withdrawals" | "fees" | "returned" | "daily" | "other";
 
 const MONTHS: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
@@ -95,6 +95,10 @@ function sectionFor(line: string): Section | null {
   if (t.startsWith("DEPOSITS & CREDITS")) return "deposits";
   if (t.startsWith("WITHDRAWALS")) return "withdrawals";
   if (t.startsWith("FEES")) return "fees";
+  // "Returned Checks": pagamento por débito/cheque que o banco devolveu
+  // (ex.: conta de luz recusada). O dinheiro VOLTA pra conta — no resumo
+  // vem com "+". Antes caía dentro de "fees" e entrava como saída.
+  if (t.startsWith("RETURNED CHECKS")) return "returned";
   if (t.startsWith("DAILY BALANCE SUMMARY")) return "daily";
   if (t.startsWith("SUMMARY") || t.startsWith("CHECKS")) return "other";
   return null;
@@ -172,7 +176,7 @@ export function parseRegionsStatementText(text: string): ParsedStatement {
       continue;
     }
 
-    if (section !== "deposits" && section !== "withdrawals" && section !== "fees") {
+    if (section !== "deposits" && section !== "withdrawals" && section !== "fees" && section !== "returned") {
       continue;
     }
 
@@ -183,7 +187,7 @@ export function parseRegionsStatementText(text: string): ParsedStatement {
       date,
       description,
       amountCents: Math.abs(amountCents),
-      direction: section === "deposits" ? "in" : "out",
+      direction: section === "deposits" || section === "returned" ? "in" : "out",
       mcc: findMccInDescription(description),
     });
   }
