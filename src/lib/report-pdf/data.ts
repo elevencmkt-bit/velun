@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountScope } from "@/lib/visibility";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { getCategoryColorMap, MUTED_CATEGORY_COLOR } from "@/lib/category-colors";
-import { buildReportInsight, categoryDeltas, type MonthTransaction, type ReportInsight } from "@/lib/reports";
+import { buildReportInsight, categoryDeltas, subcategoryBreakdown, type MonthTransaction, type ReportInsight, type SubcategorySlice } from "@/lib/reports";
+import { CATEGORY_JOIN, resolveJoinedCategory, type JoinedCategory } from "@/lib/subcategories";
 import { addDays, type ReportPeriod } from "./period";
 
 // Tudo que o relatório em PDF mostra, calculado no servidor a partir dos
@@ -26,14 +27,16 @@ type Tx = {
   description: string;
   status: string;
   transfer_group_id: string | null;
-  category: { name: string; is_transfer?: boolean } | { name: string; is_transfer?: boolean }[] | null;
+  category: JoinedCategory | JoinedCategory[] | null;
   account: { name: string } | { name: string }[] | null;
 };
 
 const single = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
 function toMonthRows(rows: Tx[]): MonthTransaction[] {
-  return rows.map((r) => ({
+  return rows.map((r) => {
+    const category = resolveJoinedCategory(r.category);
+    return {
     id: r.id,
     account_id: r.account_id,
     date: r.date,
@@ -41,10 +44,12 @@ function toMonthRows(rows: Tx[]): MonthTransaction[] {
     direction: r.direction,
     description: r.description,
     transfer_group_id: r.transfer_group_id,
-    category_name: single(r.category)?.name ?? null,
-    category_is_transfer: single(r.category)?.is_transfer ?? false,
+    category_name: category.name,
+    subcategory_name: category.sub,
+    category_is_transfer: category.isTransfer,
     account_name: single(r.account)?.name ?? "—",
-  }));
+  };
+  });
 }
 
 export type ReportCategoryRow = {
@@ -53,6 +58,8 @@ export type ReportCategoryRow = {
   prev_cents: number | null;
   share: number;
   color: string;
+  /** Divisão pelas subcategorias, quando a categoria tem. */
+  subs?: SubcategorySlice[];
 };
 
 export type ReportDetailGroup = {
@@ -60,7 +67,7 @@ export type ReportDetailGroup = {
   direction: "in" | "out";
   total_cents: number;
   color: string;
-  rows: { date: string; description: string; account_name: string; amount_cents: number }[];
+  rows: { date: string; description: string; account_name: string; amount_cents: number; sub: string | null }[];
   /** Parte do total que vem de contas que mostram só a soma. */
   hidden_cents: number;
 };
@@ -126,7 +133,7 @@ export async function buildReportData(params: {
           supabase
             .from("transactions")
             .select(
-              "id, account_id, date, amount_cents, direction, description, status, transfer_group_id, category:categories(name, is_transfer), account:accounts(name)",
+              `id, account_id, date, amount_cents, direction, description, status, transfer_group_id, ${CATEGORY_JOIN}, account:accounts(name)`,
             )
             .eq("household_id", householdId)
             .eq("status", status)
@@ -180,8 +187,15 @@ export async function buildReportData(params: {
     (colorMap.get(name) ?? (d === "in" ? { fg: "#12B76A" } : MUTED_CATEGORY_COLOR)).fg;
   const expenseDeltas = categoryDeltas(current, previous, "out");
   const incomeDeltas = categoryDeltas(current, previous, "in");
+  const subsOut = subcategoryBreakdown(current, "out");
+  const subsIn = subcategoryBreakdown(current, "in");
   const withShare = (rows: typeof expenseDeltas, total: number, d: "in" | "out"): ReportCategoryRow[] =>
-    rows.map((r) => ({ ...r, share: total > 0 ? r.amount_cents / total : 0, color: colorOf(r.name, d) }));
+    rows.map((r) => ({
+      ...r,
+      share: total > 0 ? r.amount_cents / total : 0,
+      color: colorOf(r.name, d),
+      subs: (d === "out" ? subsOut : subsIn).get(r.name),
+    }));
 
   // A frase do Insight foi escrita pra um mês: só entra quando é um mês.
   const insight =
@@ -273,6 +287,7 @@ export async function buildReportData(params: {
             description: r.description,
             account_name: r.account_name,
             amount_cents: r.amount_cents,
+            sub: r.subcategory_name ?? null,
           })),
           hidden_cents: c.amount_cents - listed,
         };

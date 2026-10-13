@@ -30,6 +30,7 @@ import { DeleteTransactionButton } from "@/components/delete-transaction-button"
 import type { AccountOption, CategoryOption, TransactionRow } from "./types";
 import { Money } from "@/components/money";
 import { CategoryOptions } from "./category-options";
+import { categoryLabel } from "@/lib/subcategories";
 import { themedPair } from "@/lib/theme-color";
 
 const NO_CATEGORY = "__none__";
@@ -403,7 +404,7 @@ export function TransactionsTable({
                       {/* A categoria só aparece aqui no celular; no
                           computador ela é a etiqueta à direita. */}
                       <span className="font-semibold md:hidden" style={{ color: catColor }}>
-                        {row.category_name ?? "Sem categoria"}
+                        {categoryLabel(row.category_name, row.subcategory_name ?? null) ?? "Sem categoria"}
                         <span className="font-normal text-(--text-muted)"> · </span>
                       </span>
                       {row.account_name}
@@ -461,7 +462,7 @@ export function TransactionsTable({
                           backgroundColor: `color-mix(in srgb, ${catColor} 11%, transparent)`,
                         }}
                       >
-                        {row.category_name ?? "Sem categoria"}
+                        {categoryLabel(row.category_name, row.subcategory_name ?? null) ?? "Sem categoria"}
                       </span>
                     </span>
                   )}

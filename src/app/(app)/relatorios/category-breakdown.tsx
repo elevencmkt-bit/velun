@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import type { CurrencyCode } from "@/lib/money";
 import { Money } from "@/components/money";
 import { CategoryDrawer, type CategoryDrawerQuery } from "@/components/category-drawer";
+import { ChevronDown } from "lucide-react";
+import type { SubcategorySlice } from "@/lib/reports";
 
 export type BreakdownRow = {
   name: string;
@@ -12,6 +14,8 @@ export type BreakdownRow = {
   /** Valor no mês anterior; null = a categoria não existia. */
   prev_cents: number | null;
   color: string;
+  /** Divisão pelas subcategorias, quando a categoria tem. */
+  subs?: SubcategorySlice[];
 };
 
 const MOBILE_LIMIT = 5;
@@ -127,12 +131,21 @@ export function CategoryBreakdown({
   const [drawer, setDrawer] = useState<CategoryDrawerQuery | null>(null);
   const [tab, setTab] = useState<"expense" | "income">("expense");
   const [showAll, setShowAll] = useState(false);
+  // Categoria com subcategorias: clicar abre a divisão em vez do painel.
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const toggle = (name: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   const rows = tab === "expense" ? expense : income;
   const total = rows.reduce((n, r) => n + r.amount_cents, 0);
   const prevTotal = tab === "expense" ? prevTotalExpense : prevTotalIncome;
   const max = rows[0]?.amount_cents ?? 1;
-  const openCategory = (r: BreakdownRow) =>
-    setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color, accountId, period });
+  const openCategory = (r: BreakdownRow, sub: string | null = null) =>
+    setDrawer({ month, name: r.name, sub, direction: tab === "income" ? "in" : "out", status, color: r.color, accountId, period });
 
   const tabClass = (on: boolean) =>
     `flex h-9 flex-1 items-center justify-center rounded-[10px] px-4 text-[13px] font-semibold transition-colors sm:flex-none ${
@@ -212,11 +225,12 @@ export function CategoryBreakdown({
               <span className="text-right">{prevLabel ? `vs ${prevLabel}` : "Por mês"}</span>
             </div>
             {rows.map((r, i) => (
+              <Fragment key={r.name}>
               <button
                 type="button"
-                key={r.name}
-                onClick={() => openCategory(r)}
-                aria-label={`Ver lançamentos de ${r.name}`}
+                onClick={() => (r.subs ? toggle(r.name) : openCategory(r))}
+                aria-label={r.subs ? `Ver subcategorias de ${r.name}` : `Ver lançamentos de ${r.name}`}
+                aria-expanded={r.subs ? open.has(r.name) : undefined}
                 className={`-mx-2 grid min-h-[44px] w-[calc(100%+16px)] grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 rounded-[10px] border-b border-(--border-soft) px-2 text-left transition-colors last:border-0 hover:bg-(--primary-soft) md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_96px_110px] md:border-0 ${
                   !showAll && i >= MOBILE_LIMIT ? "max-md:hidden" : ""
                 }`}
@@ -224,6 +238,11 @@ export function CategoryBreakdown({
                 <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-(--text-primary)">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: r.color }} />
                   <span className="truncate">{r.name}</span>
+                  {r.subs ? (
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 shrink-0 text-(--text-muted) transition-transform ${open.has(r.name) ? "rotate-180" : ""}`}
+                    />
+                  ) : null}
                 </span>
                 <span className="h-2 overflow-hidden rounded-full bg-(--bg-hover) max-md:hidden">
                   <span
@@ -253,6 +272,44 @@ export function CategoryBreakdown({
                   )}
                 </span>
               </button>
+              {r.subs && open.has(r.name) ? (
+                <div
+                  className={`mb-1 ml-1 border-l-2 pl-2 ${!showAll && i >= MOBILE_LIMIT ? "max-md:hidden" : ""}`}
+                  style={{ borderColor: `color-mix(in srgb, ${r.color} 30%, transparent)` }}
+                >
+                  {r.subs.map((sub) => (
+                    <button
+                      type="button"
+                      key={sub.name}
+                      onClick={() => openCategory(r, sub.name)}
+                      aria-label={`Ver lançamentos de ${r.name} · ${sub.name}`}
+                      className="grid min-h-[38px] w-full grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 rounded-[10px] px-2 text-left text-[13px] text-(--text-secondary) transition-colors hover:bg-(--primary-soft) md:grid-cols-[minmax(0,142px)_minmax(0,1fr)_96px_110px]"
+                    >
+                      <span className="truncate">{sub.name}</span>
+                      <span className="h-1.5 overflow-hidden rounded-full bg-(--bg-hover) max-md:hidden">
+                        <span
+                          className="block h-full rounded-full opacity-60"
+                          style={{ width: `${Math.max(2, Math.round((sub.amount_cents / r.amount_cents) * 100))}%`, background: r.color }}
+                        />
+                      </span>
+                      <span className="text-right font-semibold tabular-nums text-(--text-primary)">
+                        <Money cents={sub.amount_cents} currency={currency} />
+                      </span>
+                      <span className="text-right text-xs tabular-nums text-(--text-muted)">
+                        {formatShare(r.amount_cents > 0 ? sub.amount_cents / r.amount_cents : 0)}
+                      </span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => openCategory(r)}
+                    className="px-2 py-1.5 text-[12px] font-semibold text-(--primary) hover:underline"
+                  >
+                    Ver todos os lançamentos de {r.name}
+                  </button>
+                </div>
+              ) : null}
+              </Fragment>
             ))}
             {rows.length > MOBILE_LIMIT && !showAll ? (
               <button

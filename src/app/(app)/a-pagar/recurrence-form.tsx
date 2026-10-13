@@ -24,9 +24,10 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateInput } from "@/components/date-input";
 import { fitsDirection } from "@/lib/category-kind";
+import { CategorySelectItems } from "@/components/category-select-items";
 
 type Account = { id: string; name: string };
-type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean };
+type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean; parent_id?: string | null };
 type Frequency = "monthly" | "weekly" | "yearly";
 
 function todayISO() {
@@ -144,11 +145,7 @@ export function RecurrenceForm({
                 <SelectValue placeholder="Sem categoria" />
               </SelectTrigger>
               <SelectContent>
-                {categoriesForDirection.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
+                <CategorySelectItems categories={categoriesForDirection} />
               </SelectContent>
             </Select>
           </div>

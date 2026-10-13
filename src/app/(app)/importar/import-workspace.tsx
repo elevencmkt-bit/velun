@@ -46,9 +46,10 @@ import {
 import { Money } from "@/components/money";
 import { AccountAvatar } from "@/components/account-avatar";
 import { fitsDirection } from "@/lib/category-kind";
+import { CategorySelectItems } from "@/components/category-select-items";
 
 type Account = { id: string; name: string; isPersonal: boolean; type: string; institution: string | null };
-type Category = { id: string; name: string; kind: string; is_transfer?: boolean };
+type Category = { id: string; name: string; kind: string; is_transfer?: boolean; parent_id?: string | null };
 type OpenImport = {
   id: string;
   fileName: string;
@@ -161,11 +162,7 @@ function CategoryCell({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
-        {options.map((c) => (
-          <SelectItem key={c.id} value={c.id}>
-            {c.name}
-          </SelectItem>
-        ))}
+        <CategorySelectItems categories={options} />
       </SelectContent>
     </Select>
     {isAuto ? (

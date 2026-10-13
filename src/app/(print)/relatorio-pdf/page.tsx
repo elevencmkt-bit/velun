@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
@@ -159,17 +160,28 @@ function CategoryTable({
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.name}>
-            <td>
-              <span className="rp-dot" style={{ background: r.color }} />
-              {r.name}
-            </td>
-            <td className="r num">{formatCents(r.amount_cents, currency)}</td>
-            <td className="r num">{pct(r.share)}</td>
-            <td className="r num">
-              <Delta now={r.amount_cents} prev={r.prev_cents} kind={kind} currency={currency} />
-            </td>
-          </tr>
+          <Fragment key={r.name}>
+            <tr>
+              <td>
+                <span className="rp-dot" style={{ background: r.color }} />
+                {r.name}
+              </td>
+              <td className="r num">{formatCents(r.amount_cents, currency)}</td>
+              <td className="r num">{pct(r.share)}</td>
+              <td className="r num">
+                <Delta now={r.amount_cents} prev={r.prev_cents} kind={kind} currency={currency} />
+              </td>
+            </tr>
+            {/* Subcategorias: uma linha cada, recuada, sem comparação. */}
+            {(r.subs ?? []).map((s) => (
+              <tr key={`${r.name}›${s.name}`} className="text-[#667085]">
+                <td style={{ paddingLeft: 22, fontSize: 10.5 }}>{s.name}</td>
+                <td className="r num" style={{ fontSize: 10.5 }}>{formatCents(s.amount_cents, currency)}</td>
+                <td className="r num" style={{ fontSize: 10.5 }}>{pct(total > 0 ? s.amount_cents / total : 0)}</td>
+                <td />
+              </tr>
+            ))}
+          </Fragment>
         ))}
         <tr className="rp-total">
           <td>Total</td>
@@ -460,7 +472,10 @@ export default async function RelatorioPdfPage({ searchParams }: { searchParams:
                         <td className="num" style={{ width: 52 }}>
                           {formatDateBr(r.date).slice(0, period.multiMonth ? 10 : 5)}
                         </td>
-                        <td>{r.description}</td>
+                        <td>
+                          {r.description}
+                          {r.sub ? <span className="ml-1.5 text-[#98A2B3]">· {r.sub}</span> : null}
+                        </td>
                         <td className="text-[#667085]">{r.account_name}</td>
                         <td className="r num">{money(r.amount_cents)}</td>
                       </tr>

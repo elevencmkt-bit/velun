@@ -199,7 +199,7 @@ export default async function MetasPage() {
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind, is_transfer")
+      .select("id, name, kind, is_transfer, parent_id")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -211,7 +211,8 @@ export default async function MetasPage() {
     .filter((a) => visible.has(a.id as string) && (a.owner_id === null || a.owner_id === memberId))
     .map((a) => ({ id: a.id as string, name: a.name as string, type: a.type as string, couple: a.owner_id === null, mine: a.owner_id === memberId }));
   const categories: GoalCategoryOption[] = (categoryRows ?? [])
-    .filter((c) => c.kind === "expense" && !c.is_transfer)
+    // Limite fica na categoria principal (já soma as subs dela).
+    .filter((c) => c.kind === "expense" && !c.is_transfer && !c.parent_id)
     .map((c) => ({ id: c.id as string, name: c.name as string }));
   const formProps = { accounts, categories, currency: currency as CurrencyCode, today };
 

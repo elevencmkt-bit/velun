@@ -11,7 +11,10 @@ export type MonthTransaction = {
   direction: "in" | "out";
   description: string;
   transfer_group_id: string | null;
+  /** Nome da categoria PRINCIPAL (a sub fica em `subcategory_name`). */
   category_name: string | null;
+  /** Subcategoria, quando o lançamento está numa. */
+  subcategory_name?: string | null;
   account_name: string;
   /** Categoria de movimentação entre contas: fora de receita e despesa. */
   category_is_transfer?: boolean;
@@ -361,4 +364,37 @@ export function buildPeriodHighlights(input: {
   }
 
   return { headline, tone, items: items.slice(0, 4) };
+}
+
+export const NO_SUBCATEGORY = "Sem subcategoria";
+
+export type SubcategorySlice = { name: string; amount_cents: number };
+
+// Divisão de cada categoria principal pelas subs, só das que têm alguma
+// sub com lançamento. O que está direto na principal vira "Sem
+// subcategoria", pra soma bater com o total da categoria.
+export function subcategoryBreakdown(
+  rows: MonthTransaction[],
+  direction: "in" | "out",
+): Map<string, SubcategorySlice[]> {
+  const byParent = new Map<string, Map<string, number>>();
+  const hasSub = new Set<string>();
+  for (const r of rows) {
+    if (r.direction !== direction) continue;
+    const parent = r.category_name ?? "Sem categoria";
+    const sub = r.subcategory_name ?? NO_SUBCATEGORY;
+    if (r.subcategory_name) hasSub.add(parent);
+    const m = byParent.get(parent) ?? new Map<string, number>();
+    m.set(sub, (m.get(sub) ?? 0) + r.amount_cents);
+    byParent.set(parent, m);
+  }
+  const out = new Map<string, SubcategorySlice[]>();
+  for (const parent of hasSub) {
+    const list = [...(byParent.get(parent) ?? new Map()).entries()]
+      .map(([name, amount_cents]) => ({ name, amount_cents }))
+      // "Sem subcategoria" sempre por último.
+      .sort((a, b) => (a.name === NO_SUBCATEGORY ? 1 : b.name === NO_SUBCATEGORY ? -1 : b.amount_cents - a.amount_cents));
+    out.set(parent, list);
+  }
+  return out;
 }

@@ -13,6 +13,7 @@ import {
 } from "@/lib/month";
 import { TransactionsWorkspace } from "./workspace";
 import type { StatusKey, TransactionRow } from "./types";
+import { CATEGORY_JOIN, familyIds, resolveJoinedCategory } from "@/lib/subcategories";
 
 // Constrói a URL de navegação de mês preservando os outros filtros ativos
 // (conta, categoria, quem lançou, origem, busca) e removendo o intervalo
@@ -43,13 +44,17 @@ type Filterable<Q> = {
   is(column: string, value: null): Q;
   not(column: string, operator: string, value: null): Q;
   or(filters: string): Q;
+  in(column: string, values: string[]): Q;
 };
 function applyFilters<Q extends Filterable<Q>>(
   query: Q,
   params: Record<string, string | undefined>,
+  /** A categoria filtrada e as subs dela: "Transporte" pega "Transporte · Gasolina". */
+  categoryFamily: string[] = [],
 ): Q {
   if (params.account) query = query.eq("account_id", params.account);
   if (params.category === "none") query = query.is("category_id", null);
+  else if (params.category && categoryFamily.length > 1) query = query.in("category_id", categoryFamily);
   else if (params.category) query = query.eq("category_id", params.category);
   if (params.member) query = query.eq("created_by", params.member);
   if (params.origin === "manual") query = query.is("import_id", null);
@@ -114,7 +119,7 @@ export default async function TransacoesPage({
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind, is_transfer, color, icon")
+      .select("id, name, kind, is_transfer, color, icon, parent_id")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -134,7 +139,7 @@ export default async function TransacoesPage({
         `id, date, description, notes, bank_description, amount_cents, direction, status, import_id,
          transfer_group_id, recurrence_id, account_id, category_id, installment_number, installment_total,
          account:accounts(name),
-         category:categories(name),
+         ${CATEGORY_JOIN},
          creator:members!created_by(display_name)`,
       )
       .eq("household_id", householdId)
@@ -143,7 +148,11 @@ export default async function TransacoesPage({
       .order("created_at", { ascending: false })
       .order("id");
 
-    query = applyFilters(query, params);
+    query = applyFilters(
+      query,
+      params,
+      params.category && params.category !== "none" ? familyIds(categories ?? [], params.category) : [],
+    );
 
     if (hasCustomRange) {
       if (params.from) query = query.gte("date", params.from);
@@ -187,7 +196,8 @@ export default async function TransacoesPage({
     account_id: row.account_id,
     category_id: row.category_id,
     account_name: single<{ name: string }>(row.account)?.name ?? "—",
-    category_name: single<{ name: string }>(row.category)?.name ?? null,
+    category_name: resolveJoinedCategory(row.category as never).name,
+    subcategory_name: resolveJoinedCategory(row.category as never).sub,
     creator_name:
       single<{ display_name: string }>(row.creator)?.display_name ?? null,
     can_edit: writableIds.has(row.account_id),

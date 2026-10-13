@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import type { MonthTransaction } from "@/lib/reports";
 import type { AccountScope } from "@/lib/visibility";
+import { CATEGORY_JOIN, resolveJoinedCategory, type JoinedCategory } from "@/lib/subcategories";
 
 // Transações de um household num intervalo de datas, com conta e
 // categoria já resolvidas — usado pelo Dashboard e por Relatórios.
@@ -27,7 +28,7 @@ export async function fetchMonthTransactions(
     description: string;
     transfer_group_id: string | null;
     account: { name: string } | { name: string }[] | null;
-    category: { name: string; is_transfer: boolean } | { name: string; is_transfer: boolean }[] | null;
+    category: JoinedCategory | JoinedCategory[] | null;
   };
   const data = await fetchAll<Row>((from, to) =>
     supabase
@@ -35,7 +36,7 @@ export async function fetchMonthTransactions(
       .select(
         `id, date, amount_cents, direction, description, transfer_group_id, account_id,
          account:accounts(name),
-         category:categories(name, is_transfer)`,
+         ${CATEGORY_JOIN}`,
       )
       .eq("household_id", householdId)
       .eq("status", status)
@@ -50,7 +51,9 @@ export async function fetchMonthTransactions(
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
 
-  return data.map((row) => ({
+  return data.map((row) => {
+    const category = resolveJoinedCategory(row.category);
+    return {
     id: row.id,
     account_id: row.account_id,
     date: row.date,
@@ -59,7 +62,9 @@ export async function fetchMonthTransactions(
     description: row.description,
     transfer_group_id: row.transfer_group_id,
     account_name: single<{ name: string }>(row.account)?.name ?? "—",
-    category_name: single<{ name: string }>(row.category)?.name ?? null,
-    category_is_transfer: single<{ is_transfer: boolean }>(row.category)?.is_transfer ?? false,
-  }));
+    category_name: category.name,
+    subcategory_name: category.sub,
+    category_is_transfer: category.isTransfer,
+  };
+  });
 }

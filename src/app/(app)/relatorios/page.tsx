@@ -15,6 +15,7 @@ import {
   excludeTransfers,
   groupByCategory,
   monthlySeries,
+  subcategoryBreakdown,
   sumByDirection,
 } from "@/lib/reports";
 import { formatDateBr, monthsCovered } from "@/lib/report-pdf/period";
@@ -150,9 +151,13 @@ export default async function RelatoriosPage({
 
   const expenseDeltas = categoryDeltas(current, previous, "out");
   const incomeDeltas = categoryDeltas(current, previous, "in");
-  const withColor = (d: (typeof expenseDeltas)[number]) => ({
+  // Subcategorias: a linha da categoria abre a divisão por sub.
+  const subsOut = subcategoryBreakdown(current, "out");
+  const subsIn = subcategoryBreakdown(current, "in");
+  const withColor = (d: (typeof expenseDeltas)[number], dir: "in" | "out" = "out") => ({
     ...d,
     color: (colorMap.get(d.name) ?? MUTED_CATEGORY_COLOR).fg,
+    subs: (dir === "out" ? subsOut : subsIn).get(d.name),
   });
 
   // Evolução: dia a dia no mês (e em datas livres de até 2 meses); mês a
@@ -404,8 +409,8 @@ export default async function RelatoriosPage({
       ) : (
         <>
           <CategoryBreakdown
-            expense={expenseDeltas.map(withColor)}
-            income={incomeDeltas.map(withColor)}
+            expense={expenseDeltas.map((d) => withColor(d, "out"))}
+            income={incomeDeltas.map((d) => withColor(d, "in"))}
             prevLabel={long ? (yearPrev && hasPrev ? yearPrev.label : null) : prevName}
             currency={currency}
             emptyExpense={expenseEmpty}

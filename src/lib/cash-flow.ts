@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AccountScope } from "@/lib/visibility";
 import { getAccountBalances } from "@/lib/balances";
 import { cardBillsForScope } from "@/lib/cards";
+import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
 
 export type CashFlowEvent = {
   id: string;
@@ -50,10 +51,6 @@ function addDays(d: Date, days: number) {
   return next;
 }
 
-function single<T>(value: T | T[] | null): T | null {
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
 // Saldo atual + pendentes projetado dia a dia — mesma lógica usada pela
 // tela Fluxo de caixa e pelo card-resumo do Dashboard, só o horizonte muda.
 export async function getCashFlowProjection(
@@ -73,7 +70,7 @@ export async function getCashFlowProjection(
     supabase
       // limite: pendentes da projeção (até 90 dias)
       .from("transactions")
-      .select("id, date, description, amount_cents, direction, account_id, category:categories(name)")
+      .select(`id, date, description, amount_cents, direction, account_id, ${CATEGORY_JOIN}`)
       .eq("household_id", householdId)
       .eq("status", "pending")
       .in("account_id", scope.ids)
@@ -147,7 +144,7 @@ export async function getCashFlowProjection(
       description: row.description,
       direction: row.direction,
       amount_cents: row.amount_cents,
-      category_name: single<{ name: string }>(row.category as { name: string } | null)?.name ?? null,
+      category_name: resolveJoinedCategory(row.category as never).name,
     });
   }
 

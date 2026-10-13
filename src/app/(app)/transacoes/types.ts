@@ -17,7 +17,10 @@ export type TransactionRow = {
   account_id: string;
   category_id: string | null;
   account_name: string;
+  /** Categoria principal (a que dá cor e ícone). */
   category_name: string | null;
+  /** Subcategoria, quando tem: aparece como "Transporte · Gasolina". */
+  subcategory_name?: string | null;
   creator_name: string | null;
   /**
    * Se quem está vendo pode mexer neste lançamento: conta do casal ou
@@ -35,6 +38,8 @@ export type CategoryOption = {
   is_transfer?: boolean;
   color?: string | null;
   icon?: string | null;
+  /** Preenchido quando é subcategoria. */
+  parent_id?: string | null;
 };
 export type AccountOption = { id: string; name: string; type?: string; institution?: string | null };
 export type MemberOption = { id: string; name: string };
