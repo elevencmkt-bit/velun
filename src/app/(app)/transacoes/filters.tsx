@@ -18,6 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { AccountOption, CategoryOption, MemberOption } from "./types";
+import { CategoryOptions } from "./category-options";
 
 const ALL = "__all__";
 const ADVANCED_KEYS = ["member", "origin", "direction", "from", "to"];
@@ -52,6 +53,11 @@ export function TransactionFilters({
     for (const key of ADVANCED_KEYS) params.delete(key);
     router.push(`/transacoes?${params.toString()}`);
   }
+
+  // Filtro de direção ligado: só as categorias daquele tipo.
+  const direction = searchParams.get("direction");
+  const filterKind =
+    direction === "in" ? ("income" as const) : direction === "out" ? ("expense" as const) : null;
 
   const advancedCount = ADVANCED_KEYS.filter((key) =>
     searchParams.get(key),
@@ -102,11 +108,7 @@ export function TransactionFilters({
           <SelectContent>
             <SelectItem value={ALL}>Todas as categorias</SelectItem>
             <SelectItem value="none">Sem categoria</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            <CategoryOptions categories={categories} kind={filterKind} keepId={searchParams.get("category")} />
           </SelectContent>
         </Select>
 
@@ -178,11 +180,7 @@ export function TransactionFilters({
             <SelectContent>
               <SelectItem value={ALL}>Todas as categorias</SelectItem>
               <SelectItem value="none">Sem categoria</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
+              <CategoryOptions categories={categories} kind={filterKind} keepId={searchParams.get("category")} />
             </SelectContent>
           </Select>
 

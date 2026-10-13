@@ -29,6 +29,7 @@ import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
 import { DeleteTransactionButton } from "@/components/delete-transaction-button";
 import type { AccountOption, CategoryOption, TransactionRow } from "./types";
 import { Money } from "@/components/money";
+import { CategoryOptions } from "./category-options";
 
 const NO_CATEGORY = "__none__";
 
@@ -151,6 +152,18 @@ export function TransactionsTable({
     );
   }
 
+  // Seleção só de saídas oferece despesas; só de entradas, receitas;
+  // misturada, as duas separadas.
+  const selectedDirections = new Set(
+    rows.filter((r) => selected.has(r.id)).map((r) => r.direction),
+  );
+  const bulkKind =
+    selectedDirections.size === 1
+      ? selectedDirections.has("in")
+        ? ("income" as const)
+        : ("expense" as const)
+      : null;
+
   function applyBulkCategory() {
     const categoryId =
       bulkCategoryId === NO_CATEGORY ? null : bulkCategoryId || null;
@@ -209,11 +222,7 @@ export function TransactionsTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
+              <CategoryOptions categories={categories} kind={bulkKind} />
             </SelectContent>
           </Select>
           <Button
@@ -392,11 +401,11 @@ export function TransactionsTable({
                           <SelectItem value={NO_CATEGORY}>
                             Sem categoria
                           </SelectItem>
-                          {categories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
+                          <CategoryOptions
+                            categories={categories}
+                            kind={row.direction === "in" ? "income" : "expense"}
+                            keepId={row.category_id}
+                          />
                         </SelectContent>
                       </Select>
                     </span>
