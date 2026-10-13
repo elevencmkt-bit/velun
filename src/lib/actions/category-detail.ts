@@ -31,7 +31,8 @@ export type CategoryDetail = {
   direction: "in" | "out";
   rows: CategoryDetailRow[];
   totalCents: number;
-  prevCents: number;
+  /** null quando o período não tem com o que comparar (todo o período, de/até). */
+  prevCents: number | null;
   /** Parte do total que vem de contas que só mostram a soma. */
   hiddenCents: number;
   categories: { id: string; name: string; kind: "income" | "expense"; icon: string | null; is_transfer?: boolean }[];
@@ -51,6 +52,11 @@ type AccountJoin = { name: string; institution: string | null; type: string; own
 export async function getCategoryDetail(params: {
   /** "2026-09" */
   month: string;
+  /**
+   * Período longo dos Relatórios (ano, todo o período, de/até): troca o
+   * mês por estas datas. `prev` só no ano; sem ele, nada de comparação.
+   */
+  period?: { from: string; to: string; prev?: { from: string; to: string } | null } | null;
   name: string;
   direction: "in" | "out";
   status: "cleared" | "pending";
@@ -60,13 +66,25 @@ export async function getCategoryDetail(params: {
   const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
 
-  const m = params.month.match(/^(\d{4})-(\d{2})$/);
-  if (!m) throw new Error("Mês inválido.");
-  const year = Number(m[1]);
-  const monthIndex = Number(m[2]) - 1;
-  const { start, end } = monthRange(year, monthIndex);
-  const prev = shiftMonth(year, monthIndex, -1);
-  const prevRange = monthRange(prev.year, prev.monthIndex);
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  let start: string;
+  let end: string;
+  let prevRange: { start: string; end: string } | null;
+  if (params.period) {
+    const { from, to, prev } = params.period;
+    if (!isoDate.test(from) || !isoDate.test(to)) throw new Error("Período inválido.");
+    start = from;
+    end = to;
+    prevRange = prev && isoDate.test(prev.from) && isoDate.test(prev.to) ? { start: prev.from, end: prev.to } : null;
+  } else {
+    const m = params.month.match(/^(\d{4})-(\d{2})$/);
+    if (!m) throw new Error("Mês inválido.");
+    const year = Number(m[1]);
+    const monthIndex = Number(m[2]) - 1;
+    ({ start, end } = monthRange(year, monthIndex));
+    const prev = shiftMonth(year, monthIndex, -1);
+    prevRange = monthRange(prev.year, prev.monthIndex);
+  }
 
   const [totalsScopeAll, listScopeAll, { data: categories }] = await Promise.all([
     accountScope(supabase, householdId, memberId, "categories"),
@@ -101,7 +119,7 @@ export async function getCategoryDetail(params: {
       direction: params.direction,
       rows: [],
       totalCents: 0,
-      prevCents: 0,
+      prevCents: prevRange ? 0 : null,
       hiddenCents: 0,
       categories: (categories ?? []) as CategoryDetail["categories"],
     };
@@ -129,7 +147,7 @@ export async function getCategoryDetail(params: {
 
   const [current, previous] = await Promise.all([
     fetchRange(start, end, totalsScope.ids),
-    fetchRange(prevRange.start, prevRange.end, totalsScope.ids),
+    prevRange ? fetchRange(prevRange.start, prevRange.end, totalsScope.ids) : Promise.resolve(null),
   ]);
 
   const listable = new Set(listScope.ids);
@@ -159,7 +177,7 @@ export async function getCategoryDetail(params: {
     direction: params.direction,
     rows,
     totalCents,
-    prevCents: sum(previous),
+    prevCents: previous ? sum(previous) : null,
     hiddenCents: totalCents - sum(visible),
     categories: (categories ?? []) as CategoryDetail["categories"],
   };

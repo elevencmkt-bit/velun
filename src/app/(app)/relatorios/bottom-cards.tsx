@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Check, Equal, Plus, Sparkles, TrendingDown } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarCheck, Check, Equal, Plus, Scale, Sparkles, Tag, TrendingDown, TrendingUp } from "lucide-react";
 import type { CurrencyCode } from "@/lib/money";
 import type { InsightPart, ReportInsight } from "@/lib/reports";
 import { Money } from "@/components/money";
@@ -28,6 +28,20 @@ function Parts({
 
 // Ícone de cada frase pelo que ela diz: entrou, saiu, igual, novidade.
 function iconFor(item: ReportInsight["items"][number]) {
+  switch (item.icon) {
+    case "best":
+      return { Icon: TrendingUp, bg: "#E9FBF2", fg: "#1A8A6D" };
+    case "worst":
+      return { Icon: TrendingDown, bg: "#FFF4E5", fg: "#B54708" };
+    case "top":
+      return { Icon: Tag, bg: "#EEF1FF", fg: "#536DFE" };
+    case "months":
+      return { Icon: CalendarCheck, bg: "#F2F4F7", fg: "#475467" };
+    case "compare":
+      return item.tone === "positive"
+        ? { Icon: Scale, bg: "#E9FBF2", fg: "#1A8A6D" }
+        : { Icon: Scale, bg: "#FFF4E5", fg: "#B54708" };
+  }
   const first = typeof item.parts[0] === "string" ? item.parts[0] : "";
   if (first.startsWith("Entrou")) return { Icon: ArrowDownLeft, bg: "#E9FBF2", fg: "#1A8A6D" };
   if (first.startsWith("Saiu"))
@@ -39,15 +53,20 @@ function iconFor(item: ReportInsight["items"][number]) {
   return { Icon: Sparkles, bg: "#EEF1FF", fg: "#536DFE" };
 }
 
-/** Insight Velun: a frase do mês em destaque e até 4 comparações com o mês anterior. */
+/**
+ * Insight Velun: a frase do mês em destaque e até 4 comparações com o mês
+ * anterior. Em período longo, o mesmo card vira "Destaques do período".
+ */
 export function InsightVelunCard({
   insight,
   currency,
   subtitle,
+  title = "Insight Velun",
 }: {
   insight: ReportInsight;
   currency: CurrencyCode;
   subtitle: string;
+  title?: string;
 }) {
   const warning = insight.tone === "warning";
   return (
@@ -57,7 +76,7 @@ export function InsightVelunCard({
           <Sparkles className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="text-card-title">Insight Velun</h2>
+          <h2 className="text-card-title">{title}</h2>
           <p className="text-[13px] text-(--text-muted)">{subtitle}</p>
         </div>
       </div>

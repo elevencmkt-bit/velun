@@ -31,17 +31,21 @@ function ChartTooltip({
   active,
   payload,
   currency,
+  granularity,
+  cumulativeLabel,
 }: {
   active?: boolean;
   payload?: { payload: ChartPoint }[];
   currency: CurrencyCode;
+  granularity: "day" | "month";
+  cumulativeLabel: string;
 }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
-  const dateLabel = new Date(`${point.date}T00:00:00`).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-  });
+  const dateLabel = new Date(`${point.date}T00:00:00`).toLocaleDateString(
+    "pt-BR",
+    granularity === "month" ? { month: "long", year: "numeric" } : { day: "2-digit", month: "long" },
+  );
 
   return (
     <div
@@ -63,7 +67,7 @@ function ChartTooltip({
           </span>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-(--text-secondary)">Acumulado no mês</span>
+          <span className="text-(--text-secondary)">{cumulativeLabel}</span>
           <span className="font-semibold tabular-nums" style={{ color: "#3B82F6" }}>
             <Money cents={point.cumulative_cents} currency={currency} />
           </span>
@@ -73,18 +77,24 @@ function ChartTooltip({
   );
 }
 
-// Barras pra receitas e despesas de cada dia, e uma linha curva pro
-// saldo acumulado no mês. A curva é "basis": arredonda os degraus mas
+// Barras pra receitas e despesas de cada dia (ou de cada mês, em período
+// longo), e uma linha curva pro saldo acumulado. A curva é "basis": arredonda os degraus mas
 // fica sempre entre os valores de verdade — nunca inventa um vale abaixo
 // do menor saldo nem um pico acima do maior, que era o defeito das curvas
 // antigas.
 export function PeriodEvolutionChart({
   points,
   currency,
+  granularity = "day",
+  cumulativeLabel = "Acumulado no mês",
 }: {
   points: DailyReportPoint[];
   currency: CurrencyCode;
+  /** "month" em período longo: uma barra por mês. */
+  granularity?: "day" | "month";
+  cumulativeLabel?: string;
 }) {
+  const barSize = granularity === "month" ? 16 : 10;
   const data = withCumulative(points);
 
   return (
@@ -108,9 +118,9 @@ export function PeriodEvolutionChart({
             width={72}
           />
           <ReferenceLine y={0} stroke="var(--border-strong)" />
-          <Tooltip content={<ChartTooltip currency={currency} />} cursor={{ fill: "rgba(83,109,254,0.06)" }} />
-          <Bar dataKey="income_cents" fill="#22C55E" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
-          <Bar dataKey="expense_cents" fill="#F04469" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
+          <Tooltip content={<ChartTooltip currency={currency} granularity={granularity} cumulativeLabel={cumulativeLabel} />} cursor={{ fill: "rgba(83,109,254,0.06)" }} />
+          <Bar dataKey="income_cents" fill="#22C55E" radius={[3, 3, 0, 0]} maxBarSize={barSize} isAnimationActive={false} />
+          <Bar dataKey="expense_cents" fill="#F04469" radius={[3, 3, 0, 0]} maxBarSize={barSize} isAnimationActive={false} />
           <Line
             type="basis"
             dataKey="cumulative_cents"
