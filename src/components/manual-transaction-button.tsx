@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NEW_TRANSACTION_EVENT } from "@/components/nav-items";
+import { DateInput } from "@/components/date-input";
 
 type Account = { id: string; name: string; type?: string };
 type Category = { id: string; name: string; kind: "income" | "expense" };
@@ -189,10 +190,9 @@ export function ManualTransactionButton({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="date">Data</Label>
-              <Input
+              <DateInput
                 id="date"
                 name="date"
-                type="date"
                 defaultValue={todayISO()}
                 required
               />
@@ -408,10 +408,9 @@ export function ManualTransactionButton({
                     <Label htmlFor="recurrence_ends_on">
                       Repetir até (opcional)
                     </Label>
-                    <Input
+                    <DateInput
                       id="recurrence_ends_on"
                       name="recurrence_ends_on"
-                      type="date"
                     />
                   </div>
                 </div>

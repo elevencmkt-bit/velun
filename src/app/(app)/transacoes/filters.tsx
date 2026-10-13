@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import type { AccountOption, CategoryOption, MemberOption } from "./types";
 import { CategoryOptions } from "./category-options";
+import { DateInput } from "@/components/date-input";
 
 const ALL = "__all__";
 const ADVANCED_KEYS = ["member", "origin", "direction", "from", "to"];
@@ -251,16 +252,16 @@ export function TransactionFilters({
               Período personalizado
             </span>
             <div className="flex items-center gap-2">
-              <Input
-                type="date"
+              <DateInput
+                aria-label="De"
                 defaultValue={searchParams.get("from") ?? ""}
-                onChange={(e) => setParam("from", e.target.value)}
+                onChange={(v) => setParam("from", v)}
               />
               <span className="text-xs text-(--text-muted)">até</span>
-              <Input
-                type="date"
+              <DateInput
+                aria-label="Até"
                 defaultValue={searchParams.get("to") ?? ""}
-                onChange={(e) => setParam("to", e.target.value)}
+                onChange={(v) => setParam("to", v)}
               />
             </div>
           </div>

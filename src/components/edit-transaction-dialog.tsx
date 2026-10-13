@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateInput } from "@/components/date-input";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; kind: "income" | "expense" };
@@ -151,7 +152,7 @@ export function EditTransactionDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="date">Data</Label>
-              <Input id="date" name="date" type="date" defaultValue={transaction.date} required />
+              <DateInput id="date" name="date" defaultValue={transaction.date} required />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="amount">Valor (USD)</Label>
@@ -288,7 +289,7 @@ export function EditTransactionDialog({
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label htmlFor="recurrence_ends_on">Repetir até (opcional)</Label>
-                      <Input id="recurrence_ends_on" name="recurrence_ends_on" type="date" />
+                      <DateInput id="recurrence_ends_on" name="recurrence_ends_on" />
                     </div>
                   </div>
                 ) : null}
