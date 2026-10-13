@@ -245,11 +245,16 @@ export default async function TransacoesPage({
     };
   }
 
-  // O resumo é sempre do período inteiro, qualquer que seja a aba.
-  const ins = rows.filter((r) => r.direction === "in");
-  const outs = rows.filter((r) => r.direction === "out");
-  const totalIn = ins.reduce((sum, r) => sum + r.amount_cents, 0);
-  const totalOut = outs.reduce((sum, r) => sum + r.amount_cents, 0);
+  // O resumo é sempre do período inteiro, qualquer que seja a aba. Os
+  // números grandes são só o confirmado; o pendente (inclusive as
+  // recorrências já lançadas pro futuro) vem à parte, como previsto.
+  const total = (list: TransactionRow[]) => list.reduce((sum, r) => sum + r.amount_cents, 0);
+  const confirmed = rows.filter((r) => r.status !== "pending");
+  const pending = rows.filter((r) => r.status === "pending");
+  const ins = confirmed.filter((r) => r.direction === "in");
+  const outs = confirmed.filter((r) => r.direction === "out");
+  const pendingIns = pending.filter((r) => r.direction === "in");
+  const pendingOuts = pending.filter((r) => r.direction === "out");
 
   return (
     <TransactionsWorkspace
@@ -280,11 +285,14 @@ export default async function TransacoesPage({
       prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
       nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
       summary={{
-        inCents: totalIn,
-        outCents: totalOut,
+        inCents: total(ins),
+        outCents: total(outs),
         inCount: ins.length,
         outCount: outs.length,
-        pendingInCount: ins.filter((r) => r.status === "pending").length,
+        pendingInCents: total(pendingIns),
+        pendingOutCents: total(pendingOuts),
+        pendingInCount: pendingIns.length,
+        pendingOutCount: pendingOuts.length,
       }}
       counts={counts}
       activeStatus={activeStatus}
