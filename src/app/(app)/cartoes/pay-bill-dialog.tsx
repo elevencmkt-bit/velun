@@ -132,7 +132,7 @@ export function PayBillDialog({
                 {error}
               </p>
             ) : null}
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" size="form" disabled={isPending} className="mt-1 w-full">
               {isPending ? "Registrando…" : "Registrar pagamento"}
             </Button>
           </form>

@@ -252,7 +252,7 @@ export function TransactionsTable({
           {selected.size > 0 ? (
             <>
               <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48 h-10! rounded-[10px] text-[14px]">
                   <SelectValue placeholder="Recategorizar para..." />
                 </SelectTrigger>
                 <SelectContent>

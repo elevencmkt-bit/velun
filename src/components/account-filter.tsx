@@ -1,11 +1,11 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Landmark } from "lucide-react";
-import { AccountAvatar } from "@/components/account-avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AccountOptions } from "@/components/account-options";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const ALL = "__all__";
+
 
 // Filtro de conta do Dashboard: os totais, o saldo e as listas passam a
 // ser de uma conta só. Fica na URL (?account=), junto com o mês.
@@ -38,17 +38,13 @@ export function AccountFilter({
       >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent position="popper" align="end" className="min-w-[220px]">
-        <SelectItem value={ALL}>
-          <Landmark className="h-4 w-4 text-(--text-muted)" />
-          Todas as contas
-        </SelectItem>
-        {accounts.map((a) => (
-          <SelectItem key={a.id} value={a.id}>
-            <AccountAvatar institution={a.institution} type={a.type} size={20} />
-            <span className="truncate">{a.name}</span>
-          </SelectItem>
-        ))}
+      <SelectContent
+        position="popper"
+        align="end"
+        sideOffset={8}
+        className="max-h-[min(420px,var(--radix-select-content-available-height))] min-w-[280px]"
+      >
+        <AccountOptions accounts={accounts} allValue={ALL} />
       </SelectContent>
     </Select>
   );

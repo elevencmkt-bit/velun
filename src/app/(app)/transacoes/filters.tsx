@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef } from "react";
-import { Landmark, Search, SlidersHorizontal, Tag } from "lucide-react";
+import { Search, SlidersHorizontal, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { AccountOptions } from "@/components/account-options";
 import type { AccountOption, CategoryOption, MemberOption } from "./types";
 import { CategoryOptions } from "./category-options";
 import { DateInput } from "@/components/date-input";
@@ -91,7 +92,7 @@ export function TransactionFilters({
           placeholder="Buscar…"
           defaultValue={searchParams.get("q") ?? ""}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9"
+          className="h-10 rounded-[10px] pl-9 text-[14px]"
         />
       </div>
       <div className="flex items-center gap-2 max-md:hidden">
@@ -99,17 +100,11 @@ export function TransactionFilters({
           defaultValue={searchParams.get("account") ?? ALL}
           onValueChange={(v) => setParam("account", v)}
         >
-          <SelectTrigger className="w-44">
-            <Landmark className="h-3.5 w-3.5 text-(--text-muted) " />
+          <SelectTrigger className="w-52 h-10! rounded-[10px] pl-2 text-[14px]">
             <SelectValue placeholder="Todas as contas" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>Todas as contas</SelectItem>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
+            <AccountOptions accounts={accounts} allValue={ALL} />
           </SelectContent>
         </Select>
 
@@ -117,7 +112,7 @@ export function TransactionFilters({
           defaultValue={searchParams.get("category") ?? ALL}
           onValueChange={(v) => setParam("category", v)}
         >
-          <SelectTrigger className="w-52">
+          <SelectTrigger className="w-52 h-10! rounded-[10px] text-[14px]">
             <Tag className="h-3.5 w-3.5 text-(--text-muted) " />
             <SelectValue placeholder="Todas as categorias" />
           </SelectTrigger>
@@ -171,17 +166,11 @@ export function TransactionFilters({
             defaultValue={searchParams.get("account") ?? ALL}
             onValueChange={(v) => setParam("account", v)}
           >
-            <SelectTrigger className="w-full">
-              <Landmark className="h-3.5 w-3.5 text-(--text-muted)" />
+            <SelectTrigger className="w-full pl-2.5">
               <SelectValue placeholder="Todas as contas" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL}>Todas as contas</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
+              <AccountOptions accounts={accounts} allValue={ALL} />
             </SelectContent>
           </Select>
 

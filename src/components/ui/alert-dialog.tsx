@@ -54,7 +54,7 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-[24px] bg-(--bg-surface) p-6 text-sm text-popover-foreground shadow-[0_24px_60px_rgba(16,24,40,.2)] duration-100 outline-none sm:max-w-[440px] sm:p-7 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -93,7 +93,7 @@ function AlertDialogTitle({
   return (
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
-      className={cn("font-heading text-base leading-none font-medium", className)}
+      className={cn("text-[19px] leading-tight font-extrabold tracking-[-0.02em] text-(--text-primary)", className)}
       {...props}
     />
   )
@@ -106,7 +106,7 @@ function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn("text-[14px] leading-relaxed text-(--text-muted)", className)}
       {...props}
     />
   )
@@ -118,7 +118,7 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action>) {
   return (
     <AlertDialogPrimitive.Action
-      className={cn(buttonVariants({ variant: "default" }), className)}
+      className={cn(buttonVariants({ variant: "default" }), "h-11 rounded-[12px] px-5 text-[14px]", className)}
       {...props}
     />
   )
@@ -131,7 +131,7 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
   return (
     <AlertDialogPrimitive.Cancel asChild {...props}>
-      <Button variant="outline" className={className}>
+      <Button variant="outline" className={cn("h-11 rounded-[12px] px-5 text-[14px]", className)}>
         {children}
       </Button>
     </AlertDialogPrimitive.Cancel>

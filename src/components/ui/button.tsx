@@ -31,6 +31,8 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
+        /** Botão principal de formulário/quadro: mesma altura dos campos. */
+        form: "h-12 gap-2 rounded-[14px] px-5 text-[15px] font-bold",
       },
     },
     defaultVariants: {

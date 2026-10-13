@@ -156,7 +156,7 @@ function CategoryCell({
       disabled={disabled}
       onValueChange={(value) => onChange(value === NO_CATEGORY ? null : value)}
     >
-      <SelectTrigger className="h-8">
+      <SelectTrigger className="h-8! rounded-[8px] pl-2.5 text-[13px]">
         <SelectValue placeholder="Sem categoria" />
       </SelectTrigger>
       <SelectContent>
@@ -222,7 +222,7 @@ function NameCell({
               setEditing(false);
             }
           }}
-          className="h-8"
+          className="h-8 rounded-[8px] px-2.5 text-[13px]"
           aria-label="Nome do lançamento"
         />
       ) : (
