@@ -40,11 +40,15 @@ export type MemberOption = { id: string; name: string };
 /** Situação pra abas: atrasado (pendente que passou), pendente, confirmado. */
 export type StatusKey = "late" | "pending" | "confirmed";
 
+// Resumo do período: só o que já foi confirmado. O que ainda está
+// pendente (recorrências futuras, contas a vencer) aparece à parte.
 export type TransactionsSummary = {
   inCents: number;
   outCents: number;
   inCount: number;
   outCount: number;
-  /** Entradas ainda não confirmadas. */
+  pendingInCents: number;
+  pendingOutCents: number;
   pendingInCount: number;
+  pendingOutCount: number;
 };

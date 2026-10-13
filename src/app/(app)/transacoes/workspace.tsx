@@ -81,6 +81,10 @@ export function TransactionsWorkspace({
   const router = useRouter();
   const searchParams = useSearchParams();
   const net = summary.inCents - summary.outCents;
+  const pendingNet = summary.pendingInCents - summary.pendingOutCents;
+  const hasPending = summary.pendingInCount + summary.pendingOutCount > 0;
+  const withPending = net + pendingNet;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   function tabHref(key: StatusKey | "all") {
     const params = new URLSearchParams(searchParams.toString());
@@ -148,6 +152,15 @@ export function TransactionsWorkspace({
             </div>
           ))}
         </div>
+        {hasPending ? (
+          <div className="relative mt-2.5 border-t border-white/20 pt-2 text-[12px] text-white/80">
+            Confirmado até aqui. Com o que falta confirmar:{" "}
+            <span className="font-semibold text-white">
+              {withPending < 0 ? "−" : ""}
+              <Money cents={Math.abs(withPending)} currency={currency} />
+            </span>
+          </div>
+        ) : null}
       </section>
       <div className="grid grid-cols-3 gap-5 max-md:hidden">
         <div className="rounded-[20px] bg-(--bg-surface) px-5 py-5 shadow-(--shadow-card)">
@@ -161,13 +174,14 @@ export function TransactionsWorkspace({
             <Money cents={summary.inCents} currency={currency} />
           </div>
           <div className="mt-0.5 text-xs text-(--text-light)">
-            {summary.inCount} {summary.inCount === 1 ? "entrada" : "entradas"}
-            {summary.pendingInCount > 0
-              ? summary.pendingInCount === summary.inCount
-                ? summary.inCount === 1 ? " · pendente" : " · todas pendentes"
-                : ` · ${summary.pendingInCount} pendente${summary.pendingInCount > 1 ? "s" : ""}`
-              : ""}
+            {plural(summary.inCount, "entrada confirmada", "entradas confirmadas")}
           </div>
+          {summary.pendingInCount > 0 ? (
+            <div className="mt-2 border-t border-(--border-soft) pt-2 text-xs text-(--text-muted)">
+              + <Money cents={summary.pendingInCents} currency={currency} /> a confirmar
+              <span className="text-(--text-light)"> · {plural(summary.pendingInCount, "entrada", "entradas")}</span>
+            </div>
+          ) : null}
         </div>
         <div className="rounded-[20px] bg-(--bg-surface) px-5 py-5 shadow-(--shadow-card)">
           <div className="flex items-center gap-2.5">
@@ -180,8 +194,14 @@ export function TransactionsWorkspace({
             <Money cents={summary.outCents} currency={currency} />
           </div>
           <div className="mt-0.5 text-xs text-(--text-light)">
-            {summary.outCount} {summary.outCount === 1 ? "saída" : "saídas"}
+            {plural(summary.outCount, "saída confirmada", "saídas confirmadas")}
           </div>
+          {summary.pendingOutCount > 0 ? (
+            <div className="mt-2 border-t border-(--border-soft) pt-2 text-xs text-(--text-muted)">
+              + <Money cents={summary.pendingOutCents} currency={currency} /> a confirmar
+              <span className="text-(--text-light)"> · {plural(summary.pendingOutCount, "saída", "saídas")}</span>
+            </div>
+          ) : null}
         </div>
         <div className="relative overflow-hidden rounded-[20px] bg-(--primary) px-5 py-5 text-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -195,6 +215,15 @@ export function TransactionsWorkspace({
             {net < 0 ? "Entrou menos do que saiu" : net > 0 ? "Entrou mais do que saiu" : "Empatou"}
             {scopeNote ? ` · ${scopeNote}` : ""}
           </div>
+          {hasPending ? (
+            <div className="relative mt-2 border-t border-white/20 pt-2 text-xs text-white/80">
+              Com o que falta confirmar:{" "}
+              <span className="font-semibold text-white">
+                {withPending < 0 ? "−" : ""}
+                <Money cents={Math.abs(withPending)} currency={currency} />
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
 
