@@ -22,7 +22,7 @@ import { CategoryOptions } from "./category-options";
 import { DateInput } from "@/components/date-input";
 
 const ALL = "__all__";
-const ADVANCED_KEYS = ["member", "origin", "direction", "from", "to"];
+const ADVANCED_KEYS = ["member", "origin", "direction", "from", "to", "all"];
 
 export function TransactionFilters({
   accounts,
@@ -45,6 +45,19 @@ export function TransactionFilters({
     if (key === "from" || key === "to") params.delete("all");
     router.push(`/transacoes?${params.toString()}`);
   }
+
+  // "Todo o período" liga/desliga; ligado, tira mês e de/até.
+  function toggleAllPeriod() {
+    const params = new URLSearchParams(searchParams.toString());
+    if (params.get("all") === "1") {
+      params.delete("all");
+    } else {
+      for (const key of ["month", "from", "to"]) params.delete(key);
+      params.set("all", "1");
+    }
+    router.push(`/transacoes?${params.toString()}`);
+  }
+  const allPeriod = searchParams.get("all") === "1";
 
   function onSearchChange(value: string) {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -251,16 +264,31 @@ export function TransactionFilters({
 
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-(--text-secondary)">
-              Período personalizado
+              Período
             </span>
+            <button
+              type="button"
+              onClick={toggleAllPeriod}
+              aria-pressed={allPeriod}
+              className={`flex h-10 items-center justify-center rounded-[10px] border text-[13px] font-semibold transition-colors ${
+                allPeriod
+                  ? "border-(--primary) bg-(--primary-soft) text-(--primary)"
+                  : "border-input bg-white text-(--text-secondary) hover:border-(--primary) hover:text-(--primary)"
+              }`}
+            >
+              Todo o período
+            </button>
+            <span className="mt-1 text-xs text-(--text-muted)">ou de / até</span>
             <div className="flex items-center gap-2">
               <DateInput
+                key={`from-${allPeriod}`}
                 aria-label="De"
                 defaultValue={searchParams.get("from") ?? ""}
                 onChange={(v) => setParam("from", v)}
               />
               <span className="text-xs text-(--text-muted)">até</span>
               <DateInput
+                key={`to-${allPeriod}`}
                 aria-label="Até"
                 defaultValue={searchParams.get("to") ?? ""}
                 onChange={(v) => setParam("to", v)}
