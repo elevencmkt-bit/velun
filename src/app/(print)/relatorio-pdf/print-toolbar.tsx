@@ -11,8 +11,28 @@ import { ArrowLeft, Download } from "lucide-react";
 export function PrintToolbar({ autoPrint, backHref }: { autoPrint: boolean; backHref: string }) {
   useEffect(() => {
     if (!autoPrint) return;
-    const t = setTimeout(() => window.print(), 600);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    // Espera fontes e imagens (o logo) carregarem: imprimir antes deixa
+    // o logo em branco no PDF.
+    const t = setTimeout(async () => {
+      await document.fonts?.ready;
+      await Promise.all(
+        Array.from(document.images)
+          .filter((img) => !img.complete)
+          .map(
+            (img) =>
+              new Promise((resolve) => {
+                img.addEventListener("load", resolve, { once: true });
+                img.addEventListener("error", resolve, { once: true });
+              }),
+          ),
+      );
+      if (!cancelled) window.print();
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [autoPrint]);
 
   return (

@@ -240,12 +240,10 @@ export default async function RelatorioPdfPage({ searchParams }: { searchParams:
       <PrintToolbar autoPrint={sp.print === "1"} backHref={`/relatorios?month=${backMonth}`} />
       <div className="rp rp-sheet font-sans text-[#111318]">
         <header className="flex items-center justify-between border-b-[1.5px] border-[#EAECF0] pb-3.5">
-          <div className="flex items-center gap-2 text-[16px] font-extrabold tracking-[-0.02em]">
-            <span className="flex h-6 w-6 items-center justify-center rounded-[7px] bg-[#536DFE]">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 5l8 14 8-14" />
-              </svg>
-            </span>
+          {/* O mesmo logo da barra lateral do app (ícone oficial + "velun"). */}
+          <div className="flex items-center gap-2.5 text-[18px] font-bold tracking-[-0.02em]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/velun-icon.png" alt="" width={28} height={28} className="h-7 w-7 rounded-[8px]" />
             velun
           </div>
           <div className="text-right text-[11px] leading-[1.5] text-[#667085]">
