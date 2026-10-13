@@ -54,6 +54,8 @@ export async function getCategoryDetail(params: {
   name: string;
   direction: "in" | "out";
   status: "cleared" | "pending";
+  /** Só uma conta (filtro de conta do Dashboard); sem ele, todas. */
+  accountId?: string | null;
 }): Promise<CategoryDetail> {
   const { householdId, memberId } = await getCurrentMember();
   const supabase = await createClient();
@@ -66,7 +68,7 @@ export async function getCategoryDetail(params: {
   const prev = shiftMonth(year, monthIndex, -1);
   const prevRange = monthRange(prev.year, prev.monthIndex);
 
-  const [totalsScope, listScope, { data: categories }] = await Promise.all([
+  const [totalsScopeAll, listScopeAll, { data: categories }] = await Promise.all([
     accountScope(supabase, householdId, memberId, "categories"),
     accountScope(supabase, householdId, memberId, "transactions"),
     supabase
@@ -76,6 +78,11 @@ export async function getCategoryDetail(params: {
       .eq("is_archived", false)
       .order("name"),
   ]);
+
+  // Filtro de conta: só estreita o que a pessoa já pode ver.
+  const only = (ids: string[]) => (params.accountId ? ids.filter((id) => id === params.accountId) : ids);
+  const totalsScope = { ids: only(totalsScopeAll.ids) };
+  const listScope = { ids: only(listScopeAll.ids) };
 
   // "Sem categoria" é a ausência de categoria; as outras, pelo nome (é
   // como o relatório agrupa).

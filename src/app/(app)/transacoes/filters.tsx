@@ -41,6 +41,8 @@ export function TransactionFilters({
     const params = new URLSearchParams(searchParams.toString());
     if (!value || value === ALL) params.delete(key);
     else params.set(key, value);
+    // De/até é outro tipo de período: tira o "todo o período".
+    if (key === "from" || key === "to") params.delete("all");
     router.push(`/transacoes?${params.toString()}`);
   }
 

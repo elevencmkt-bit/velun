@@ -23,6 +23,8 @@ export type CategoryDrawerQuery = {
   status: "cleared" | "pending";
   /** Cor da categoria no relatório (texto), pra o cabeçalho combinar. */
   color?: string;
+  /** Só uma conta (filtro de conta do Dashboard). */
+  accountId?: string | null;
 };
 
 const NONE = "__none__";
@@ -65,7 +67,7 @@ export function CategoryDrawer({
   const [isSaving, startSaving] = useTransition();
   const router = useRouter();
 
-  const key = query ? `${query.month}|${query.name}|${query.direction}|${query.status}` : null;
+  const key = query ? `${query.month}|${query.name}|${query.direction}|${query.status}|${query.accountId ?? ""}` : null;
 
   useEffect(() => {
     if (!query) return;
@@ -134,7 +136,7 @@ export function CategoryDrawer({
   const categoryParam = query?.name === "Sem categoria" ? "none" : matched?.id ?? "";
   const transactionsHref = `/transacoes?month=${query?.month ?? ""}${categoryParam ? `&category=${categoryParam}` : ""}${
     query?.status === "pending" ? "&status=pending" : ""
-  }`;
+  }${query?.accountId ? `&account=${query.accountId}` : ""}`;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>

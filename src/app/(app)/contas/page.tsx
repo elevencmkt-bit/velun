@@ -9,7 +9,7 @@ import { accountScope } from "@/lib/visibility";
 import { CardArt } from "@/components/card-art";
 import { fetchDeletionRequests } from "@/lib/notifications";
 import { AccountForm } from "./account-form";
-import { AccountRowActions } from "./account-row-actions";
+import { AccountRowActions, ClickableAccountRow } from "./account-row-actions";
 import { Money } from "@/components/money";
 
 // Texto curto pro badge da conta pessoal do outro membro. Diz o que ele
@@ -115,8 +115,8 @@ export default async function ContasPage() {
       : isPersonal
         ? VISIBILITY_BADGE[a.visibility]
         : null;
-    return (
-      <div key={a.id} className="flex min-h-[72px] items-center gap-3 border-b border-(--border-soft) py-3 last:border-0 md:gap-3.5">
+    const main = (
+      <>
         <AccountAvatar institution={a.institution} type={a.type} size={42} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold text-(--text-primary)">{a.name}</div>
@@ -133,6 +133,10 @@ export default async function ContasPage() {
             </div>
           ) : null}
         </div>
+      </>
+    );
+    const trailing = (
+      <>
         {chip ? (
           <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-[#F4F5F8] px-2.5 text-xs font-semibold text-(--text-secondary) max-md:hidden">
             {a.visibility === "hidden" && isMine ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -145,18 +149,29 @@ export default async function ContasPage() {
         >
           {isCard ? <Money cents={Math.max(0, -balance)} currency={currency} /> : <Money cents={balance} currency={currency} />}
         </span>
-        {canManage ? (
-          <AccountRowActions
-            account={editable(a)}
-            isArchived={a.is_archived}
-            paymentAccounts={paymentAccounts}
-            needsApproval={a.owner_id === null && Boolean(partner)}
-            partnerName={partnerFirst}
-            pendingRequest={requestByAccount.get(a.id) ?? null}
-          />
-        ) : (
-          <span className="w-9 shrink-0" aria-hidden />
-        )}
+      </>
+    );
+    if (canManage) {
+      return (
+        <ClickableAccountRow
+          key={a.id}
+          trailing={trailing}
+          account={editable(a)}
+          isArchived={a.is_archived}
+          paymentAccounts={paymentAccounts}
+          needsApproval={a.owner_id === null && Boolean(partner)}
+          partnerName={partnerFirst}
+          pendingRequest={requestByAccount.get(a.id) ?? null}
+        >
+          {main}
+        </ClickableAccountRow>
+      );
+    }
+    return (
+      <div key={a.id} className="flex min-h-[72px] items-center gap-3 border-b border-(--border-soft) py-3 last:border-0 md:gap-3.5">
+        {main}
+        {trailing}
+        <span className="w-9 shrink-0" aria-hidden />
       </div>
     );
   };

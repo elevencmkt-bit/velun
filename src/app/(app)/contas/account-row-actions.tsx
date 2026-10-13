@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, ArchiveRestore, Ellipsis, Pencil, Trash2, Undo2, X } from "lucide-react";
 import {
@@ -41,6 +41,8 @@ export function AccountRowActions({
   needsApproval = false,
   partnerName = null,
   pendingRequest = null,
+  editOpen: editOpenProp,
+  onEditOpenChange,
 }: {
   account: EditableAccount;
   isArchived: boolean;
@@ -50,8 +52,13 @@ export function AccountRowActions({
   partnerName?: string | null;
   /** Pedido de exclusão aberto pra esta conta. */
   pendingRequest?: { id: string; isMine: boolean } | null;
+  /** Quando a linha inteira abre a edição, quem manda no diálogo é ela. */
+  editOpen?: boolean;
+  onEditOpenChange?: (open: boolean) => void;
 }) {
-  const [editOpen, setEditOpen] = useState(false);
+  const [editOpenState, setEditOpenState] = useState(false);
+  const editOpen = editOpenProp ?? editOpenState;
+  const setEditOpen = onEditOpenChange ?? setEditOpenState;
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -193,5 +200,51 @@ export function AccountRowActions({
         onOpenChange={setEditOpen}
       />
     </>
+  );
+}
+
+// Linha de conta que abre a edição com um clique (ou toque) em qualquer
+// lugar dela, como as categorias em Configurações. O ⋯ continua ali pro
+// resto (arquivar, excluir). Conta arquivada não edita: só o ⋯.
+export function ClickableAccountRow({
+  children,
+  trailing,
+  ...actions
+}: React.ComponentProps<typeof AccountRowActions> & {
+  /** Nome, tipo, avisos — a parte que abre a edição. */
+  children: ReactNode;
+  /** Selo e saldo, entre o nome e o ⋯. */
+  trailing: ReactNode;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const clickable = !actions.isArchived;
+  return (
+    <div
+      className={`group relative -mx-2 flex min-h-[72px] items-center gap-3 rounded-[14px] px-2 py-3 transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-(--border-soft) last:after:hidden md:gap-3.5 ${
+        clickable ? "cursor-pointer hover:bg-[#F7F8FA]" : ""
+      }`}
+      onClick={(e) => {
+        if (!clickable) return;
+        // Clique que veio do ⋯ ou do diálogo (pelo portal) não conta.
+        if (!e.currentTarget.contains(e.target as Node)) return;
+        if ((e.target as HTMLElement).closest("button, a, [role=menu]")) return;
+        setEditOpen(true);
+      }}
+    >
+      {clickable ? (
+        <button
+          type="button"
+          onClick={() => setEditOpen(true)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left outline-none md:gap-3.5"
+          aria-label={`Editar ${actions.account.name}`}
+        >
+          {children}
+        </button>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-3.5">{children}</div>
+      )}
+      {trailing}
+      <AccountRowActions {...actions} editOpen={editOpen} onEditOpenChange={setEditOpen} />
+    </div>
   );
 }

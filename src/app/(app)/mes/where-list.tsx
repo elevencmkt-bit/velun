@@ -12,6 +12,7 @@ export function WhereList({
   colors,
   uncategorized,
   month,
+  accountId = null,
   currency,
 }: {
   where: { name: string; amount_cents: number }[];
@@ -19,12 +20,14 @@ export function WhereList({
   uncategorized: number;
   /** "2026-09" */
   month: string;
+  /** Filtro de conta do Dashboard, que o painel também respeita. */
+  accountId?: string | null;
   currency: CurrencyCode;
 }) {
   const [drawer, setDrawer] = useState<CategoryDrawerQuery | null>(null);
   const max = where[0]?.amount_cents ?? 1;
   const open = (name: string, color?: string) =>
-    setDrawer({ month, name, direction: "out", status: "cleared", color });
+    setDrawer({ month, name, direction: "out", status: "cleared", color, accountId });
 
   return (
     <>

@@ -37,7 +37,10 @@ export function TransactionsWorkspace({
   categoryColors,
   categoryIcons,
   currency,
-  monthLabel,
+  periodLabel,
+  month,
+  allPeriod,
+  today,
   prevHref,
   nextHref,
   summary,
@@ -56,7 +59,12 @@ export function TransactionsWorkspace({
   categoryColors: Record<string, CategoryColorPair>;
   categoryIcons: Record<string, string | null>;
   currency: CurrencyCode;
-  monthLabel: string;
+  /** "Setembro de 2026", "Todo o período" ou "01/09/2026 – 30/09/2026". */
+  periodLabel: string;
+  /** Mês mostrado ("2026-09"), ou null quando o período não é um mês. */
+  month: string | null;
+  allPeriod: boolean;
+  today: string;
   prevHref: string;
   nextHref: string;
   summary: TransactionsSummary;
@@ -90,7 +98,14 @@ export function TransactionsWorkspace({
           <p className="text-page-subtitle max-sm:hidden">Tudo o que entrou e saiu, dia a dia.</p>
         </div>
         <div className="flex items-center gap-3">
-          <MonthSelector label={monthLabel} prevHref={prevHref} nextHref={nextHref} />
+          <MonthSelector
+            label={periodLabel}
+            prevHref={prevHref}
+            nextHref={nextHref}
+            month={month}
+            today={today}
+            allPeriod={{ active: allPeriod }}
+          />
           <Button
             variant="ghost"
             onClick={() => setSelectionMode((v) => !v)}

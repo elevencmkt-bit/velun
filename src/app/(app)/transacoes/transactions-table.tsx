@@ -121,6 +121,11 @@ export function TransactionsTable({
     if (!row.transfer_group_id) setEditingRow(row);
   }
 
+  // Tudo o que dá pra mexer na lista de agora (o "Selecionar todas").
+  const editableIds = rows.filter((r) => r.can_edit).map((r) => r.id);
+  const everythingSelected =
+    editableIds.length > 0 && editableIds.every((id) => selected.has(id));
+
   const selectedPendingIds = rows
     .filter((r) => selected.has(r.id) && r.status === "pending")
     .map((r) => r.id);
@@ -211,45 +216,69 @@ export function TransactionsTable({
 
   return (
     <div className="flex flex-col gap-4">
-      {selected.size > 0 ? (
-        <div className="flex items-center gap-3 rounded-[10px] border border-(--border-primary) bg-(--bg-subtle) px-3 py-2">
-          <span className="text-sm font-medium text-(--text-primary)">
-            {selected.size} selecionada(s)
-          </span>
-          <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Recategorizar para..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
-              <CategoryOptions categories={categories} kind={bulkKind} />
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            disabled={!bulkCategoryId || isPending}
-            onClick={applyBulkCategory}
-          >
-            Aplicar
-          </Button>
-          {selectedPendingIds.length > 0 ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isPending}
-              onClick={applyBulkConfirm}
-            >
-              <Check className="h-3.5 w-3.5" /> Confirmar{" "}
-              {selectedPendingIds.length}
-            </Button>
-          ) : null}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelected(new Set())}
-          >
-            Limpar seleção
-          </Button>
+      {selectionMode || selected.size > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border border-(--border-primary) bg-(--bg-subtle) px-3 py-2">
+          {/* Seleciona tudo o que está na lista (com os filtros e a aba de
+              agora), não só um dia — pra recategorizar de uma vez. */}
+          {selectionMode ? (
+            <label className="flex min-h-9 cursor-pointer items-center gap-2.5 pr-1 text-sm font-medium text-(--text-primary)">
+              <Checkbox
+                checked={everythingSelected}
+                onCheckedChange={(checked) => setSelected(checked === true ? new Set(editableIds) : new Set())}
+                disabled={editableIds.length === 0}
+                aria-label="Selecionar todas"
+              />
+              {selected.size > 0
+                ? `${selected.size} de ${editableIds.length} selecionada${selected.size === 1 ? "" : "s"}`
+                : `Selecionar todas (${editableIds.length})`}
+            </label>
+          ) : (
+            <span className="text-sm font-medium text-(--text-primary)">
+              {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+            </span>
+          )}
+          {selected.size > 0 ? (
+            <>
+              <Select value={bulkCategoryId} onValueChange={setBulkCategoryId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Recategorizar para..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
+                  <CategoryOptions categories={categories} kind={bulkKind} />
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!bulkCategoryId || isPending}
+                onClick={applyBulkCategory}
+              >
+                Aplicar
+              </Button>
+              {selectedPendingIds.length > 0 ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={applyBulkConfirm}
+                >
+                  <Check className="h-3.5 w-3.5" /> Confirmar{" "}
+                  {selectedPendingIds.length}
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelected(new Set())}
+              >
+                Limpar seleção
+              </Button>
+            </>
+          ) : (
+            <span className="text-[13px] text-(--text-muted)">
+              ou marque dia a dia, ou lançamento a lançamento.
+            </span>
+          )}
         </div>
       ) : null}
 
