@@ -26,11 +26,22 @@ function monthTitle(month: string) {
  * "Baixar PDF" dos Relatórios: escolhe período, o quanto de detalhe e as
  * contas, e abre o relatório pronto pra salvar em PDF numa aba nova.
  */
-export function ReportPdfButton({ month, today, accounts }: { month: string; today: string; accounts: Account[] }) {
+export function ReportPdfButton({
+  month,
+  today,
+  accounts,
+  initialAccounts = null,
+}: {
+  month: string;
+  today: string;
+  accounts: Account[];
+  /** Com o filtro de conta da tela ligado, o PDF já vem só com ela. */
+  initialAccounts?: string[] | null;
+}) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<PeriodKind>("month");
   const [full, setFull] = useState(true);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(accounts.map((a) => a.id)));
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(initialAccounts ?? accounts.map((a) => a.id)));
   const year = month.slice(0, 4);
   const [from, setFrom] = useState(monthBounds(month).from);
   const [to, setTo] = useState(monthBounds(month).to);

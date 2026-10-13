@@ -24,7 +24,19 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
   const dmy = (iso: string) => iso.split("-").reverse().join("-");
   const what = period.kind === "custom" ? `${dmy(period.from)} a ${dmy(period.to)}` : period.label;
   const resumo = sp.mode === "summary" ? " (resumo)" : "";
-  return { title: `Velun - Relatório ${what}${resumo} - gerado em ${dmy(today)}` };
+  // Só algumas contas: o nome delas (ou quantas) entra no arquivo.
+  let contas = "";
+  const ids = sp.accounts ? sp.accounts.split(",").filter(Boolean) : [];
+  if (ids.length > 0) {
+    if (ids.length > 2) contas = ` - ${ids.length} contas`;
+    else {
+      const supabase = await createClient();
+      const { data } = await supabase.from("accounts").select("name").in("id", ids);
+      const names = (data ?? []).map((a) => String(a.name).replace(/[\\/:*?"<>|]/g, " ").trim());
+      if (names.length > 0) contas = ` - ${names.join(" e ")}`;
+    }
+  }
+  return { title: `Velun - Relatório ${what}${contas}${resumo} - gerado em ${dmy(today)}` };
 }
 
 const TYPE_LABEL: Record<string, string> = {

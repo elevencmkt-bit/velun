@@ -75,6 +75,7 @@ export function CategoryBreakdown({
   emptyExpense,
   emptyIncome,
   month,
+  accountId = null,
   status,
   prevTotalExpense,
   prevTotalIncome,
@@ -88,6 +89,8 @@ export function CategoryBreakdown({
   emptyIncome: string;
   /** "2026-09": o painel da categoria busca os lançamentos desse mês. */
   month: string;
+  /** Filtro de conta da tela, que o painel também respeita. */
+  accountId?: string | null;
   status: "cleared" | "pending";
   /** Totais do mês anterior, pra comparar a fatia de cada categoria. */
   prevTotalExpense: number;
@@ -119,7 +122,7 @@ export function CategoryBreakdown({
   const prevTotal = tab === "expense" ? prevTotalExpense : prevTotalIncome;
   const max = rows[0]?.amount_cents ?? 1;
   const openCategory = (r: BreakdownRow) =>
-    setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color });
+    setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color, accountId });
 
   const tabClass = (on: boolean) =>
     `flex h-9 flex-1 items-center justify-center rounded-[10px] px-4 text-[13px] font-semibold transition-colors sm:flex-none ${
