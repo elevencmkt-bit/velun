@@ -30,6 +30,8 @@ import {
 import { verifyStatement } from "@/lib/import/verify";
 import { looksLikeNomad, parseNomadStatementText } from "@/lib/import/nomad-pdf";
 import { suggestCategoryId } from "@/lib/import/mcc";
+import { duplicateCounter } from "@/lib/import/duplicates";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import {
   matchForecast,
   type ForecastCandidate,
@@ -330,16 +332,25 @@ async function runImportStatement(input: {
   // Fingerprints já existentes nessa conta, pra marcar duplicata. O
   // mesmo cálculo do lançamento manual, então extrato e digitação são
   // comparáveis.
-  const { data: existing } = await supabase
-    .from("transactions")
-    .select("fingerprint")
-    .eq("household_id", householdId)
-    .eq("account_id", accountId)
-    .gte("date", statement.periodStart)
-    .lte("date", statement.periodEnd);
+  //
+  // Em páginas: o Supabase devolve no máximo 1000 linhas por consulta, e
+  // um extrato de anos passa disso fácil — sem paginar, o que passasse
+  // de 1000 entraria em dobro.
+  const existing = await fetchAll<{ fingerprint: string }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("fingerprint")
+      .eq("household_id", householdId)
+      .eq("account_id", accountId)
+      .gte("date", statement.periodStart)
+      .lte("date", statement.periodEnd)
+      .order("id")
+      .range(from, to),
+  );
 
-  const existingFingerprints = new Set(
-    (existing ?? []).map((t) => t.fingerprint as string),
+  // Por contagem: três saques iguais no mesmo dia são três lançamentos.
+  const isExistingDuplicate = duplicateCounter(
+    existing.map((t) => t.fingerprint),
   );
 
   // Previsões em aberto no período: lançamento `pending` que veio de
@@ -410,7 +421,7 @@ async function runImportStatement(input: {
       amountCents: t.amountCents,
       description: t.description,
     });
-    const isDuplicate = existingFingerprints.has(fingerprint);
+    const isDuplicate = isExistingDuplicate(fingerprint);
     const learnedId = learnedFor(t.description, t.direction);
     const suggested =
       learnedId ?? suggestCategoryId(t.mcc, categoriesByName, t.direction);

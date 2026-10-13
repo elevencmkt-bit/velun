@@ -1,3 +1,4 @@
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { fetchConfirmedCandidates } from "@/lib/import/confirmed-candidates";
@@ -60,14 +61,18 @@ export default async function ImportarPage() {
   // Quantos lançamentos cada importação criou: é o número que o desfazer
   // precisa mostrar antes de apagar nada.
   const historyIds = (history ?? []).map((h) => h.id as string);
-  const { data: importedRows } =
+  const importedRows =
     historyIds.length > 0
-      ? await supabase
-          .from("transactions")
-          .select("import_id")
-          .eq("household_id", householdId)
-          .in("import_id", historyIds)
-      : { data: null };
+      ? await fetchAll<{ import_id: string }>((from, to) =>
+          supabase
+            .from("transactions")
+            .select("import_id")
+            .eq("household_id", householdId)
+            .in("import_id", historyIds)
+            .order("id")
+            .range(from, to),
+        )
+      : [];
 
   const countByImport = new Map<string, number>();
   for (const row of importedRows ?? []) {
@@ -75,15 +80,20 @@ export default async function ImportarPage() {
     countByImport.set(id, (countByImport.get(id) ?? 0) + 1);
   }
 
-  const { data: staged } = openImport
-    ? await supabase
+  // Em páginas: extrato de anos passa de 1000 linhas.
+  const staged = openImport
+    ? await fetchAll<Record<string, unknown>>((from, to) =>
+        supabase
         .from("staged_transactions")
         .select(
           "id, date, description, bank_description, amount_cents, direction, suggested_category_id, category_source, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status), card_payment_accepted, card:accounts!staged_transactions_card_payment_account_id_fkey(name)",
         )
         .eq("import_id", openImport.id)
         .order("date")
-    : { data: null };
+        .order("id")
+        .range(from, to),
+      )
+    : null;
 
   // Previsões do período que o extrato não confirmou. Sem isso elas
   // ficam somando no mês ao lado do dinheiro de verdade, e é o caso do
