@@ -18,6 +18,7 @@ import { buildCategoryColorMap } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { formatCents, type CurrencyCode } from "@/lib/money";
+import { fitsDirection } from "@/lib/category-kind";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
 type Category = {
@@ -26,6 +27,7 @@ type Category = {
   kind: "income" | "expense";
   icon?: string | null;
   color?: string | null;
+  is_transfer?: boolean;
 };
 type Mode = "in" | "out" | "transfer";
 
@@ -212,7 +214,7 @@ export function ManualTransactionButton({
     () => buildCategoryColorMap(categories.map((c) => ({ name: c.name, kind: c.kind, color: c.color ?? null }))),
     [categories],
   );
-  const categoriesForDirection = categories.filter((c) => c.kind === (mode === "in" ? "income" : "expense"));
+  const categoriesForDirection = categories.filter((c) => fitsDirection(c, mode === "in" ? "in" : "out"));
 
   function reset() {
     formRef.current?.reset();

@@ -31,6 +31,7 @@ import { verifyStatement } from "@/lib/import/verify";
 import { looksLikeNomad, parseNomadStatementText } from "@/lib/import/nomad-pdf";
 import { suggestCategoryId } from "@/lib/import/mcc";
 import { duplicateCounter } from "@/lib/import/duplicates";
+import { fitsDirection } from "@/lib/category-kind";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import {
   matchForecast,
@@ -318,14 +319,14 @@ async function runImportStatement(input: {
   // estorno de cartão traz o mesmo MCC da compra.
   const { data: categories } = await supabase
     .from("categories")
-    .select("id, name, kind")
+    .select("id, name, kind, is_transfer")
     .eq("household_id", householdId)
     .eq("is_archived", false);
 
   const categoriesByName = new Map(
     (categories ?? []).map((c) => [
       (c.name as string).toLowerCase(),
-      { id: c.id as string, kind: c.kind as string },
+      { id: c.id as string, kind: c.kind as string, is_transfer: (c.is_transfer as boolean | null) ?? false },
     ]),
   );
 
@@ -359,6 +360,7 @@ async function runImportStatement(input: {
   // A janela é esticada em 5 dias nas duas pontas porque a previsão pode
   // cair pouco antes ou depois do dia em que o banco postou.
   const { data: forecastRows } = await supabase
+    // limite: previsões pendentes de recorrência no período do extrato
     .from("transactions")
     .select(
       "id, date, amount_cents, direction, recurrence_id, recurrences(frequency)",
@@ -404,14 +406,12 @@ async function runImportStatement(input: {
   // que o código do cartão (MCC): foi ela quem escolheu. Só serve se a
   // categoria ainda existe e é do tipo certo (despesa pra saída).
   const learned = await loadMerchantCategories(supabase, memberId);
-  const kindById = new Map(
-    [...categoriesByName.values()].map((c) => [c.id, c.kind]),
-  );
+  const categoryById = new Map([...categoriesByName.values()].map((c) => [c.id, c]));
   const learnedFor = (description: string, direction: "in" | "out") => {
     const id = learnedCategoryFor(learned, description, direction);
-    const kind = id ? kindById.get(id) : undefined;
-    if (!kind) return null;
-    return kind === (direction === "in" ? "income" : "expense") ? id : null;
+    const category = id ? categoryById.get(id) : undefined;
+    if (!category) return null;
+    return fitsDirection(category, direction) ? id : null;
   };
 
   const rows = statement.transactions.map((t) => {
@@ -551,6 +551,7 @@ async function runImportStatement(input: {
   // corrente. Se existe essa transferência pro cartão, a linha é duplicata.
   if (isCard) {
     const { data: paymentsIn } = await supabase
+      // limite: pagamentos de fatura no período do extrato
       .from("transactions")
       .select("date, amount_cents")
       .eq("household_id", householdId)

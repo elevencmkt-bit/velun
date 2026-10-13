@@ -2,6 +2,7 @@
 
 import { SelectGroup, SelectItem, SelectLabel } from "@/components/ui/select";
 import type { CategoryOption } from "./types";
+import { fitsDirection } from "@/lib/category-kind";
 
 /**
  * Opções de categoria pra um seletor.
@@ -24,7 +25,7 @@ export function CategoryOptions({
   keepId?: string | null;
 }) {
   if (kind) {
-    const list = categories.filter((c) => c.kind === kind || c.id === keepId);
+    const list = categories.filter((c) => fitsDirection(c, kind === "income" ? "in" : "out") || c.id === keepId);
     return (
       <>
         {list.map((c) => (
@@ -37,8 +38,9 @@ export function CategoryOptions({
   }
 
   const groups: [string, CategoryOption[]][] = [
-    ["Despesas", categories.filter((c) => c.kind === "expense")],
-    ["Receitas", categories.filter((c) => c.kind === "income")],
+    ["Despesas", categories.filter((c) => c.kind === "expense" && !c.is_transfer)],
+    ["Receitas", categories.filter((c) => c.kind === "income" && !c.is_transfer)],
+    ["Entre contas", categories.filter((c) => c.is_transfer)],
   ];
   return (
     <>

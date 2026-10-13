@@ -33,6 +33,9 @@ export async function createCategory(formData: FormData) {
   const color = typeof colorInput === "string" ? colorInput : null;
   const iconInput = formData.get("icon");
   const icon = typeof iconInput === "string" ? iconInput : null;
+  // Movimentação entre contas: serve pra entrada e saída e fica fora de
+  // receita e despesa. Guardada como despesa só porque o tipo é obrigatório.
+  const isTransfer = formData.get("is_transfer") === "on";
 
   if (!name) throw new Error("Nome da categoria é obrigatório.");
   if (kind !== "income" && kind !== "expense") throw new Error("Tipo de categoria inválido.");
@@ -49,9 +52,10 @@ export async function createCategory(formData: FormData) {
     .insert({
       household_id: householdId,
       name,
-      kind,
+      kind: isTransfer ? "expense" : kind,
       color: color ?? NO_MANUAL_COLOR,
       icon,
+      ...(isTransfer ? { is_transfer: true } : {}),
     })
     .select("id")
     .single();

@@ -60,7 +60,7 @@ export default async function ConfiguracoesPage() {
     supabase.from("members").select("display_name, avatar_url").eq("id", memberId).maybeSingle(),
     supabase
       .from("categories")
-      .select("id, name, kind, color, icon")
+      .select("id, name, kind, color, icon, is_transfer")
       .eq("household_id", householdId)
       .order("name"),
     getCategoryColorMap(supabase, householdId),
@@ -98,8 +98,9 @@ export default async function ConfiguracoesPage() {
   }
 
   const categories = categoriesResult.data ?? [];
-  const expenseCategories = categories.filter((c) => c.kind === "expense");
-  const incomeCategories = categories.filter((c) => c.kind === "income");
+  const expenseCategories = categories.filter((c) => c.kind === "expense" && !c.is_transfer);
+  const incomeCategories = categories.filter((c) => c.kind === "income" && !c.is_transfer);
+  const transferCategories = categories.filter((c) => c.is_transfer);
   const pendingInvite = inviteResult.data
     ? {
         id: inviteResult.data.id,
@@ -211,7 +212,11 @@ export default async function ConfiguracoesPage() {
 
       <Card>
         <CardContent>
-          <CategoriesPanel expense={expenseCategories.map(toItem)} income={incomeCategories.map(toItem)} />
+          <CategoriesPanel
+            expense={expenseCategories.map(toItem)}
+            income={incomeCategories.map(toItem)}
+            transfer={transferCategories.map(toItem)}
+          />
         </CardContent>
       </Card>
 

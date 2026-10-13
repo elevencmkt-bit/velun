@@ -84,6 +84,7 @@ async function fetchPending(
 ): Promise<PendingRow[]> {
   if (scope.ids.length === 0) return [];
   const { data, error } = await supabase
+    // limite: pendentes até o fim do mês mostrado
     .from("transactions")
     .select(
       "id, date, description, amount_cents, direction, transfer_group_id, account_id",

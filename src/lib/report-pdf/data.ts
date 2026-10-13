@@ -26,7 +26,7 @@ type Tx = {
   description: string;
   status: string;
   transfer_group_id: string | null;
-  category: { name: string } | { name: string }[] | null;
+  category: { name: string; is_transfer?: boolean } | { name: string; is_transfer?: boolean }[] | null;
   account: { name: string } | { name: string }[] | null;
 };
 
@@ -42,6 +42,7 @@ function toMonthRows(rows: Tx[]): MonthTransaction[] {
     description: r.description,
     transfer_group_id: r.transfer_group_id,
     category_name: single(r.category)?.name ?? null,
+    category_is_transfer: single(r.category)?.is_transfer ?? false,
     account_name: single(r.account)?.name ?? "—",
   }));
 }
@@ -125,7 +126,7 @@ export async function buildReportData(params: {
           supabase
             .from("transactions")
             .select(
-              "id, account_id, date, amount_cents, direction, description, status, transfer_group_id, category:categories(name), account:accounts(name)",
+              "id, account_id, date, amount_cents, direction, description, status, transfer_group_id, category:categories(name, is_transfer), account:accounts(name)",
             )
             .eq("household_id", householdId)
             .eq("status", status)
@@ -157,8 +158,8 @@ export async function buildReportData(params: {
   ]);
 
   // Transferência entre contas não é receita nem despesa.
-  const current = toMonthRows(curRaw).filter((r) => !r.transfer_group_id);
-  const previous = toMonthRows(prevRaw).filter((r) => !r.transfer_group_id);
+  const current = toMonthRows(curRaw).filter((r) => !r.transfer_group_id && !r.category_is_transfer);
+  const previous = toMonthRows(prevRaw).filter((r) => !r.transfer_group_id && !r.category_is_transfer);
 
   const sum = (rows: MonthTransaction[], d: "in" | "out") =>
     rows.filter((r) => r.direction === d).reduce((n, r) => n + r.amount_cents, 0);
@@ -224,7 +225,7 @@ export async function buildReportData(params: {
     .filter((a): a is NonNullable<typeof a> => a !== null);
 
   const upcoming = toMonthRows(upcomingRaw)
-    .filter((r) => !r.transfer_group_id)
+    .filter((r) => !r.transfer_group_id && !r.category_is_transfer)
     .map((r) => ({
       date: r.date,
       description: r.description,

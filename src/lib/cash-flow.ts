@@ -71,6 +71,7 @@ export async function getCashFlowProjection(
   const [balances, { data: pending }, { cardIds, bills }, { data: overdueRows }] = await Promise.all([
     getAccountBalances(supabase, householdId, scope),
     supabase
+      // limite: pendentes da projeção (até 90 dias)
       .from("transactions")
       .select("id, date, description, amount_cents, direction, account_id, category:categories(name)")
       .eq("household_id", householdId)
@@ -83,6 +84,7 @@ export async function getCashFlowProjection(
     // Atrasados: pendentes com data antes de hoje. A projeção começa hoje,
     // então eles ficariam de fora em silêncio — a tela avisa e deixa incluir.
     supabase
+      // limite: pendentes atrasados, poucas dezenas
       .from("transactions")
       .select("amount_cents, direction, account_id")
       .eq("household_id", householdId)

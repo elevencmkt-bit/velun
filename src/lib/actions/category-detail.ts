@@ -34,7 +34,7 @@ export type CategoryDetail = {
   prevCents: number;
   /** Parte do total que vem de contas que só mostram a soma. */
   hiddenCents: number;
-  categories: { id: string; name: string; kind: "income" | "expense"; icon: string | null }[];
+  categories: { id: string; name: string; kind: "income" | "expense"; icon: string | null; is_transfer?: boolean }[];
 };
 
 type Raw = {
@@ -71,7 +71,7 @@ export async function getCategoryDetail(params: {
     accountScope(supabase, householdId, memberId, "transactions"),
     supabase
       .from("categories")
-      .select("id, name, kind, icon")
+      .select("id, name, kind, icon, is_transfer")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),

@@ -94,11 +94,12 @@ export default async function AVencerPage({
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind")
+      .select("id, name, kind, is_transfer")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
     supabase
+      // limite: pendentes até o horizonte da tela (semanas), poucas dezenas
       .from("transactions")
       .select(
         `id, date, description, amount_cents, direction, account_id, recurrence_id, transfer_group_id,
@@ -111,6 +112,7 @@ export default async function AVencerPage({
       .lte("date", horizon)
       .order("date", { ascending: true }),
     supabase
+      // limite: recorrências ativas da casa, poucas dezenas
       .from("recurrences")
       .select("id, template, frequency, day_of_month")
       .eq("household_id", householdId)

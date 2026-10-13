@@ -8,9 +8,18 @@ type Item = { category: CategoryRowData; color: string | null };
 
 // Categorias em blocos, com abas Despesas/Receitas — cabe tudo em poucas
 // linhas em vez de uma lista comprida.
-export function CategoriesPanel({ expense, income }: { expense: Item[]; income: Item[] }) {
-  const [tab, setTab] = useState<"expense" | "income">("expense");
-  const items = tab === "expense" ? expense : income;
+export function CategoriesPanel({
+  expense,
+  income,
+  transfer = [],
+}: {
+  expense: Item[];
+  income: Item[];
+  /** Movimentação entre contas: fora de receita e despesa. */
+  transfer?: Item[];
+}) {
+  const [tab, setTab] = useState<"expense" | "income" | "transfer">("expense");
+  const items = tab === "expense" ? expense : tab === "income" ? income : transfer;
 
   const tabClass = (on: boolean) =>
     `flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[10px] px-3.5 text-[13px] font-semibold transition-colors sm:flex-none ${
@@ -34,6 +43,9 @@ export function CategoriesPanel({ expense, income }: { expense: Item[]; income: 
           <button type="button" role="tab" aria-selected={tab === "income"} className={tabClass(tab === "income")} onClick={() => setTab("income")}>
             Receitas <span className="text-xs text-(--text-light)">{income.length}</span>
           </button>
+          <button type="button" role="tab" aria-selected={tab === "transfer"} className={tabClass(tab === "transfer")} onClick={() => setTab("transfer")}>
+            Entre contas <span className="text-xs text-(--text-light)">{transfer.length}</span>
+          </button>
         </div>
         <div className="order-2 sm:order-3">
           <NewCategoryDialog />
@@ -42,7 +54,11 @@ export function CategoriesPanel({ expense, income }: { expense: Item[]; income: 
 
       {items.length === 0 ? (
         <p className="text-sm text-(--text-muted)">
-          {tab === "expense" ? "Nenhuma categoria de despesa ainda." : "Nenhuma categoria de receita ainda."}
+          {tab === "expense"
+            ? "Nenhuma categoria de despesa ainda."
+            : tab === "income"
+              ? "Nenhuma categoria de receita ainda."
+              : "Nenhuma ainda. Crie uma (ex.: Transferência) em \"Nova categoria\" › Entre contas, pra dinheiro que só muda de conta — não conta como receita nem despesa."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:gap-2.5 lg:grid-cols-3 xl:grid-cols-4">

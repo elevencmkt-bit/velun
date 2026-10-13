@@ -13,6 +13,7 @@ import { updateTransactionCategory } from "@/lib/actions/transactions";
 import { categoryInsight } from "@/lib/category-insight";
 import { getCategoryIcon } from "@/lib/category-icons";
 import type { CurrencyCode } from "@/lib/money";
+import { fitsDirection } from "@/lib/category-kind";
 
 export type CategoryDrawerQuery = {
   /** "2026-09" */
@@ -110,7 +111,7 @@ export function CategoryDrawer({
   const open = query !== null;
   const dir = query?.direction ?? "out";
   const kind = dir === "in" ? "income" : "expense";
-  const options = (detail?.categories ?? []).filter((c) => c.kind === kind);
+  const options = (detail?.categories ?? []).filter((c) => fitsDirection(c, dir));
   const matched = detail?.categories.find((c) => c.name === query?.name);
   const icon = createElement(getCategoryIcon(query?.name ?? null, dir, matched?.icon ?? null), {
     className: "h-5 w-5",
