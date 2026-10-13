@@ -54,6 +54,8 @@ function formatDayHeading(date: string) {
   return short.charAt(0).toUpperCase() + short.slice(1);
 }
 
+const ROWS_PER_PAGE = 200;
+
 export function TransactionsTable({
   rows,
   accounts,
@@ -83,14 +85,23 @@ export function TransactionsTable({
   const [editingRow, setEditingRow] = useState<TransactionRow | null>(null);
   const router = useRouter();
 
+  // Período longo (todo o período, de/até de anos) traz milhares de
+  // lançamentos. Desenhar todos de uma vez gerava uma página de mais de
+  // 10 MB que nem terminava de carregar; a lista mostra em blocos.
+  const [limit, setLimit] = useState(ROWS_PER_PAGE);
+  const visibleRows = useMemo(
+    () => (rows.length > limit ? rows.slice(0, limit) : rows),
+    [rows, limit],
+  );
+
   const groups = useMemo(() => {
     const map = new Map<string, TransactionRow[]>();
-    for (const row of rows) {
+    for (const row of visibleRows) {
       if (!map.has(row.date)) map.set(row.date, []);
       map.get(row.date)!.push(row);
     }
     return Array.from(map.entries());
-  }, [rows]);
+  }, [visibleRows]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -533,6 +544,21 @@ export function TransactionsTable({
           </div>
         );
       })}
+
+      {rows.length > limit ? (
+        <div className="flex flex-col items-center gap-1.5 pt-2">
+          <button
+            type="button"
+            onClick={() => setLimit((n) => n + ROWS_PER_PAGE)}
+            className="h-10 rounded-full bg-(--primary-soft) px-5 text-sm font-semibold text-(--primary) transition-opacity hover:opacity-90"
+          >
+            Mostrar mais {Math.min(ROWS_PER_PAGE, rows.length - limit)}
+          </button>
+          <span className="text-xs text-(--text-muted)">
+            {limit} de {rows.length} lançamentos
+          </span>
+        </div>
+      ) : null}
 
       {editingRow ? (
         <EditTransactionDialog
