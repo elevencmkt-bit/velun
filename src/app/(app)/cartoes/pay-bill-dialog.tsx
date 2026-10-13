@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DateInput } from "@/components/date-input";
 
 export function PayBillDialog({
   cardId,
@@ -114,10 +115,9 @@ export function PayBillDialog({
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="pay-date">Data</Label>
-                <Input
+                <DateInput
                   id="pay-date"
                   name="date"
-                  type="date"
                   required
                   defaultValue={localToday()}
                 />

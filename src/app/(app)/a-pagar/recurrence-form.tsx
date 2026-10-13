@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateInput } from "@/components/date-input";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; kind: "income" | "expense" };
@@ -172,7 +173,7 @@ export function RecurrenceForm({
               <Label htmlFor="starts_on">
                 {frequency === "monthly" ? "Primeira ocorrência" : "Data de início"}
               </Label>
-              <Input id="starts_on" name="starts_on" type="date" defaultValue={todayISO()} required />
+              <DateInput id="starts_on" name="starts_on" defaultValue={todayISO()} required />
             </div>
             {frequency === "monthly" ? (
               <div className="flex flex-col gap-2">
@@ -190,14 +191,14 @@ export function RecurrenceForm({
             ) : (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="ends_on">Termina em (opcional)</Label>
-                <Input id="ends_on" name="ends_on" type="date" />
+                <DateInput id="ends_on" name="ends_on" />
               </div>
             )}
           </div>
           {frequency === "monthly" ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="ends_on">Termina em (opcional)</Label>
-              <Input id="ends_on" name="ends_on" type="date" />
+              <DateInput id="ends_on" name="ends_on" />
             </div>
           ) : null}
 
