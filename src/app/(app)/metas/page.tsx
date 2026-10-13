@@ -284,7 +284,7 @@ export default async function MetasPage() {
                 )}
                 {g.canEdit ? (
                   <div className="flex flex-wrap gap-2 border-t border-(--border-soft) pt-3.5">
-                    {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} /> : null}
+                    {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} currency={currency} /> : null}
                     <EditGoalButton goal={actionData(g, memberId)} currency={currency} />
                   </div>
                 ) : null}
@@ -405,7 +405,7 @@ export default async function MetasPage() {
                   )}
                   {g.canEdit ? (
                     <div className="mt-1 flex flex-wrap gap-2">
-                      {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} /> : null}
+                      {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} currency={currency} /> : null}
                       <EditGoalButton goal={actionData(g, memberId)} currency={currency} />
                     </div>
                   ) : null}

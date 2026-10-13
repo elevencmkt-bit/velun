@@ -168,3 +168,115 @@ export async function deleteGoalDeposit(id: string): Promise<Result> {
   if (!data || data.length === 0) return { ok: false, error: "Você não pode apagar esse valor." };
   return done();
 }
+
+export type LinkableTransaction = {
+  id: string;
+  date: string;
+  description: string;
+  account_name: string;
+  amount_cents: number;
+  direction: "in" | "out";
+};
+
+/**
+ * Lançamentos que dá pra vincular a uma meta: das contas que a meta pode
+ * usar (meta do casal: só conta do casal; minha: do casal ou minha), dos
+ * últimos 6 meses, que ainda não estão nela. Busca opcional pelo texto.
+ */
+export async function findLinkableTransactions(goalId: string, query: string): Promise<LinkableTransaction[]> {
+  const { householdId, memberId, today } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const { data: goal } = await supabase.from("goals").select("owner_id, kind").eq("id", goalId).maybeSingle();
+  if (!goal || (goal.owner_id !== null && goal.owner_id !== memberId)) return [];
+
+  const { data: accounts } = await supabase
+    .from("accounts")
+    .select("id, name, owner_id")
+    .eq("household_id", householdId);
+  const allowed = (accounts ?? []).filter((a) =>
+    goal.owner_id === null ? a.owner_id === null : a.owner_id === null || a.owner_id === memberId,
+  );
+  if (allowed.length === 0) return [];
+  const names = new Map(allowed.map((a) => [a.id as string, a.name as string]));
+
+  const { data: used } = await supabase
+    // limite: valores de uma meta só
+    .from("goal_deposits")
+    .select("transaction_id")
+    .eq("goal_id", goalId)
+    .not("transaction_id", "is", null);
+  const taken = new Set((used ?? []).map((u) => u.transaction_id as string));
+
+  const since = new Date(`${today}T12:00:00Z`);
+  since.setUTCMonth(since.getUTCMonth() - 6);
+  let q = supabase
+    // limite: os 40 mais recentes que batem com a busca
+    .from("transactions")
+    .select("id, date, description, amount_cents, direction, account_id")
+    .eq("household_id", householdId)
+    .eq("status", "cleared")
+    .in("account_id", [...names.keys()])
+    .gte("date", since.toISOString().slice(0, 10))
+    .order("date", { ascending: false })
+    .order("id")
+    .limit(40);
+  const term = query.trim();
+  if (term) {
+    const cents = Math.round(Number.parseFloat(term.replace(/[^\d.,]/g, "").replace(",", ".")) * 100);
+    const safe = `"%${term.replace(/["\\]/g, "")}%"`;
+    q = Number.isFinite(cents) && cents > 0 && /^[\d.,$\s]+$/.test(term)
+      ? q.eq("amount_cents", cents)
+      : q.or(`description.ilike.${safe},bank_description.ilike.${safe}`);
+  } else {
+    // Sem busca, o que mais costuma ser pagamento/depósito: saídas.
+    q = q.eq("direction", "out");
+  }
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((t) => !taken.has(t.id as string))
+    .map((t) => ({
+      id: t.id as string,
+      date: t.date as string,
+      description: t.description as string,
+      account_name: names.get(t.account_id as string) ?? "",
+      amount_cents: t.amount_cents as number,
+      direction: t.direction as "in" | "out",
+    }));
+}
+
+/** Vincula um lançamento: entra na meta com o valor e a data dele. */
+export async function linkTransactionToGoal(goalId: string, transactionId: string): Promise<Result> {
+  const { householdId, memberId } = await getCurrentMember();
+  const supabase = await createClient();
+  const { data: tx } = await supabase
+    .from("transactions")
+    .select("amount_cents, date")
+    .eq("id", transactionId)
+    .maybeSingle();
+  if (!tx) return { ok: false, error: "Lançamento não encontrado." };
+
+  const { data, error } = await supabase
+    .from("goal_deposits")
+    .insert({
+      household_id: householdId,
+      goal_id: goalId,
+      amount_cents: tx.amount_cents,
+      date: tx.date,
+      transaction_id: transactionId,
+      created_by: memberId,
+    })
+    .select("id");
+  if (error) {
+    if (error.code === "23505") return { ok: false, error: "Esse lançamento já está nesta meta." };
+    return {
+      ok: false,
+      error: error.message.includes("row-level security")
+        ? "Meta do casal só aceita lançamento de conta do casal."
+        : error.message,
+    };
+  }
+  if (!data || data.length === 0) return { ok: false, error: "Você não pode mexer nessa meta." };
+  return done();
+}

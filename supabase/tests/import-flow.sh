@@ -407,6 +407,20 @@ check "meta do casal não segue conta pessoal" "$(admin "select count(*) from go
 as_user $LEVI "insert into goals (household_id, owner_id, kind, name, target_cents, tracking, account_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'save', 'Minha na minha', 100, 'account', 'acc00000-0000-0000-0000-000000000001');" >/dev/null 2>&1
 check "a minha segue a minha conta" "$(admin "select count(*) from goals where name='Minha na minha'")" "1"
 
+echo "metas: vincular lançamento:"
+admin "insert into transactions (id, household_id, account_id, date, amount_cents, direction, description, status, fingerprint, created_by) values ('f0000000-0000-0000-0000-0000000000c2', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000001', '2026-10-02', 40000, 'out', 'Pagamento pessoal', 'cleared', 'fp-pessoal', '$LEVI');" >/dev/null
+admin "insert into transactions (id, household_id, account_id, date, amount_cents, direction, description, status, fingerprint, created_by) values ('f0000000-0000-0000-0000-0000000000c1', '11111111-0000-0000-0000-000000000001', 'acc00000-0000-0000-0000-000000000002', '2026-10-01', 30000, 'out', 'Parcela empréstimo', 'cleared', 'fp-parcela', '$LEVI');" >/dev/null
+as_user $LEVI "insert into goal_deposits (household_id, goal_id, amount_cents, transaction_id) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', 40000, 'f0000000-0000-0000-0000-0000000000c2');" >/dev/null 2>&1
+check "meta do casal não vincula lançamento da conta pessoal" "$(admin "select count(*) from goal_deposits where transaction_id='f0000000-0000-0000-0000-0000000000c2'")" "0"
+as_user $LEVI "insert into goal_deposits (household_id, goal_id, amount_cents, transaction_id) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000002', 40000, 'f0000000-0000-0000-0000-0000000000c2');"
+check "a minha vincula da minha conta" "$(admin "select count(*) from goal_deposits where transaction_id='f0000000-0000-0000-0000-0000000000c2'")" "1"
+as_user $ESPOSA "insert into goal_deposits (household_id, goal_id, amount_cents, transaction_id) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', 30000, 'f0000000-0000-0000-0000-0000000000c1');" >/dev/null 2>&1
+check "conjunta na meta do casal: vincula" "$(admin "select count(*) from goal_deposits where transaction_id='f0000000-0000-0000-0000-0000000000c1'")" "1"
+as_user $ESPOSA "insert into goal_deposits (household_id, goal_id, amount_cents, transaction_id) values ('11111111-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', 30000, 'f0000000-0000-0000-0000-0000000000c1');" >/dev/null 2>&1
+check "o mesmo lançamento não entra duas vezes" "$(admin "select count(*) from goal_deposits where transaction_id='f0000000-0000-0000-0000-0000000000c1'")" "1"
+admin "delete from transactions where id='f0000000-0000-0000-0000-0000000000c1';" >/dev/null
+check "apagou o lançamento, sai da meta" "$(admin "select count(*) from goal_deposits where transaction_id='f0000000-0000-0000-0000-0000000000c1'")" "0"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
