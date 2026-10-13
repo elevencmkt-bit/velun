@@ -241,6 +241,21 @@ async function runImportStatement(input: {
               : `${nomad.cancelledCount} compras canceladas ficaram de fora.`,
           );
         }
+        if (nomad.processingCount > 0) {
+          parts.push(
+            nomad.processingCount === 1
+              ? "1 lançamento ainda está processando e entrou como saída — a Nomad já desconta do saldo."
+              : `${nomad.processingCount} lançamentos ainda estão processando e entraram — a Nomad já desconta do saldo.`,
+          );
+        }
+        const unknown = Object.entries(nomad.unknownStatuses);
+        if (unknown.length > 0) {
+          const total = unknown.reduce((n, [, c]) => n + c, 0);
+          const names = unknown.map(([name]) => `"${name}"`).join(", ");
+          parts.push(
+            `Atenção: ${total} ${total === 1 ? "lançamento ficou" : "lançamentos ficaram"} de fora por uma situação que o Velun ainda não conhece (${names}). Confira no app da Nomad.`,
+          );
+        }
         if (nomad.reportedBalance) {
           const [y, m, d] = nomad.reportedBalance.date.split("-");
           const amount = (nomad.reportedBalance.cents / 100).toLocaleString("en-US", {
