@@ -36,7 +36,7 @@ import {
   matchForecast,
   type ForecastCandidate,
 } from "@/lib/import/match-forecast";
-import { matchConfirmed } from "@/lib/import/match-confirmed";
+import { matchConfirmed, matchConfirmedExact } from "@/lib/import/match-confirmed";
 import { fetchConfirmedCandidates } from "@/lib/import/confirmed-candidates";
 
 const MAX_TEXT_LENGTH = 2 * 1024 * 1024;
@@ -472,15 +472,29 @@ async function runImportStatement(input: {
     accountId,
     statement,
   );
-  const pairs = matchConfirmed(
+  const lines = () =>
     rows.map((r) => ({
       date: r.date,
       amountCents: r.amount_cents,
       direction: r.direction,
       fingerprint: r.fingerprint,
       free: r.dup_status === "none" && r.match_transaction_id === null,
-    })),
-    confirmed,
+    }));
+
+  // Mesmo dia e valor: o lançamento digitado à mão é esta linha. Junção
+  // já marcada — sem isso, quem lançou um mês à mão clicava "Juntar" em
+  // cada linha.
+  const exact = matchConfirmedExact(lines(), confirmed);
+  const exactIds = new Set(exact.values());
+  for (const [index, transactionId] of exact) {
+    rows[index].match_transaction_id = transactionId;
+    rows[index].merge_accepted = true;
+  }
+
+  // O resto: valor único com data perto vira sugestão, desmarcada.
+  const pairs = matchConfirmed(
+    lines(),
+    confirmed.filter((c) => !exactIds.has(c.id)),
   );
   for (const [index, transactionId] of pairs) {
     rows[index].match_transaction_id = transactionId;

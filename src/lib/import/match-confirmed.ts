@@ -75,6 +75,37 @@ export function relevantCandidates<T extends ConfirmedCandidate>(
 }
 
 /**
+ * Nível 0: mesmo dia, mesmo valor, mesma direção. Aqui não tem dúvida
+ * razoável — quem lançou à mão copiou do app do banco — então a junção
+ * já vem MARCADA. Valores repetidos no mesmo dia (duas cobranças de $10
+ * da Anthropic) casam um a um, na ordem: são intercambiáveis.
+ *
+ * Devolve índice da linha do extrato → id do lançamento confirmado.
+ */
+export function matchConfirmedExact(
+  lines: StatementLine[],
+  candidates: ConfirmedCandidate[],
+): Map<number, string> {
+  const exactKey = (x: { direction: string; amountCents: number; date: string }) =>
+    `${x.direction}|${x.amountCents}|${x.date}`;
+
+  const pool = new Map<string, string[]>();
+  for (const c of relevantCandidates(lines, candidates)) {
+    const list = pool.get(exactKey(c)) ?? [];
+    list.push(c.id);
+    pool.set(exactKey(c), list);
+  }
+
+  const result = new Map<number, string>();
+  lines.forEach((line, index) => {
+    if (!line.free) return;
+    const id = pool.get(exactKey(line))?.shift();
+    if (id) result.set(index, id);
+  });
+  return result;
+}
+
+/**
  * Nível 1: pares únicos. Devolve índice da linha do extrato → id do
  * lançamento confirmado.
  */
