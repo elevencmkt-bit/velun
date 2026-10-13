@@ -157,11 +157,19 @@ export default async function AVencerPage({
 
   // Compra prevista no cartão não aparece sozinha: ela já está dentro da
   // fatura, que entra aqui como uma linha só.
+  // Transferência programada (ex.: guardar pra uma meta) entra como uma
+  // linha só, a da saída, com "de → pra". Confirmar confirma os dois lados.
+  const transferTo = new Map<string, string>();
+  for (const row of pendingRaw ?? []) {
+    if (row.transfer_group_id && row.direction === "in") {
+      transferTo.set(row.transfer_group_id as string, single<{ name: string }>(row.account)?.name ?? "—");
+    }
+  }
   const allPending: PendingRow[] = [
     ...(pendingRaw ?? [])
       .filter(
         (row) =>
-          !row.transfer_group_id && !cardIds.has(row.account_id as string),
+          (!row.transfer_group_id || row.direction === "out") && !cardIds.has(row.account_id as string),
       )
       .map((row) => ({
         id: row.id as string,
@@ -169,7 +177,9 @@ export default async function AVencerPage({
         description: row.description as string,
         amount_cents: row.amount_cents as number,
         direction: row.direction as "in" | "out",
-        account_name: single<{ name: string }>(row.account)?.name ?? "—",
+        account_name: row.transfer_group_id
+          ? `${single<{ name: string }>(row.account)?.name ?? "—"} → ${transferTo.get(row.transfer_group_id as string) ?? "outra conta"}`
+          : (single<{ name: string }>(row.account)?.name ?? "—"),
         category_name: single<{ name: string }>(row.category)?.name ?? null,
         recurring: row.recurrence_id !== null,
         can_edit: writableIds.has(row.account_id as string),

@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope } from "@/lib/visibility";
 import { getAccountBalances } from "@/lib/balances";
-import type { GoalKind } from "@/lib/goal-math";
+import { monthlyDates, type GoalKind } from "@/lib/goal-math";
+import { computeFingerprint } from "@/lib/fingerprint";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -338,5 +339,118 @@ export async function unlinkTransactionFromGoal(goalId: string, transactionId: s
     .select("id");
   if (error) return { ok: false, error: error.message };
   if (!data || data.length === 0) return { ok: false, error: "Não estava vinculado." };
+  return done();
+}
+
+/**
+ * Programa "todo dia X, $Y da conta A pra conta da meta": cria as
+ * transferências como PENDENTES (aparecem em Transações, A vencer e no
+ * Fluxo de caixa) até a data da meta — ou 12 meses, sem data. Confirmadas,
+ * o saldo da conta da meta sobe e ela anda sozinha.
+ */
+export async function scheduleGoalTransfers(input: {
+  goalId: string;
+  fromAccountId: string;
+  amountCents: number;
+  day: number;
+}): Promise<Result> {
+  const { householdId, memberId, today } = await getCurrentMember();
+  const supabase = await createClient();
+  const amount = Math.round(input.amountCents);
+  const day = Math.round(input.day);
+  if (amount <= 0) return { ok: false, error: "Informe o valor." };
+  if (!(day >= 1 && day <= 31)) return { ok: false, error: "Dia do mês inválido." };
+
+  const { data: goal } = await supabase
+    .from("goals")
+    .select("id, name, kind, tracking, account_id, owner_id, target_date, schedule")
+    .eq("id", input.goalId)
+    .maybeSingle();
+  if (!goal || goal.kind !== "save" || goal.tracking !== "account" || !goal.account_id) {
+    return { ok: false, error: "Só dá pra programar em meta que segue o saldo de uma conta." };
+  }
+  if (goal.owner_id !== null && goal.owner_id !== memberId) return { ok: false, error: "Você não pode mexer nessa meta." };
+  if (goal.schedule) return { ok: false, error: "Essa meta já tem uma programação. Cancele antes de criar outra." };
+  if (input.fromAccountId === goal.account_id) return { ok: false, error: "Escolha uma conta diferente da conta da meta." };
+
+  // Mesma regra das metas: do casal só mexe em conta do casal.
+  const { data: from } = await supabase.from("accounts").select("id, owner_id").eq("id", input.fromAccountId).maybeSingle();
+  if (!from) return { ok: false, error: "Conta não encontrada." };
+  const okAccount = from.owner_id === null || (goal.owner_id !== null && from.owner_id === memberId);
+  if (!okAccount) return { ok: false, error: "Meta do casal só programa a partir de conta do casal." };
+
+  const dates = monthlyDates(today, day, goal.target_date as string | null, goal.target_date ? 36 : 12);
+  if (dates.length === 0) return { ok: false, error: "A data da meta já passou." };
+
+  const description = `Guardar · ${goal.name}`;
+  const groups: string[] = [];
+  const rows = dates.flatMap((date) => {
+    const group = crypto.randomUUID();
+    groups.push(group);
+    const base = {
+      household_id: householdId,
+      category_id: null,
+      date,
+      amount_cents: amount,
+      description,
+      notes: null,
+      status: "pending" as const,
+      transfer_group_id: group,
+      created_by: memberId,
+    };
+    return [
+      {
+        ...base,
+        account_id: input.fromAccountId,
+        direction: "out" as const,
+        fingerprint: computeFingerprint({ accountId: input.fromAccountId, date, amountCents: amount, description }),
+      },
+      {
+        ...base,
+        account_id: goal.account_id as string,
+        direction: "in" as const,
+        fingerprint: computeFingerprint({ accountId: goal.account_id as string, date, amountCents: amount, description }),
+      },
+    ];
+  });
+
+  // Um insert só: ou entram todas, ou nenhuma.
+  const { error } = await supabase.from("transactions").insert(rows);
+  if (error) return { ok: false, error: error.message };
+
+  const { error: saveError } = await supabase
+    .from("goals")
+    .update({ schedule: { from_account_id: input.fromAccountId, amount_cents: amount, day, groups } })
+    .eq("id", goal.id);
+  if (saveError) {
+    await supabase.from("transactions").delete().in("transfer_group_id", groups).eq("status", "pending");
+    return { ok: false, error: saveError.message };
+  }
+  revalidatePath("/transacoes");
+  revalidatePath("/a-pagar");
+  revalidatePath("/fluxo-de-caixa");
+  return done();
+}
+
+/** Cancela a programação: apaga as transferências que ainda não caíram. */
+export async function cancelGoalSchedule(goalId: string): Promise<Result> {
+  const supabase = await createClient();
+  const { data: goal } = await supabase.from("goals").select("id, schedule").eq("id", goalId).maybeSingle();
+  if (!goal?.schedule) return { ok: false, error: "Essa meta não tem programação." };
+  const groups = (goal.schedule as { groups?: string[] }).groups ?? [];
+  if (groups.length > 0) {
+    const { error } = await supabase
+      .from("transactions")
+      .delete()
+      .in("transfer_group_id", groups)
+      .eq("status", "pending");
+    if (error) return { ok: false, error: error.message };
+  }
+  const { data, error } = await supabase.from("goals").update({ schedule: null }).eq("id", goalId).select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "Você não pode mexer nessa meta." };
+  revalidatePath("/transacoes");
+  revalidatePath("/a-pagar");
+  revalidatePath("/fluxo-de-caixa");
   return done();
 }

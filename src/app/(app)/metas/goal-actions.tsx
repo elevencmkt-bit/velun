@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Link2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { CalendarClock, Link2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -17,10 +17,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/date-input";
+import { localToday } from "@/lib/today";
 import { amountToCents } from "@/lib/amount-input";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import {
   addGoalDeposit,
+  cancelGoalSchedule,
+  scheduleGoalTransfers,
   deleteGoal,
   deleteGoalDeposit,
   findLinkableTransactions,
@@ -192,6 +195,9 @@ export function DepositButton({ goal, today, currency }: { goal: GoalActionData;
                 <div>
                   <span className={label}>Data</span>
                   <DateInput aria-label="Data" defaultValue={today} onChange={(v) => setDate(v || today)} className="h-12 rounded-[14px]" />
+                  {date > today ? (
+                    <p className="mt-1.5 px-0.5 text-xs text-(--warning-dark)">Data à frente: fica agendado e só conta na meta quando o dia chegar.</p>
+                  ) : null}
                 </div>
                 <label>
                   <span className={label}>
@@ -357,7 +363,10 @@ export function EditGoalButton({ goal, currency }: { goal: GoalActionData; curre
                 <div className="flex max-h-[220px] flex-col overflow-y-auto rounded-[14px] bg-(--bg-subtle) px-3">
                   {goal.deposits.map((d) => (
                     <div key={d.id} className="flex min-h-12 items-center gap-3 border-b border-(--border-soft) last:border-0">
-                      <span className="w-[76px] shrink-0 text-xs text-(--text-muted)">{brDate(d.date)}</span>
+                      <span className="w-[76px] shrink-0 text-xs text-(--text-muted)">
+                        {brDate(d.date)}
+                        {d.date > localToday() ? <span className="block text-[10px] font-bold text-(--warning-dark)">agendado</span> : null}
+                      </span>
                       <span className="min-w-0 flex-1 truncate text-[13px] text-(--text-secondary)">
                         {d.transaction_id ? (
                           <span className="inline-flex max-w-full items-center gap-1.5" title="Vinculado a um lançamento">
@@ -424,5 +433,167 @@ export function EditGoalButton({ goal, currency }: { goal: GoalActionData; curre
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+/**
+ * "Programar transferência": todo dia X, $Y de uma conta pra conta da
+ * meta. Vira transferência pendente de verdade, mês a mês.
+ */
+export function ScheduleButton({
+  goal,
+  accounts,
+  suggestedCents,
+  currency,
+}: {
+  goal: { id: string; name: string; target_date: string | null; account_id: string | null; owner_id: string | null };
+  accounts: { id: string; name: string; type: string; couple: boolean; mine: boolean }[];
+  suggestedCents: number | null;
+  currency: CurrencyCode;
+}) {
+  const [open, setOpen] = useState(false);
+  const choices = accounts.filter(
+    (a) => a.id !== goal.account_id && a.type !== "credit_card" && (goal.owner_id === null ? a.couple : a.couple || a.mine),
+  );
+  const [fromId, setFromId] = useState(choices[0]?.id ?? "");
+  const [amount, setAmount] = useState(suggestedCents ? (suggestedCents / 100).toFixed(2).replace(".", ",") : "");
+  const [day, setDay] = useState("5");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const cents = amountToCents(amount);
+
+  function submit() {
+    setError(null);
+    startTransition(async () => {
+      const r = await scheduleGoalTransfers({ goalId: goal.id, fromAccountId: fromId, amountCents: cents, day: Number(day) });
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex h-9 items-center gap-1.5 rounded-[11px] bg-(--primary-light) px-3.5 text-[13px] font-semibold text-(--primary) transition-opacity hover:opacity-90"
+      >
+        <CalendarClock className="h-3.5 w-3.5" /> Programar transferência
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Programar · {goal.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <p className="text-[13px] leading-relaxed text-(--text-muted)">
+              Cria uma transferência pendente por mês{goal.target_date ? ` até ${brDate(goal.target_date)}` : " pelos próximos 12 meses"}. Ela aparece em
+              Transações, A vencer e no Fluxo de caixa; quando você confirmar, a meta anda sozinha.
+            </p>
+            <div>
+              <span className={label}>Sai de</span>
+              {choices.length === 0 ? (
+                <p className="text-[13px] text-(--text-muted)">Nenhuma outra conta {goal.owner_id === null ? "do casal" : "sua ou do casal"} pra usar.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {choices.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      aria-pressed={fromId === a.id}
+                      onClick={() => setFromId(a.id)}
+                      className={`inline-flex h-10 items-center rounded-full border-[1.5px] px-4 text-sm ${
+                        fromId === a.id
+                          ? "border-(--primary) bg-(--primary-soft) font-semibold text-(--primary-hover)"
+                          : "border-(--border-primary) font-medium text-(--text-body) hover:border-(--primary-border)"
+                      }`}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-[1fr_120px] gap-3">
+              <label>
+                <span className={label}>Quanto por mês</span>
+                <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" className="h-12 rounded-[14px] text-[17px] font-bold" />
+              </label>
+              <label>
+                <span className={label}>Todo dia</span>
+                <Input inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))} className="h-12 rounded-[14px] text-[17px] font-bold" />
+              </label>
+            </div>
+            {suggestedCents ? (
+              <p className="-mt-2 px-0.5 text-xs text-(--text-muted)">
+                Pra chegar na data: {formatCents(suggestedCents, currency)}/mês.
+              </p>
+            ) : null}
+            {error ? <p className="text-sm text-(--danger-text)">{error}</p> : null}
+            <Button onClick={submit} disabled={isPending || !fromId || cents <= 0} className="h-12 rounded-[14px] text-[15px] font-bold">
+              {isPending ? "Programando…" : cents > 0 ? `Programar ${formatCents(cents, currency)}/mês` : "Programar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/** Linha da programação, com "Cancelar" (apaga as que ainda não caíram). */
+export function SchedulePlan({
+  goalId,
+  plan,
+  currency,
+  canEdit,
+}: {
+  goalId: string;
+  plan: { fromName: string; amountCents: number; day: number; next: string | null; remaining: number };
+  currency: CurrencyCode;
+  canEdit: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const router = useRouter();
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] bg-(--bg-subtle) px-3.5 py-2.5 text-[13px] text-(--text-secondary)">
+      <CalendarClock className="h-4 w-4 shrink-0 text-(--primary)" />
+      <span className="min-w-0 flex-1">
+        <b className="font-semibold text-(--text-primary)">{formatCents(plan.amountCents, currency)}</b> todo dia {plan.day} da {plan.fromName}
+        {plan.next ? ` · próxima ${brDate(plan.next).slice(0, 5)} · ${plan.remaining} ${plan.remaining === 1 ? "pendente" : "pendentes"}` : " · nenhuma pendente"}
+      </span>
+      {canEdit ? (
+        confirming ? (
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  await cancelGoalSchedule(goalId);
+                  setConfirming(false);
+                  router.refresh();
+                })
+              }
+              className="text-xs font-semibold text-(--danger-text) hover:underline"
+            >
+              {isPending ? "Cancelando…" : "Apagar as pendentes"}
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} className="text-xs text-(--text-muted) hover:underline">
+              Manter
+            </button>
+          </span>
+        ) : (
+          <button type="button" onClick={() => setConfirming(true)} className="text-xs font-semibold text-(--text-muted) hover:text-(--danger-text)">
+            Cancelar
+          </button>
+        )
+      ) : null}
+    </div>
   );
 }
