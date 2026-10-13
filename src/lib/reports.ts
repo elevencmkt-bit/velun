@@ -112,7 +112,12 @@ export type InsightPart = string | { cents: number };
 export type ReportInsight = {
   headline: InsightPart[];
   tone: "positive" | "warning";
-  items: { parts: InsightPart[]; tone: "positive" | "warning" | "info" }[];
+  items: {
+    parts: InsightPart[];
+    tone: "positive" | "warning" | "info";
+    /** Ícone explícito (destaques do período); sem ele, o card deduz pela frase. */
+    icon?: "best" | "worst" | "top" | "months" | "compare";
+  }[];
 };
 
 /** Categoria com o valor do mês e o do mês anterior (null = não existia). */
@@ -235,6 +240,123 @@ export function buildReportInsight(input: {
     items.push({
       parts: [`${named[0].name} foi sua maior despesa: `, { cents: named[0].amount_cents }, ` (${share}%).`],
       tone: "info",
+    });
+  }
+
+  return { headline, tone, items: items.slice(0, 4) };
+}
+
+// Entradas, saídas e saldo de cada MÊS entre `from` e `to` (períodos
+// longos). `date` é o dia 1º do mês; `label` vem de quem chama, porque
+// depende de o período passar de um ano.
+export function monthlySeries(
+  rows: MonthTransaction[],
+  months: string[],
+  labelFor: (month: string) => string,
+): DailyReportPoint[] {
+  const byMonth = new Map<string, { income_cents: number; expense_cents: number }>();
+  for (const row of rows) {
+    const key = row.date.slice(0, 7);
+    const entry = byMonth.get(key) ?? { income_cents: 0, expense_cents: 0 };
+    if (row.direction === "in") entry.income_cents += row.amount_cents;
+    else entry.expense_cents += row.amount_cents;
+    byMonth.set(key, entry);
+  }
+  return months.map((month) => {
+    const entry = byMonth.get(month) ?? { income_cents: 0, expense_cents: 0 };
+    return {
+      date: `${month}-01`,
+      label: labelFor(month),
+      income_cents: entry.income_cents,
+      expense_cents: entry.expense_cents,
+      net_cents: entry.income_cents - entry.expense_cents,
+    };
+  });
+}
+
+// "Destaques do período": no lugar do insight do mês (que compara com o
+// mês anterior), o que marcou um período longo — melhor e pior mês, o
+// maior gasto e quantos meses fecharam no azul. No ano, entra também a
+// comparação com o mesmo trecho do ano anterior.
+export function buildPeriodHighlights(input: {
+  /** Uma linha por mês do período, já com o nome ("setembro de 2025"). */
+  months: { name: string; income_cents: number; expense_cents: number }[];
+  balance: number;
+  expense: number;
+  expenseByCategory: CategorySlice[];
+  /** Só no ano: o que saiu no mesmo trecho do ano anterior. */
+  compare?: { expensePrev: number; inLabel: string } | null;
+}): ReportInsight {
+  const { months, balance, expense, expenseByCategory, compare } = input;
+  const count = Math.max(1, months.length);
+  const avg = Math.round(balance / count);
+
+  let headline: InsightPart[];
+  let tone: ReportInsight["tone"];
+  if (balance < 0) {
+    headline =
+      count > 1
+        ? [`Em ${count} meses saiu mais do que entrou: faltaram `, { cents: -balance }, " (", { cents: -avg }, " por mês)."]
+        : ["Saiu mais do que entrou: faltaram ", { cents: -balance }, "."];
+    tone = "warning";
+  } else {
+    headline =
+      count > 1
+        ? [`Em ${count} meses sobrou `, { cents: balance }, " — em média ", { cents: avg }, " por mês."]
+        : ["Sobrou ", { cents: balance }, " no período."];
+    tone = "positive";
+  }
+
+  const items: ReportInsight["items"] = [];
+
+  if (compare && (compare.expensePrev !== 0 || expense !== 0)) {
+    const diff = expense - compare.expensePrev;
+    if (diff !== 0) {
+      items.push({
+        parts: ["Saiu ", { cents: Math.abs(diff) }, ` ${diff < 0 ? "a menos" : "a mais"} que ${compare.inLabel}.`],
+        tone: diff < 0 ? "positive" : "warning",
+        icon: "compare",
+      });
+    }
+  }
+
+  // Só meses com movimento: um mês vazio no meio não é "o melhor" nem "no azul".
+  const active = months.filter((m) => m.income_cents !== 0 || m.expense_cents !== 0);
+  if (active.length >= 2) {
+    const net = (m: (typeof active)[number]) => m.income_cents - m.expense_cents;
+    const best = active.reduce((a, b) => (net(b) > net(a) ? b : a));
+    const worst = active.reduce((a, b) => (net(b) < net(a) ? b : a));
+    if (net(best) > 0) {
+      items.push({ parts: [`Melhor mês: ${best.name}, sobraram `, { cents: net(best) }, "."], tone: "positive", icon: "best" });
+    }
+    if (worst !== best) {
+      items.push(
+        net(worst) < 0
+          ? { parts: [`Mês mais apertado: ${worst.name}, faltaram `, { cents: -net(worst) }, "."], tone: "warning", icon: "worst" }
+          : { parts: [`Mês mais apertado: ${worst.name}, sobraram só `, { cents: net(worst) }, "."], tone: "info", icon: "worst" },
+      );
+    }
+  }
+
+  const top = expenseByCategory.find((c) => c.name !== UNCATEGORIZED);
+  if (top && expense > 0) {
+    const share = Math.round((top.amount_cents / expense) * 100);
+    items.push({
+      parts:
+        count > 1
+          ? [`${top.name} é o maior gasto: ${share}% de tudo que saiu (`, { cents: Math.round(top.amount_cents / count) }, " por mês)."]
+          : [`${top.name} é o maior gasto: ${share}% de tudo que saiu.`],
+      tone: "info",
+      icon: "top",
+    });
+  }
+
+  if (active.length >= 2) {
+    const blue = active.filter((m) => m.income_cents >= m.expense_cents).length;
+    items.push({
+      parts: [`${blue} de ${active.length} meses fecharam no azul.`],
+      tone: blue * 2 >= active.length ? "positive" : "warning",
+      icon: "months",
     });
   }
 

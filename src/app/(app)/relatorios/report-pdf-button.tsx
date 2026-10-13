@@ -31,20 +31,23 @@ export function ReportPdfButton({
   today,
   accounts,
   initialAccounts = null,
+  initialPeriod = null,
 }: {
   month: string;
   today: string;
   accounts: Account[];
   /** Com o filtro de conta da tela ligado, o PDF já vem só com ela. */
   initialAccounts?: string[] | null;
+  /** O período da tela, quando não é um mês: o PDF já abre nele. */
+  initialPeriod?: { kind: "year" } | { kind: "custom"; from: string; to: string } | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<PeriodKind>("month");
+  const [kind, setKind] = useState<PeriodKind>(initialPeriod?.kind ?? "month");
   const [full, setFull] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(initialAccounts ?? accounts.map((a) => a.id)));
   const year = month.slice(0, 4);
-  const [from, setFrom] = useState(monthBounds(month).from);
-  const [to, setTo] = useState(monthBounds(month).to);
+  const [from, setFrom] = useState(initialPeriod?.kind === "custom" ? initialPeriod.from : monthBounds(month).from);
+  const [to, setTo] = useState(initialPeriod?.kind === "custom" ? initialPeriod.to : monthBounds(month).to);
   const [error, setError] = useState<string | null>(null);
 
   // Ano: de 1º de janeiro até hoje (ano corrente) ou até 31/12.

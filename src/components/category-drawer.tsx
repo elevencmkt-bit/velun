@@ -26,6 +26,17 @@ export type CategoryDrawerQuery = {
   color?: string;
   /** Só uma conta (filtro de conta do Dashboard). */
   accountId?: string | null;
+  /**
+   * Período longo dos Relatórios. `label` vai no cabeçalho ("Ano de 2026");
+   * `prev` só no ano ("2025"); sem ele, o card do meio mostra a média por mês.
+   */
+  period?: {
+    from: string;
+    to: string;
+    label: string;
+    months: number;
+    prev?: { from: string; to: string; label: string } | null;
+  } | null;
 };
 
 const NONE = "__none__";
@@ -36,9 +47,12 @@ function monthTitle(month: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function dayTitle(iso: string) {
+function dayTitle(iso: string, withYear = false) {
   const [y, m, d] = iso.split("-").map(Number);
-  const s = new Date(y, m - 1, d).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  const s = new Date(y, m - 1, d).toLocaleDateString(
+    "pt-BR",
+    withYear ? { weekday: "long", day: "numeric", month: "long", year: "numeric" } : { weekday: "long", day: "numeric", month: "long" },
+  );
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -68,7 +82,9 @@ export function CategoryDrawer({
   const [isSaving, startSaving] = useTransition();
   const router = useRouter();
 
-  const key = query ? `${query.month}|${query.name}|${query.direction}|${query.status}|${query.accountId ?? ""}` : null;
+  const key = query
+    ? `${query.month}|${query.period ? `${query.period.from}~${query.period.to}` : ""}|${query.name}|${query.direction}|${query.status}|${query.accountId ?? ""}`
+    : null;
 
   useEffect(() => {
     if (!query) return;
@@ -120,7 +136,9 @@ export function CategoryDrawer({
     className: "h-5 w-5",
   });
   const accent = themedFg(query?.color ?? "#475467");
-  const delta = detail ? detail.totalCents - detail.prevCents : 0;
+  const period = query?.period ?? null;
+  const compares = detail?.prevCents != null;
+  const delta = detail && detail.prevCents != null ? detail.totalCents - detail.prevCents : 0;
   // Gasto que sobe é ruim; receita que sobe é boa.
   const deltaGood = dir === "out" ? delta <= 0 : delta >= 0;
   const insight = categoryInsight(detail?.rows ?? []);
@@ -133,9 +151,14 @@ export function CategoryDrawer({
   }
 
   const [y, m] = (query?.month ?? "2026-01").split("-").map(Number);
-  const prevName = new Date(y, m - 2, 1).toLocaleDateString("pt-BR", { month: "long" });
+  const prevName = period
+    ? (period.prev?.label ?? "")
+    : new Date(y, m - 2, 1).toLocaleDateString("pt-BR", { month: "long" });
+  // Lançamentos de anos diferentes: o dia leva o ano.
+  const withYear = period ? period.from.slice(0, 4) !== period.to.slice(0, 4) : false;
   const categoryParam = query?.name === "Sem categoria" ? "none" : matched?.id ?? "";
-  const transactionsHref = `/transacoes?month=${query?.month ?? ""}${categoryParam ? `&category=${categoryParam}` : ""}${
+  const periodParam = period ? `from=${period.from}&to=${period.to}` : `month=${query?.month ?? ""}`;
+  const transactionsHref = `/transacoes?${periodParam}${categoryParam ? `&category=${categoryParam}` : ""}${
     query?.status === "pending" ? "&status=pending" : ""
   }${query?.accountId ? `&account=${query.accountId}` : ""}`;
 
@@ -159,7 +182,7 @@ export function CategoryDrawer({
                   {query?.name}
                 </DialogTitle>
                 <p className="text-[13px] text-(--text-muted)">
-                  {query ? monthTitle(query.month) : ""}
+                  {period ? period.label : query ? monthTitle(query.month) : ""}
                   {query?.status === "pending" ? " · a vencer" : ""}
                 </p>
               </div>
@@ -183,25 +206,34 @@ export function CategoryDrawer({
                     <Money cents={detail.totalCents} currency={currency} />
                   </div>
                 </div>
-                <div
-                  className="rounded-[14px] p-3"
-                  style={{ backgroundColor: delta === 0 ? "var(--bg-subtle)" : deltaGood ? "var(--success-soft)" : "var(--danger-soft)" }}
-                >
-                  <div className="text-xs" style={{ color: delta === 0 ? "var(--text-muted)" : deltaGood ? "var(--success-text)" : "var(--danger-text)" }}>
-                    vs {prevName}
-                  </div>
+                {compares ? (
                   <div
-                    className="text-[17px] font-extrabold tabular-nums"
-                    style={{ color: delta === 0 ? "var(--text-primary)" : deltaGood ? "var(--success-text)" : "var(--danger-text)" }}
+                    className="rounded-[14px] p-3"
+                    style={{ backgroundColor: delta === 0 ? "var(--bg-subtle)" : deltaGood ? "var(--success-soft)" : "var(--danger-soft)" }}
                   >
-                    {delta === 0 ? "igual" : (
-                      <>
-                        {delta > 0 ? "+" : "−"}
-                        <Money cents={Math.abs(delta)} currency={currency} />
-                      </>
-                    )}
+                    <div className="text-xs" style={{ color: delta === 0 ? "var(--text-muted)" : deltaGood ? "var(--success-text)" : "var(--danger-text)" }}>
+                      vs {prevName}
+                    </div>
+                    <div
+                      className="text-[17px] font-extrabold tabular-nums"
+                      style={{ color: delta === 0 ? "var(--text-primary)" : deltaGood ? "var(--success-text)" : "var(--danger-text)" }}
+                    >
+                      {delta === 0 ? "igual" : (
+                        <>
+                          {delta > 0 ? "+" : "−"}
+                          <Money cents={Math.abs(delta)} currency={currency} />
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-[14px] bg-(--bg-subtle) p-3">
+                    <div className="text-xs text-(--text-muted)">Por mês</div>
+                    <div className="text-[17px] font-extrabold tabular-nums">
+                      <Money cents={Math.round(detail.totalCents / Math.max(1, period?.months ?? 1))} currency={currency} />
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-[14px] bg-(--bg-subtle) p-3">
                   <div className="text-xs text-(--text-muted)">Lançamentos</div>
                   <div className="text-[17px] font-extrabold tabular-nums">{detail.rows.length}</div>
@@ -225,7 +257,7 @@ export function CategoryDrawer({
                         <Money cents={insight.heavy.cents} currency={currency} />
                       </b>{" "}
                       em {insight.heavy.count} vezes —{" "}
-                      {insight.heavy.share >= 0.5 ? "mais da metade do mês" : "quase metade do mês"}.
+                      {insight.heavy.share >= 0.5 ? "mais da metade" : "quase metade"} {period ? "do período" : "do mês"}.
                     </>
                   ) : null}
                 </p>
@@ -242,13 +274,13 @@ export function CategoryDrawer({
           ) : error ? (
             <p className="py-16 text-center text-sm text-(--expense-dark)">{error}</p>
           ) : detail && detail.rows.length === 0 && detail.hiddenCents === 0 ? (
-            <p className="py-16 text-center text-sm text-(--text-muted)">Nenhum lançamento nessa categoria no mês.</p>
+            <p className="py-16 text-center text-sm text-(--text-muted)">Nenhum lançamento nessa categoria {period ? "no período" : "no mês"}.</p>
           ) : (
             <>
               {groups.map((g) => (
                 <div key={g.date}>
                   <div className="mt-4 mb-0.5 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase">
-                    {dayTitle(g.date)}
+                    {dayTitle(g.date, withYear)}
                   </div>
                   {g.rows.map((r) => (
                     <div key={r.id} className="flex min-h-[58px] items-center gap-3 border-b border-(--border-soft) py-2 last:border-0">

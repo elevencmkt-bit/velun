@@ -66,7 +66,11 @@ function Delta({
   );
 }
 
-/** Rosca + lista com barra e variação contra o mês anterior, com abas Despesas/Receitas. */
+/**
+ * Rosca + lista com barra e variação contra o mês anterior, com abas
+ * Despesas/Receitas. Em período longo sem comparação (todo o período,
+ * de/até), a última coluna vira a média por mês.
+ */
 export function CategoryBreakdown({
   expense,
   income,
@@ -79,11 +83,13 @@ export function CategoryBreakdown({
   status,
   prevTotalExpense,
   prevTotalIncome,
+  months = 1,
+  period = null,
 }: {
   expense: BreakdownRow[];
   income: BreakdownRow[];
-  /** "agosto" */
-  prevLabel: string;
+  /** "agosto", "2025"; null = sem comparação, mostra a média por mês. */
+  prevLabel: string | null;
   currency: CurrencyCode;
   emptyExpense: string;
   emptyIncome: string;
@@ -95,6 +101,10 @@ export function CategoryBreakdown({
   /** Totais do mês anterior, pra comparar a fatia de cada categoria. */
   prevTotalExpense: number;
   prevTotalIncome: number;
+  /** Meses do período, pra média por mês. */
+  months?: number;
+  /** Período longo: o painel da categoria busca estas datas no lugar do mês. */
+  period?: CategoryDrawerQuery["period"];
 }) {
   // Valor ou percentual do total; a escolha fica lembrada neste navegador.
   const [unit, setUnit] = useState<"value" | "percent">("value");
@@ -122,7 +132,7 @@ export function CategoryBreakdown({
   const prevTotal = tab === "expense" ? prevTotalExpense : prevTotalIncome;
   const max = rows[0]?.amount_cents ?? 1;
   const openCategory = (r: BreakdownRow) =>
-    setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color, accountId });
+    setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color, accountId, period });
 
   const tabClass = (on: boolean) =>
     `flex h-9 flex-1 items-center justify-center rounded-[10px] px-4 text-[13px] font-semibold transition-colors sm:flex-none ${
@@ -199,7 +209,7 @@ export function CategoryBreakdown({
               <span>Categoria</span>
               <span className="max-md:hidden" />
               <span className="text-right">{unit === "percent" ? "Do total" : "Valor"}</span>
-              <span className="text-right">vs {prevLabel}</span>
+              <span className="text-right">{prevLabel ? `vs ${prevLabel}` : "Por mês"}</span>
             </div>
             {rows.map((r, i) => (
               <button
@@ -234,7 +244,13 @@ export function CategoryBreakdown({
                   </span>
                 )}
                 <span className="text-right text-xs font-semibold whitespace-nowrap tabular-nums">
-                  <Delta row={r} kind={tab} currency={currency} unit={unit} total={total} prevTotal={prevTotal} />
+                  {prevLabel ? (
+                    <Delta row={r} kind={tab} currency={currency} unit={unit} total={total} prevTotal={prevTotal} />
+                  ) : (
+                    <span className="text-(--text-muted)">
+                      <Money cents={Math.round(r.amount_cents / Math.max(1, months))} currency={currency} />
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
