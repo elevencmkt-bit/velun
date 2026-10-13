@@ -72,7 +72,7 @@ function GroupCard({ group, currency }: { group: Group; currency: CurrencyCode }
     <section
       className="rounded-[20px] p-5 md:p-6"
       style={{
-        background: overdue ? "var(--danger-soft)" : "#FFFFFF",
+        background: overdue ? "var(--danger-soft)" : "var(--bg-surface)",
         boxShadow: overdue ? "none" : "var(--shadow-card)",
       }}
     >
