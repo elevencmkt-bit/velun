@@ -1,3 +1,4 @@
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { accountScope, scopeLabel } from "@/lib/visibility";
@@ -103,7 +104,7 @@ export default async function TransacoesPage({
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind")
+      .select("id, name, kind, is_transfer")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -115,31 +116,37 @@ export default async function TransacoesPage({
     getCategoryIconMap(supabase, householdId),
   ]);
 
-  let query = supabase
-    .from("transactions")
-    .select(
-      `id, date, description, notes, bank_description, amount_cents, direction, status, import_id,
-       transfer_group_id, recurrence_id, account_id, category_id, installment_number, installment_total,
-       account:accounts(name),
-       category:categories(name),
-       creator:members!created_by(display_name)`,
-    )
-    .eq("household_id", householdId)
-    .in("account_id", visibleIds)
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false });
+  const buildQuery = () => {
+    let query = supabase
+      // limite: paginada por fetchAll logo abaixo
+      .from("transactions")
+      .select(
+        `id, date, description, notes, bank_description, amount_cents, direction, status, import_id,
+         transfer_group_id, recurrence_id, account_id, category_id, installment_number, installment_total,
+         account:accounts(name),
+         category:categories(name),
+         creator:members!created_by(display_name)`,
+      )
+      .eq("household_id", householdId)
+      .in("account_id", visibleIds)
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id");
 
-  query = applyFilters(query, params);
+    query = applyFilters(query, params);
 
-  if (hasCustomRange) {
-    if (params.from) query = query.gte("date", params.from);
-    if (params.to) query = query.lte("date", params.to);
-  } else {
-    query = query.gte("date", start).lte("date", end);
-  }
+    if (hasCustomRange) {
+      if (params.from) query = query.gte("date", params.from);
+      if (params.to) query = query.lte("date", params.to);
+    } else {
+      query = query.gte("date", start).lte("date", end);
+    }
+    return query;
+  };
 
-  const { data: rawRows, error } = await query;
-  if (error) throw new Error(error.message);
+  // Em páginas: um período longo passa fácil de 1000 lançamentos, e o
+  // Supabase cortaria o resto em silêncio.
+  const rawRows = await fetchAll((from, to) => buildQuery().range(from, to));
 
   // Em que contas quem está vendo pode mexer: a do casal e as próprias.
   const writableIds = new Set(
@@ -200,6 +207,7 @@ export default async function TransacoesPage({
   if (rows.length === 0 && !hasCustomRange) {
     const dateQuery = () =>
       supabase
+        // limite: .limit(1) aplicado onde é usada
         .from("transactions")
         .select("date")
         .eq("household_id", householdId)

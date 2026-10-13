@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function NewCategoryDialog() {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<"income" | "expense">("expense");
+  const [kind, setKind] = useState<"income" | "expense" | "transfer">("expense");
   const [name, setName] = useState("");
   const [color, setColor] = useState<string | null>(null);
   const [icon, setIcon] = useState<string | null>(null);
@@ -32,7 +32,8 @@ export function NewCategoryDialog() {
     event.preventDefault();
     setError(null);
     const formData = new FormData(event.currentTarget);
-    formData.set("kind", kind);
+    formData.set("kind", kind === "income" ? "income" : "expense");
+    if (kind === "transfer") formData.set("is_transfer", "on");
     if (color) formData.set("color", color);
     if (icon) formData.set("icon", icon);
     startTransition(async () => {
@@ -71,7 +72,7 @@ export function NewCategoryDialog() {
           <Tabs
             value={kind}
             onValueChange={(v) => {
-              setKind(v as "income" | "expense");
+              setKind(v as "income" | "expense" | "transfer");
               setColor(null);
             }}
           >
@@ -82,8 +83,17 @@ export function NewCategoryDialog() {
               <TabsTrigger value="income" className="flex-1">
                 Receita
               </TabsTrigger>
+              <TabsTrigger value="transfer" className="flex-1">
+                Entre contas
+              </TabsTrigger>
             </TabsList>
           </Tabs>
+          {kind === "transfer" ? (
+            <p className="rounded-[12px] bg-(--primary-soft) px-3 py-2.5 text-xs leading-relaxed text-(--text-secondary)">
+              Pra dinheiro que só muda de conta — um saque que vira depósito em outra conta, por exemplo. Serve pra
+              entrada e saída e não conta como receita nem despesa nos relatórios. O saldo das contas continua certo.
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Nome</Label>
             <Input

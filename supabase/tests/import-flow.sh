@@ -375,6 +375,11 @@ check "categoria de outra casa não entra" "$(admin "select count(*) from mercha
 as_user $LEVI "insert into merchant_categories (household_id, member_id, bank_key, direction, category_id) values ('11111111-0000-0000-0000-000000000001', '$LEVI', 'publix', 'in', 'ca700000-0000-0000-0000-00000000000e');" >/dev/null
 check "mesma loja, direção diferente, lembra separado" "$(admin "select count(*) from merchant_categories where bank_key='publix'")" "2"
 
+echo "categoria entre contas:"
+check "categoria nova não é de transferência por padrão" "$(admin "select is_transfer::text from categories where id='ca700000-0000-0000-0000-00000000000a'")" "false"
+as_user $LEVI "insert into categories (household_id, name, kind, color, is_transfer) values ('11111111-0000-0000-0000-000000000001', 'Transferência', 'expense', '#000', true);" >/dev/null
+check "dá pra criar a de transferência" "$(admin "select count(*) from categories where name='Transferência' and is_transfer")" "1"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL

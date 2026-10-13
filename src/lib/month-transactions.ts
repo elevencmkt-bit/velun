@@ -27,7 +27,7 @@ export async function fetchMonthTransactions(
     description: string;
     transfer_group_id: string | null;
     account: { name: string } | { name: string }[] | null;
-    category: { name: string } | { name: string }[] | null;
+    category: { name: string; is_transfer: boolean } | { name: string; is_transfer: boolean }[] | null;
   };
   const data = await fetchAll<Row>((from, to) =>
     supabase
@@ -35,7 +35,7 @@ export async function fetchMonthTransactions(
       .select(
         `id, date, amount_cents, direction, description, transfer_group_id, account_id,
          account:accounts(name),
-         category:categories(name)`,
+         category:categories(name, is_transfer)`,
       )
       .eq("household_id", householdId)
       .eq("status", status)
@@ -60,5 +60,6 @@ export async function fetchMonthTransactions(
     transfer_group_id: row.transfer_group_id,
     account_name: single<{ name: string }>(row.account)?.name ?? "—",
     category_name: single<{ name: string }>(row.category)?.name ?? null,
+    category_is_transfer: single<{ is_transfer: boolean }>(row.category)?.is_transfer ?? false,
   }));
 }

@@ -13,10 +13,12 @@ export type MonthTransaction = {
   transfer_group_id: string | null;
   category_name: string | null;
   account_name: string;
+  /** Categoria de movimentação entre contas: fora de receita e despesa. */
+  category_is_transfer?: boolean;
 };
 
 export function excludeTransfers(rows: MonthTransaction[]): MonthTransaction[] {
-  return rows.filter((r) => !r.transfer_group_id);
+  return rows.filter((r) => !r.transfer_group_id && !r.category_is_transfer);
 }
 
 export function sumByDirection(rows: MonthTransaction[], direction: "in" | "out"): number {

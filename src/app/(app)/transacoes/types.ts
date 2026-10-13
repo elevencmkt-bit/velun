@@ -32,6 +32,7 @@ export type CategoryOption = {
   id: string;
   name: string;
   kind: "income" | "expense";
+  is_transfer?: boolean;
 };
 export type AccountOption = { id: string; name: string };
 export type MemberOption = { id: string; name: string };

@@ -45,9 +45,10 @@ import {
 } from "@/components/ui/select";
 import { Money } from "@/components/money";
 import { AccountAvatar } from "@/components/account-avatar";
+import { fitsDirection } from "@/lib/category-kind";
 
 type Account = { id: string; name: string; isPersonal: boolean; type: string; institution: string | null };
-type Category = { id: string; name: string; kind: string };
+type Category = { id: string; name: string; kind: string; is_transfer?: boolean };
 type OpenImport = {
   id: string;
   fileName: string;
@@ -136,7 +137,7 @@ function CategoryCell({
   onChange: (categoryId: string | null) => void;
 }) {
   const options = categories.filter((c) =>
-    row.direction === "in" ? c.kind === "income" : c.kind === "expense",
+    fitsDirection(c, row.direction),
   );
 
   const selected = options.some((c) => c.id === row.categoryId)

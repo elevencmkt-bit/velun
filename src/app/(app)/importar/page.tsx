@@ -29,7 +29,7 @@ export default async function ImportarPage() {
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind")
+      .select("id, name, kind, is_transfer")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -110,6 +110,7 @@ export default async function ImportarPage() {
 
   const { data: forecasts } = openImport
     ? await supabase
+        // limite: previsões pendentes de recorrência no período do extrato
         .from("transactions")
         .select("id, date, description, amount_cents, direction")
         .eq("household_id", householdId)
@@ -159,6 +160,7 @@ export default async function ImportarPage() {
         id: c.id as string,
         name: c.name as string,
         kind: c.kind as string,
+        is_transfer: (c.is_transfer as boolean | null) ?? false,
       }))}
       openImport={
         openImport

@@ -158,6 +158,7 @@ export default async function CartoesPage({
 
   const { data: purchaseRows } = selected.canSeeTransactions
     ? await supabase
+        // limite: lançamentos de uma fatura só
         .from("transactions")
         .select(
           "id, date, description, amount_cents, direction, status, transfer_group_id, installment_number, installment_total, category:categories(name)",
@@ -179,6 +180,7 @@ export default async function CartoesPage({
   // Parcelas que ainda vão cair nas próximas faturas deste cartão.
   const { data: futureParcels } = selected.canSeeTransactions
     ? await supabase
+        // limite: parcelas futuras de um cartão
         .from("transactions")
         .select("amount_cents")
         .eq("household_id", householdId)

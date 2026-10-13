@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAll } from "@/lib/supabase/fetch-all";
 import {
   CONFIRMED_WINDOW_DAYS,
   type ConfirmedCandidate,
@@ -30,21 +31,31 @@ export async function fetchConfirmedCandidates(
   accountId: string,
   period: { periodStart: string; periodEnd: string },
 ): Promise<(ConfirmedCandidate & { description: string })[]> {
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("id, date, amount_cents, direction, fingerprint, description")
-    .eq("household_id", householdId)
-    .eq("account_id", accountId)
-    .eq("status", "cleared")
-    .is("import_id", null)
-    .is("transfer_group_id", null)
-    .gte("date", shiftDays(period.periodStart, -CONFIRMED_WINDOW_DAYS))
-    .lte("date", shiftDays(period.periodEnd, CONFIRMED_WINDOW_DAYS))
-    .order("date");
+  // Em páginas: extrato de anos com muita coisa lançada à mão passa de 1000.
+  const data = await fetchAll<{
+    id: string;
+    date: string;
+    amount_cents: number;
+    direction: string;
+    fingerprint: string;
+    description: string;
+  }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("id, date, amount_cents, direction, fingerprint, description")
+      .eq("household_id", householdId)
+      .eq("account_id", accountId)
+      .eq("status", "cleared")
+      .is("import_id", null)
+      .is("transfer_group_id", null)
+      .gte("date", shiftDays(period.periodStart, -CONFIRMED_WINDOW_DAYS))
+      .lte("date", shiftDays(period.periodEnd, CONFIRMED_WINDOW_DAYS))
+      .order("date")
+      .order("id")
+      .range(from, to),
+  );
 
-  if (error) throw new Error(error.message);
-
-  return (data ?? []).map((t) => ({
+  return data.map((t) => ({
     id: t.id as string,
     date: t.date as string,
     amountCents: t.amount_cents as number,
@@ -68,6 +79,7 @@ export async function fetchExistingCardPayments(
   const from = shiftDays(period.periodStart, -CONFIRMED_WINDOW_DAYS);
   const to = shiftDays(period.periodEnd, CONFIRMED_WINDOW_DAYS);
   const { data: cardSide, error } = await supabase
+    // limite: pagamentos de fatura no período
     .from("transactions")
     .select("transfer_group_id")
     .eq("household_id", householdId)
@@ -81,6 +93,7 @@ export async function fetchExistingCardPayments(
   if (groups.length === 0) return [];
 
   const { data: out, error: outError } = await supabase
+    // limite: pernas das transferências achadas acima
     .from("transactions")
     .select("date, amount_cents")
     .eq("household_id", householdId)

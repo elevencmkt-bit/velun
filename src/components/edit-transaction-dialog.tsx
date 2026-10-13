@@ -26,9 +26,10 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateInput } from "@/components/date-input";
+import { fitsDirection } from "@/lib/category-kind";
 
 type Account = { id: string; name: string };
-type Category = { id: string; name: string; kind: "income" | "expense" };
+type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean };
 
 export type EditableTransaction = {
   id: string;
@@ -74,7 +75,7 @@ export function EditTransactionDialog({
   const router = useRouter();
 
   const categoriesForDirection = categories.filter(
-    (c) => c.kind === (direction === "in" ? "income" : "expense"),
+    (c) => fitsDirection(c, direction === "in" ? "in" : "out"),
   );
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
