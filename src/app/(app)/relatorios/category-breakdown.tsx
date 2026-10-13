@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import type { CurrencyCode } from "@/lib/money";
 import { Money } from "@/components/money";
@@ -15,17 +15,45 @@ export type BreakdownRow = {
 };
 
 const MOBILE_LIMIT = 5;
+const UNIT_KEY = "velun:report-unit";
+
+/** "34,2%" — uma casa decimal só quando ajuda (abaixo de 10%). */
+export function formatShare(share: number): string {
+  const pct = share * 100;
+  return `${pct.toLocaleString("pt-BR", { maximumFractionDigits: pct < 10 ? 1 : 0 })}%`;
+}
 
 function Delta({
   row,
   kind,
   currency,
+  unit,
+  total,
+  prevTotal,
 }: {
   row: BreakdownRow;
   kind: "expense" | "income";
   currency: CurrencyCode;
+  unit: "value" | "percent";
+  total: number;
+  prevTotal: number;
 }) {
   if (row.prev_cents === null) return <span className="text-(--primary)">novo</span>;
+  if (unit === "percent") {
+    // Diferença da FATIA, em pontos percentuais: Restaurante era 12% do
+    // que saiu e agora é 15% → "+3 p.p.".
+    const now = total > 0 ? row.amount_cents / total : 0;
+    const before = prevTotal > 0 ? row.prev_cents / prevTotal : 0;
+    const pp = Math.round((now - before) * 1000) / 10;
+    if (pp === 0) return <span className="text-(--text-light)">igual</span>;
+    const good = kind === "expense" ? pp < 0 : pp > 0;
+    return (
+      <span style={{ color: good ? "var(--income-dark)" : "var(--expense-dark)" }}>
+        {pp > 0 ? "+" : "−"}
+        {Math.abs(pp).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} p.p.
+      </span>
+    );
+  }
   const d = row.amount_cents - row.prev_cents;
   if (d === 0) return <span className="text-(--text-light)">igual</span>;
   // Gasto que sobe é ruim; receita que sobe é boa.
@@ -48,6 +76,8 @@ export function CategoryBreakdown({
   emptyIncome,
   month,
   status,
+  prevTotalExpense,
+  prevTotalIncome,
 }: {
   expense: BreakdownRow[];
   income: BreakdownRow[];
@@ -59,12 +89,34 @@ export function CategoryBreakdown({
   /** "2026-09": o painel da categoria busca os lançamentos desse mês. */
   month: string;
   status: "cleared" | "pending";
+  /** Totais do mês anterior, pra comparar a fatia de cada categoria. */
+  prevTotalExpense: number;
+  prevTotalIncome: number;
 }) {
+  // Valor ou percentual do total; a escolha fica lembrada neste navegador.
+  const [unit, setUnit] = useState<"value" | "percent">("value");
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem(UNIT_KEY) === "percent") setUnit("percent");
+    } catch {
+      // sem armazenamento: começa em valor
+    }
+  }, []);
+  function chooseUnit(next: "value" | "percent") {
+    setUnit(next);
+    try {
+      window.localStorage.setItem(UNIT_KEY, next);
+    } catch {
+      // só não lembra da próxima vez
+    }
+  }
   const [drawer, setDrawer] = useState<CategoryDrawerQuery | null>(null);
   const [tab, setTab] = useState<"expense" | "income">("expense");
   const [showAll, setShowAll] = useState(false);
   const rows = tab === "expense" ? expense : income;
   const total = rows.reduce((n, r) => n + r.amount_cents, 0);
+  const prevTotal = tab === "expense" ? prevTotalExpense : prevTotalIncome;
   const max = rows[0]?.amount_cents ?? 1;
   const openCategory = (r: BreakdownRow) =>
     setDrawer({ month, name: r.name, direction: tab === "income" ? "in" : "out", status, color: r.color });
@@ -74,17 +126,32 @@ export function CategoryBreakdown({
       on ? "bg-(--bg-surface) text-(--text-primary) shadow-[0_1px_3px_rgba(16,24,40,.08)]" : "text-(--text-muted)"
     }`;
 
+  const unitClass = (on: boolean) =>
+    `flex h-9 w-10 items-center justify-center rounded-[10px] text-[14px] font-bold transition-colors ${
+      on ? "bg-(--bg-surface) text-(--primary) shadow-[0_1px_3px_rgba(16,24,40,.08)]" : "text-(--text-muted)"
+    }`;
+
   return (
     <section className="rounded-[20px] bg-(--bg-surface) p-4 shadow-(--shadow-card) md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-card-title max-sm:hidden">Por categoria</h2>
-        <div role="tablist" className="flex gap-1 rounded-[13px] bg-[#F4F5F8] p-1">
+        <div className="flex gap-2">
+        <div role="tablist" className="flex flex-1 gap-1 rounded-[13px] bg-[#F4F5F8] p-1 sm:flex-none">
           <button type="button" role="tab" aria-selected={tab === "expense"} className={tabClass(tab === "expense")} onClick={() => { setTab("expense"); setShowAll(false); }}>
             Despesas
           </button>
           <button type="button" role="tab" aria-selected={tab === "income"} className={tabClass(tab === "income")} onClick={() => { setTab("income"); setShowAll(false); }}>
             Receitas
           </button>
+        </div>
+        <div role="radiogroup" aria-label="Mostrar em" className="flex gap-1 rounded-[13px] bg-[#F4F5F8] p-1">
+          <button type="button" role="radio" aria-checked={unit === "value"} aria-label="Valor" className={unitClass(unit === "value")} onClick={() => chooseUnit("value")}>
+            $
+          </button>
+          <button type="button" role="radio" aria-checked={unit === "percent"} aria-label="Percentual" className={unitClass(unit === "percent")} onClick={() => chooseUnit("percent")}>
+            %
+          </button>
+        </div>
         </div>
       </div>
 
@@ -128,7 +195,7 @@ export function CategoryBreakdown({
             <div className="grid grid-cols-[minmax(0,1fr)_auto_76px] items-center gap-3 pb-1 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_96px_110px]">
               <span>Categoria</span>
               <span className="max-md:hidden" />
-              <span className="text-right">Valor</span>
+              <span className="text-right">{unit === "percent" ? "Do total" : "Valor"}</span>
               <span className="text-right">vs {prevLabel}</span>
             </div>
             {rows.map((r, i) => (
@@ -151,11 +218,20 @@ export function CategoryBreakdown({
                     style={{ width: `${Math.max(2, Math.round((r.amount_cents / max) * 100))}%`, background: r.color }}
                   />
                 </span>
-                <span className="text-right text-sm font-bold tabular-nums text-(--text-primary)">
-                  <Money cents={r.amount_cents} currency={currency} />
-                </span>
+                {unit === "percent" ? (
+                  <span className="flex flex-col items-end leading-tight tabular-nums">
+                    <span className="text-sm font-bold text-(--text-primary)">{formatShare(r.amount_cents / total)}</span>
+                    <span className="text-[11px] text-(--text-muted)">
+                      <Money cents={r.amount_cents} currency={currency} />
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-right text-sm font-bold tabular-nums text-(--text-primary)">
+                    <Money cents={r.amount_cents} currency={currency} />
+                  </span>
+                )}
                 <span className="text-right text-xs font-semibold whitespace-nowrap tabular-nums">
-                  <Delta row={r} kind={tab} currency={currency} />
+                  <Delta row={r} kind={tab} currency={currency} unit={unit} total={total} prevTotal={prevTotal} />
                 </span>
               </button>
             ))}
