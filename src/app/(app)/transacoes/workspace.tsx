@@ -43,6 +43,7 @@ export function TransactionsWorkspace({
   summary,
   counts,
   activeStatus,
+  emptyState,
 }: {
   rows: TransactionRow[];
   accounts: AccountOption[];
@@ -61,6 +62,12 @@ export function TransactionsWorkspace({
   summary: TransactionsSummary;
   counts: Record<StatusKey | "all", number>;
   activeStatus: StatusKey | "all";
+  /** Mês sem nenhum lançamento: de quem, quando, e o mês mais perto que tem. */
+  emptyState: {
+    accountName: string | null;
+    monthLabel: string;
+    nearest: { label: string; href: string } | null;
+  } | null;
 }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const router = useRouter();
@@ -215,6 +222,7 @@ export function TransactionsWorkspace({
             categoryIcons={categoryIcons}
             currency={currency}
             selectionMode={selectionMode}
+            emptyState={emptyState}
           />
         </CardContent>
       </Card>

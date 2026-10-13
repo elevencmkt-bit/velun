@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { CurrencyCode } from "@/lib/money";
 import {
   MUTED_CATEGORY_COLOR,
@@ -60,6 +61,7 @@ export function TransactionsTable({
   categoryIcons,
   currency = "USD",
   selectionMode = false,
+  emptyState = null,
 }: {
   rows: TransactionRow[];
   accounts: AccountOption[];
@@ -68,6 +70,11 @@ export function TransactionsTable({
   categoryIcons: Record<string, string | null>;
   currency?: CurrencyCode;
   selectionMode?: boolean;
+  emptyState?: {
+    accountName: string | null;
+    monthLabel: string;
+    nearest: { label: string; href: string } | null;
+  } | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -158,9 +165,33 @@ export function TransactionsTable({
   }
 
   if (rows.length === 0) {
+    if (emptyState) {
+      return (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <p className="text-sm text-(--text-muted)">
+            Nenhum lançamento
+            {emptyState.accountName ? (
+              <>
+                {" "}
+                da <span className="font-semibold text-(--text-secondary)">{emptyState.accountName}</span>
+              </>
+            ) : null}{" "}
+            em {emptyState.monthLabel}.
+          </p>
+          {emptyState.nearest ? (
+            <Link
+              href={emptyState.nearest.href}
+              className="rounded-full bg-(--primary-soft) px-4 py-2 text-sm font-semibold text-(--primary) hover:opacity-90"
+            >
+              Ver {emptyState.nearest.label.charAt(0).toLowerCase() + emptyState.nearest.label.slice(1)}
+            </Link>
+          ) : null}
+        </div>
+      );
+    }
     return (
       <p className="py-10 text-center text-sm text-(--text-muted)">
-        Nenhuma transação encontrada para esse período ou filtro.
+        Nenhum lançamento encontrado com esses filtros.
       </p>
     );
   }
