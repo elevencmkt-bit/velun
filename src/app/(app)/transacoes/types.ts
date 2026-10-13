@@ -33,8 +33,10 @@ export type CategoryOption = {
   name: string;
   kind: "income" | "expense";
   is_transfer?: boolean;
+  color?: string | null;
+  icon?: string | null;
 };
-export type AccountOption = { id: string; name: string };
+export type AccountOption = { id: string; name: string; type?: string; institution?: string | null };
 export type MemberOption = { id: string; name: string };
 
 /** Situação pra abas: atrasado (pendente que passou), pendente, confirmado. */

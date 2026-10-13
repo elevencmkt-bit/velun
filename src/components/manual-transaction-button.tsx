@@ -36,7 +36,7 @@ const LAST_ACCOUNT_KEY = "velun:last-account";
 
 // Cor de cada tipo: o tipo escolhido pinta a aba, o bloco do valor e a
 // categoria marcada, pra não ter dúvida do que se está lançando.
-const TONE: Record<Mode, { bg: string; fg: string; strong: string; label: string; sign: string }> = {
+export const TONE: Record<Mode, { bg: string; fg: string; strong: string; label: string; sign: string }> = {
   out: { bg: themedBg("#FEF3F2", "#F04438"), fg: themedFg("#B42318"), strong: themedFg("#D92D20"), label: "saída", sign: "−" },
   in: { bg: themedBg("#ECFDF3", "#12B76A"), fg: themedFg("#067647"), strong: themedFg("#079455"), label: "entrada", sign: "+" },
   transfer: { bg: themedBg("#EEF1FF", "#536DFE"), fg: themedFg("#3538CD"), strong: themedFg("#536DFE"), label: "transferência", sign: "" },
@@ -65,7 +65,7 @@ function saveLastAccount(id: string) {
 }
 
 /** Contas em blocos: com poucas contas, um clique vale mais que uma lista. */
-function AccountPicker({
+export function AccountPicker({
   accounts,
   value,
   onChange,
@@ -112,7 +112,7 @@ function AccountPicker({
 }
 
 /** Interruptor de liga/desliga com explicação curta. */
-function ToggleRow({
+export function ToggleRow({
   checked,
   onChange,
   title,
