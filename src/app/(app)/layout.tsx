@@ -36,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind, icon, color, is_transfer")
+      .select("id, name, kind, icon, color, is_transfer, parent_id")
       .eq("household_id", member.householdId)
       .eq("is_archived", false)
       .order("name"),

@@ -29,7 +29,7 @@ export default async function ImportarPage() {
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind, is_transfer")
+      .select("id, name, kind, is_transfer, parent_id")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),

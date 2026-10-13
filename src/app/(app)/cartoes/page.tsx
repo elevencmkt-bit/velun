@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { AccountForm } from "../contas/account-form";
 import { PayBillDialog } from "./pay-bill-dialog";
 import { themedPair } from "@/lib/theme-color";
+import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
 
 function shortDate(date: string) {
   return new Date(`${date}T12:00:00`)
@@ -162,7 +163,7 @@ export default async function CartoesPage({
         // limite: lançamentos de uma fatura só
         .from("transactions")
         .select(
-          "id, date, description, amount_cents, direction, status, transfer_group_id, installment_number, installment_total, category:categories(name)",
+          `id, date, description, amount_cents, direction, status, transfer_group_id, installment_number, installment_total, ${CATEGORY_JOIN}`,
         )
         .eq("household_id", householdId)
         .eq("account_id", selected.id)
@@ -171,8 +172,6 @@ export default async function CartoesPage({
         .order("date", { ascending: false })
     : { data: null };
 
-  const single = <T,>(value: T | T[] | null): T | null =>
-    Array.isArray(value) ? (value[0] ?? null) : value;
   const purchases = (purchaseRows ?? []).filter((r) => !r.transfer_group_id);
   const payments = (purchaseRows ?? []).filter(
     (r) => r.transfer_group_id && r.direction === "in",
@@ -324,8 +323,7 @@ export default async function CartoesPage({
           ) : (
             <div className="flex flex-col">
               {purchases.map((row) => {
-                const category =
-                  single<{ name: string }>(row.category)?.name ?? null;
+                const category = resolveJoinedCategory(row.category as never).name;
                 const out = row.direction === "out";
                 const Icon = getCategoryIcon(
                   category,

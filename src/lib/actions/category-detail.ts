@@ -23,6 +23,8 @@ export type CategoryDetailRow = {
   account_type: string;
   amount_cents: number;
   category_id: string | null;
+  /** Nome da sub, quando o lançamento está numa. */
+  sub_name: string | null;
   can_edit: boolean;
 };
 
@@ -35,7 +37,7 @@ export type CategoryDetail = {
   prevCents: number | null;
   /** Parte do total que vem de contas que só mostram a soma. */
   hiddenCents: number;
-  categories: { id: string; name: string; kind: "income" | "expense"; icon: string | null; is_transfer?: boolean }[];
+  categories: { id: string; name: string; kind: "income" | "expense"; icon: string | null; is_transfer?: boolean; parent_id?: string | null }[];
 };
 
 type Raw = {
@@ -58,6 +60,8 @@ export async function getCategoryDetail(params: {
    */
   period?: { from: string; to: string; prev?: { from: string; to: string } | null } | null;
   name: string;
+  /** Só uma subcategoria da categoria (ou "Sem subcategoria": o que está direto nela). */
+  sub?: string | null;
   direction: "in" | "out";
   status: "cleared" | "pending";
   /** Só uma conta (filtro de conta do Dashboard); sem ele, todas. */
@@ -91,7 +95,7 @@ export async function getCategoryDetail(params: {
     accountScope(supabase, householdId, memberId, "transactions"),
     supabase
       .from("categories")
-      .select("id, name, kind, icon, is_transfer")
+      .select("id, name, kind, icon, is_transfer, parent_id")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -105,14 +109,17 @@ export async function getCategoryDetail(params: {
   // "Sem categoria" é a ausência de categoria; as outras, pelo nome (é
   // como o relatório agrupa).
   const uncategorized = params.name === "Sem categoria";
-  const { data: matching } = uncategorized
-    ? { data: [] as { id: string }[] }
-    : await supabase
-        .from("categories")
-        .select("id")
-        .eq("household_id", householdId)
-        .eq("name", params.name);
-  const categoryIds = (matching ?? []).map((c) => c.id as string);
+  // Pelo nome da categoria principal (é como o relatório agrupa), com as
+  // subs dela juntas; com `sub`, só aquela sub.
+  const all = (categories ?? []) as { id: string; name: string; parent_id: string | null }[];
+  const parents = uncategorized ? [] : all.filter((c) => c.name === params.name && !c.parent_id);
+  const parentIds = new Set(parents.map((c) => c.id));
+  const children = all.filter((c) => c.parent_id && parentIds.has(c.parent_id));
+  const categoryIds = !params.sub
+    ? [...parentIds, ...children.map((c) => c.id)]
+    : params.sub === "Sem subcategoria"
+      ? [...parentIds]
+      : children.filter((c) => c.name === params.sub).map((c) => c.id);
   if (!uncategorized && categoryIds.length === 0) {
     return {
       name: params.name,
@@ -166,6 +173,7 @@ export async function getCategoryDetail(params: {
       account_type: account?.type ?? "checking",
       amount_cents: r.amount_cents,
       category_id: r.category_id,
+      sub_name: children.find((c) => c.id === r.category_id)?.name ?? null,
       // Mexe na conta do casal e nas próprias; as do outro, só olha.
       can_edit: account?.owner_id == null || account.owner_id === memberId,
     };

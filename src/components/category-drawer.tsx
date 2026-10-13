@@ -15,11 +15,15 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import type { CurrencyCode } from "@/lib/money";
 import { fitsDirection } from "@/lib/category-kind";
 import { themedFg } from "@/lib/theme-color";
+import { orderWithChildren } from "@/lib/subcategories";
 
 export type CategoryDrawerQuery = {
   /** "2026-09" */
   month: string;
+  /** Categoria principal. */
   name: string;
+  /** Só uma subcategoria dela ("Sem subcategoria" = o que está direto na principal). */
+  sub?: string | null;
   direction: "in" | "out";
   status: "cleared" | "pending";
   /** Cor da categoria no relatório (texto), pra o cabeçalho combinar. */
@@ -83,7 +87,7 @@ export function CategoryDrawer({
   const router = useRouter();
 
   const key = query
-    ? `${query.month}|${query.period ? `${query.period.from}~${query.period.to}` : ""}|${query.name}|${query.direction}|${query.status}|${query.accountId ?? ""}`
+    ? `${query.month}|${query.period ? `${query.period.from}~${query.period.to}` : ""}|${query.name}|${query.sub ?? ""}|${query.direction}|${query.status}|${query.accountId ?? ""}`
     : null;
 
   useEffect(() => {
@@ -131,7 +135,9 @@ export function CategoryDrawer({
   const dir = query?.direction ?? "out";
   const kind = dir === "in" ? "income" : "expense";
   const options = (detail?.categories ?? []).filter((c) => fitsDirection(c, dir));
-  const matched = detail?.categories.find((c) => c.name === query?.name);
+  const matched = detail?.categories.find((c) => c.name === query?.name && !c.parent_id);
+  const matchedSub =
+    query?.sub && matched ? detail?.categories.find((c) => c.parent_id === matched.id && c.name === query.sub) : null;
   const icon = createElement(getCategoryIcon(query?.name ?? null, dir, matched?.icon ?? null), {
     className: "h-5 w-5",
   });
@@ -156,7 +162,7 @@ export function CategoryDrawer({
     : new Date(y, m - 2, 1).toLocaleDateString("pt-BR", { month: "long" });
   // Lançamentos de anos diferentes: o dia leva o ano.
   const withYear = period ? period.from.slice(0, 4) !== period.to.slice(0, 4) : false;
-  const categoryParam = query?.name === "Sem categoria" ? "none" : matched?.id ?? "";
+  const categoryParam = query?.name === "Sem categoria" ? "none" : (matchedSub?.id ?? matched?.id ?? "");
   const periodParam = period ? `from=${period.from}&to=${period.to}` : `month=${query?.month ?? ""}`;
   const transactionsHref = `/transacoes?${periodParam}${categoryParam ? `&category=${categoryParam}` : ""}${
     query?.status === "pending" ? "&status=pending" : ""
@@ -180,6 +186,7 @@ export function CategoryDrawer({
               <div className="min-w-0">
                 <DialogTitle className="truncate text-[20px] font-extrabold tracking-[-0.02em] text-(--text-primary)">
                   {query?.name}
+                  {query?.sub ? <span className="font-bold text-(--text-muted)"> · {query.sub}</span> : null}
                 </DialogTitle>
                 <p className="text-[13px] text-(--text-muted)">
                   {period ? period.label : query ? monthTitle(query.month) : ""}
@@ -287,7 +294,10 @@ export function CategoryDrawer({
                       <AccountAvatar institution={r.institution} type={r.account_type} size={30} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-(--text-primary)">{r.description}</div>
-                        <div className="truncate text-xs text-(--text-muted)">{r.account_name}</div>
+                        <div className="truncate text-xs text-(--text-muted)">
+                          {r.account_name}
+                          {r.sub_name && !query?.sub ? ` · ${r.sub_name}` : ""}
+                        </div>
                       </div>
                       {r.can_edit ? (
                         <Select
@@ -303,8 +313,13 @@ export function CategoryDrawer({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={NONE}>Sem categoria</SelectItem>
-                            {options.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
+                            {orderWithChildren(options).map((c) => (
+                              <SelectItem key={c.id} value={c.id} className={c.depth ? "pl-8" : undefined}>
+                                {c.depth ? (
+                                  <span className="in-data-[slot=select-content]:hidden">
+                                    {options.find((p) => p.id === c.parent_id)?.name} ·{" "}
+                                  </span>
+                                ) : null}
                                 {c.name}
                               </SelectItem>
                             ))}

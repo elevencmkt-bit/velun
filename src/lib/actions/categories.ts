@@ -36,6 +36,10 @@ export async function createCategory(formData: FormData) {
   // Movimentação entre contas: serve pra entrada e saída e fica fora de
   // receita e despesa. Guardada como despesa só porque o tipo é obrigatório.
   const isTransfer = formData.get("is_transfer") === "on";
+  // Subcategoria: as regras (um nível, mesmo tipo, mesma casa) o banco
+  // garante (0030); aqui só lê.
+  const parentInput = formData.get("parent_id");
+  const parentId = typeof parentInput === "string" && parentInput ? parentInput : null;
 
   if (!name) throw new Error("Nome da categoria é obrigatório.");
   if (kind !== "income" && kind !== "expense") throw new Error("Tipo de categoria inválido.");
@@ -56,15 +60,41 @@ export async function createCategory(formData: FormData) {
       color: color ?? NO_MANUAL_COLOR,
       icon,
       ...(isTransfer ? { is_transfer: true } : {}),
+      ...(parentId && !isTransfer ? { parent_id: parentId } : {}),
     })
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(friendlyCategoryError(error.message));
 
   revalidateCategoryPaths();
 
   return data.id as string;
+}
+
+// As mensagens das regras de subcategoria (0030) já vêm em português.
+function friendlyCategoryError(message: string) {
+  return message.replace(/^.*?(Uma categoria|Categoria principal|Subcategoria|Movimentação|A sub|Esta categoria)/, "$1");
+}
+
+/**
+ * Põe uma categoria dentro de outra (vira sub) ou tira (`parentId` null,
+ * volta a ser principal). Os lançamentos continuam nela; nos relatórios
+ * passam a somar na principal.
+ */
+export async function setCategoryParent(categoryId: string, parentId: string | null) {
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("categories")
+    .update({ parent_id: parentId })
+    .eq("id", categoryId)
+    .eq("household_id", householdId);
+
+  if (error) throw new Error(friendlyCategoryError(error.message));
+
+  revalidateCategoryPaths();
 }
 
 export async function updateCategoryName(categoryId: string, name: string) {
@@ -133,7 +163,9 @@ export async function deleteCategory(categoryId: string) {
   const supabase = await createClient();
 
   // transactions.category_id é ON DELETE SET NULL — lançamentos que
-  // usavam essa categoria passam a "Sem categoria", nada quebra.
+  // usavam essa categoria passam a "Sem categoria", nada quebra. Se era
+  // uma SUB, o banco (0030) passa os lançamentos pra principal antes.
+  // Se era principal com subs, as subs viram principais.
   const { error } = await supabase
     .from("categories")
     .delete()

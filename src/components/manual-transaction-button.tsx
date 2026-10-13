@@ -19,6 +19,8 @@ import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { formatCents, type CurrencyCode } from "@/lib/money";
 import { fitsDirection } from "@/lib/category-kind";
+import { topOf } from "@/lib/subcategories";
+import { SubcategoryChips } from "@/components/subcategory-chips";
 import { themedBg, themedFg, themedPair } from "@/lib/theme-color";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
@@ -29,6 +31,8 @@ type Category = {
   icon?: string | null;
   color?: string | null;
   is_transfer?: boolean;
+  /** Preenchido quando é subcategoria. */
+  parent_id?: string | null;
 };
 type Mode = "in" | "out" | "transfer";
 
@@ -216,6 +220,8 @@ export function ManualTransactionButton({
     [categories],
   );
   const categoriesForDirection = categories.filter((c) => fitsDirection(c, mode === "in" ? "in" : "out"));
+  // Categoria principal escolhida (a própria, ou a "mãe" da sub escolhida).
+  const selectedTop = topOf(categories, categoryId);
 
   function reset() {
     formRef.current?.reset();
@@ -435,8 +441,8 @@ export function ManualTransactionButton({
             <div className="flex flex-col gap-2">
               <span className="text-[13px] font-semibold text-(--text-body)">Categoria</span>
               <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
-                {categoriesForDirection.map((c) => {
-                  const on = c.id === categoryId;
+                {categoriesForDirection.filter((c) => !c.parent_id).map((c) => {
+                  const on = c.id === categoryId || c.id === selectedTop?.id;
                   const color = themedPair(colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" });
                   const Icon = getCategoryIcon(c.name, mode === "in" ? "in" : "out", c.icon ?? null);
                   return (
@@ -491,6 +497,16 @@ export function ManualTransactionButton({
                   </button>
                 )}
               </div>
+              {selectedTop ? (
+                <SubcategoryChips
+                  parent={selectedTop}
+                  categories={categories}
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  onCreated={(c) => setCategories((prev) => [...prev, c])}
+                  color={themedPair(colors.get(selectedTop.name) ?? { bg: "#F2F4F7", fg: "#475467" })}
+                />
+              ) : null}
             </div>
           ) : null}
 

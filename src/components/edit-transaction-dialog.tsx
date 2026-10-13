@@ -18,6 +18,8 @@ import { buildCategoryColorMap } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { fitsDirection } from "@/lib/category-kind";
+import { topOf } from "@/lib/subcategories";
+import { SubcategoryChips } from "@/components/subcategory-chips";
 import { themedPair } from "@/lib/theme-color";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
@@ -28,6 +30,8 @@ type Category = {
   is_transfer?: boolean;
   color?: string | null;
   icon?: string | null;
+  /** Preenchido quando é subcategoria. */
+  parent_id?: string | null;
 };
 
 export type EditableTransaction = {
@@ -93,6 +97,8 @@ export function EditTransactionDialog({
     [categories],
   );
   const categoriesForDirection = categories.filter((c) => fitsDirection(c, direction));
+  // Categoria principal escolhida (a própria, ou a "mãe" da sub escolhida).
+  const selectedTop = topOf(categories, categoryId);
   // A conta atual sempre aparece, mesmo se não estiver na lista.
   const accountChoices = accounts.some((a) => a.id === transaction.account_id)
     ? accounts
@@ -268,8 +274,8 @@ export function EditTransactionDialog({
           <div className="flex flex-col gap-2">
             <span className={fieldLabel}>Categoria</span>
             <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
-              {categoriesForDirection.map((c) => {
-                const on = c.id === categoryId;
+              {categoriesForDirection.filter((c) => !c.parent_id).map((c) => {
+                const on = c.id === categoryId || c.id === selectedTop?.id;
                 const color = themedPair(colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" });
                 const Icon = getCategoryIcon(c.name, direction, c.icon ?? null);
                 return (
@@ -321,6 +327,16 @@ export function EditTransactionDialog({
                 </button>
               )}
             </div>
+            {selectedTop ? (
+              <SubcategoryChips
+                parent={selectedTop}
+                categories={categories}
+                value={categoryId}
+                onChange={setCategoryId}
+                onCreated={(c) => setCategories((prev) => [...prev, c])}
+                color={themedPair(colors.get(selectedTop.name) ?? { bg: "#F2F4F7", fg: "#475467" })}
+              />
+            ) : null}
           </div>
 
           {transaction.status === "cleared" ? <GoalLinkField transactionId={transaction.id} /> : null}

@@ -13,6 +13,7 @@ import { Money } from "@/components/money";
 import { RecurrenceForm } from "./recurrence-form";
 import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
 import { UpcomingGroups, type Group, type PendingRow } from "./upcoming-groups";
+import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
 
 const HORIZON_DAYS = 30;
 
@@ -94,7 +95,7 @@ export default async function AVencerPage({
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind, is_transfer")
+      .select("id, name, kind, is_transfer, parent_id")
       .eq("household_id", householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -104,7 +105,7 @@ export default async function AVencerPage({
       .select(
         `id, date, description, amount_cents, direction, account_id, recurrence_id, transfer_group_id,
            account:accounts(name),
-           category:categories(name)`,
+           ${CATEGORY_JOIN}`,
       )
       .eq("household_id", householdId)
       .eq("status", "pending")
@@ -180,7 +181,7 @@ export default async function AVencerPage({
         account_name: row.transfer_group_id
           ? `${single<{ name: string }>(row.account)?.name ?? "—"} → ${transferTo.get(row.transfer_group_id as string) ?? "outra conta"}`
           : (single<{ name: string }>(row.account)?.name ?? "—"),
-        category_name: single<{ name: string }>(row.category)?.name ?? null,
+        category_name: resolveJoinedCategory(row.category as never).name,
         recurring: row.recurrence_id !== null,
         can_edit: writableIds.has(row.account_id as string),
       })),

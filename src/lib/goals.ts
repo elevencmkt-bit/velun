@@ -113,7 +113,7 @@ export async function loadGoals(params: {
       accountScope(supabase, householdId, memberId, "categories"),
       supabase.from("members").select("id, display_name").eq("household_id", householdId),
       supabase.from("accounts").select("id, name, type, owner_id").eq("household_id", householdId),
-      supabase.from("categories").select("id, name").eq("household_id", householdId),
+      supabase.from("categories").select("id, name, parent_id").eq("household_id", householdId),
     ]);
 
   const goalIds = goals.map((g) => g.id);
@@ -159,7 +159,14 @@ export async function loadGoals(params: {
 
   // Limites: gasto confirmado do mês, nas contas que entram nas somas por
   // categoria (as mesmas do relatório), sem transferência.
-  const limitCategoryIds = goals.filter((g) => g.kind === "limit" && g.category_id).map((g) => g.category_id!);
+  // Limite numa categoria conta também as subcategorias dela.
+  const goalCategories = goals.filter((g) => g.kind === "limit" && g.category_id).map((g) => g.category_id!);
+  const parentOf = new Map(
+    (categories ?? [])
+      .filter((c) => c.parent_id && goalCategories.includes(c.parent_id as string))
+      .map((c) => [c.id as string, c.parent_id as string]),
+  );
+  const limitCategoryIds = [...goalCategories, ...parentOf.keys()];
   const spentByCategory = new Map<string, number>();
   if (limitCategoryIds.length > 0 && categoriesScope.ids.length > 0) {
     const [y, m] = today.split("-").map(Number);
@@ -179,7 +186,10 @@ export async function loadGoals(params: {
         .order("id")
         .range(from, to),
     );
-    for (const r of rows) spentByCategory.set(r.category_id, (spentByCategory.get(r.category_id) ?? 0) + r.amount_cents);
+    for (const r of rows) {
+      const key = parentOf.get(r.category_id) ?? r.category_id;
+      spentByCategory.set(key, (spentByCategory.get(key) ?? 0) + r.amount_cents);
+    }
   }
 
   // Metas que seguem conta: o histórico de saldo da conta serve pro

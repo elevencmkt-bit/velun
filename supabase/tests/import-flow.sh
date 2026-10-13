@@ -421,6 +421,21 @@ check "o mesmo lançamento não entra duas vezes" "$(admin "select count(*) from
 admin "delete from transactions where id='f0000000-0000-0000-0000-0000000000c1';" >/dev/null
 check "apagou o lançamento, sai da meta" "$(admin "select count(*) from goal_deposits where transaction_id='f0000000-0000-0000-0000-0000000000c1'")" "0"
 
+echo "subcategorias:"
+H=11111111-0000-0000-0000-000000000001
+admin "insert into categories (id, household_id, name, kind, color) values ('50b00000-0000-0000-0000-000000000001', '$H', 'Transporte', 'expense', ''), ('50b00000-0000-0000-0000-000000000003', '$H', 'Mercado', 'expense', '');" >/dev/null
+as_user $LEVI "insert into categories (id, household_id, name, kind, color, parent_id) values ('50b00000-0000-0000-0000-000000000002', '$H', 'Gasolina', 'expense', '', '50b00000-0000-0000-0000-000000000001');" >/dev/null
+check "cria sub" "$(admin "select count(*) from categories where parent_id='50b00000-0000-0000-0000-000000000001'")" "1"
+as_user $LEVI "insert into categories (household_id, name, kind, color, parent_id) values ('$H', 'Sub da sub', 'expense', '', '50b00000-0000-0000-0000-000000000002');" >/dev/null 2>&1
+check "um nível só" "$(admin "select count(*) from categories where name='Sub da sub'")" "0"
+as_user $LEVI "insert into categories (household_id, name, kind, color, parent_id) values ('$H', 'Receita na despesa', 'income', '', '50b00000-0000-0000-0000-000000000001');" >/dev/null 2>&1
+check "mesmo tipo da principal" "$(admin "select count(*) from categories where name='Receita na despesa'")" "0"
+as_user $LEVI "update categories set parent_id = '50b00000-0000-0000-0000-000000000003' where id = '50b00000-0000-0000-0000-000000000001';" >/dev/null 2>&1
+check "quem tem sub não vira sub" "$(admin "select parent_id is null from categories where id='50b00000-0000-0000-0000-000000000001'")" "t"
+admin "insert into transactions (id, household_id, account_id, category_id, date, amount_cents, direction, description, status, fingerprint, created_by) values ('f0000000-0000-0000-0000-0000000000d1', '$H', 'acc00000-0000-0000-0000-000000000001', '50b00000-0000-0000-0000-000000000002', '2026-10-03', 4000, 'out', 'Shell', 'cleared', 'fp-shell', '$LEVI');" >/dev/null
+as_user $ESPOSA "delete from categories where id = '50b00000-0000-0000-0000-000000000002';" >/dev/null
+check "apagou a sub: lançamento (até de conta pessoal do outro) sobe pra principal" "$(admin "select category_id from transactions where id='f0000000-0000-0000-0000-0000000000d1'")" "50b00000-0000-0000-0000-000000000001"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
