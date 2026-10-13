@@ -20,11 +20,19 @@ import type { StatusKey, TransactionRow } from "./types";
 function monthHref(params: Record<string, string | undefined>, month: string) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === "from" || key === "to" || key === "month") continue;
+    if (key === "from" || key === "to" || key === "month" || key === "all") continue;
     if (value) search.set(key, value);
   }
   search.set("month", month);
   return `/transacoes?${search.toString()}`;
+}
+
+// Rótulo do seletor quando o período é de/até em vez de um mês.
+function rangeLabel(from: string | undefined, to: string | undefined) {
+  const br = (d: string) => d.split("-").reverse().join("/");
+  if (from && to) return `${br(from)} – ${br(to)}`;
+  if (from) return `Desde ${br(from)}`;
+  return `Até ${br(to!)}`;
 }
 
 // Filtros da tela (conta, categoria, quem lançou, origem, direção,
@@ -84,6 +92,8 @@ export default async function TransacoesPage({
     scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
   const params = await searchParams;
   const hasCustomRange = Boolean(params.from || params.to);
+  // "Todo o período": sem corte de data nenhum. De/até, se tiver, manda.
+  const allPeriod = params.all === "1" && !hasCustomRange;
   const { year, monthIndex } = parseMonthParam(params.month, today);
   const { start, end } = monthRange(year, monthIndex);
   const prev = shiftMonth(year, monthIndex, -1);
@@ -138,7 +148,7 @@ export default async function TransacoesPage({
     if (hasCustomRange) {
       if (params.from) query = query.gte("date", params.from);
       if (params.to) query = query.lte("date", params.to);
-    } else {
+    } else if (!allPeriod) {
       query = query.gte("date", start).lte("date", end);
     }
     return query;
@@ -204,7 +214,7 @@ export default async function TransacoesPage({
     monthLabel: string;
     nearest: { label: string; href: string } | null;
   } | null = null;
-  if (rows.length === 0 && !hasCustomRange) {
+  if (rows.length === 0 && !hasCustomRange && !allPeriod) {
     const dateQuery = () =>
       supabase
         // limite: .limit(1) aplicado onde é usada
@@ -257,7 +267,16 @@ export default async function TransacoesPage({
       categoryColors={Object.fromEntries(colorMap)}
       categoryIcons={Object.fromEntries(iconMap)}
       currency={currency}
-      monthLabel={monthLabel(year, monthIndex)}
+      periodLabel={
+        allPeriod
+          ? "Todo o período"
+          : hasCustomRange
+            ? rangeLabel(params.from, params.to)
+            : monthLabel(year, monthIndex)
+      }
+      month={allPeriod || hasCustomRange ? null : monthParam(year, monthIndex)}
+      allPeriod={allPeriod}
+      today={today}
       prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
       nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
       summary={{

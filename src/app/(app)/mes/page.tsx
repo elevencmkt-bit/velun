@@ -31,6 +31,7 @@ import { AccountAvatar } from "@/components/account-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthSelector } from "@/components/month-selector";
 import { WhereList } from "./where-list";
+import { AccountFilter } from "./account-filter";
 import { Money } from "@/components/money";
 import { TrendBarChart, type TrendPoint } from "./trend-bar-chart";
 import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
@@ -212,12 +213,12 @@ function Signed({
 export default async function MesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; account?: string }>;
 }) {
   const { householdId, memberId, currency, displayName, today } =
     await getCurrentMember();
   const supabase = await createClient();
-  const { month } = await searchParams;
+  const { month, account: accountParam } = await searchParams;
   const { year, monthIndex } = parseMonthParam(month, today);
 
   const { start, end } = monthRange(year, monthIndex);
@@ -265,11 +266,26 @@ export default async function MesPage({
   // Três escopos: totais e categorias agregam (`categories`), saldo e
   // fluxo aceitam `balance_only`, e lançamento a lançamento só conta
   // `shared`.
-  const [categoriesScope, balanceScope, transactionsScope] = await Promise.all([
-    accountScope(supabase, householdId, memberId, "categories"),
-    accountScope(supabase, householdId, memberId, "balance"),
-    accountScope(supabase, householdId, memberId, "transactions"),
-  ]);
+  const [fullCategoriesScope, fullBalanceScope, fullTransactionsScope] =
+    await Promise.all([
+      accountScope(supabase, householdId, memberId, "categories"),
+      accountScope(supabase, householdId, memberId, "balance"),
+      accountScope(supabase, householdId, memberId, "transactions"),
+    ]);
+
+  // Filtro de conta (?account=): estreita os três escopos pra uma conta
+  // só. Nunca alarga — conta que a pessoa não vê é ignorada.
+  const accountFilter =
+    accountParam && fullBalanceScope.ids.includes(accountParam)
+      ? accountParam
+      : null;
+  const only = (scope: AccountScope): AccountScope =>
+    accountFilter
+      ? { ids: scope.ids.filter((id) => id === accountFilter), excludedCount: 0 }
+      : scope;
+  const categoriesScope = only(fullCategoriesScope);
+  const balanceScope = only(fullBalanceScope);
+  const transactionsScope = only(fullTransactionsScope);
 
   const [
     currentRows,
@@ -309,7 +325,7 @@ export default async function MesPage({
       today,
     ),
     fetchPending(supabase, householdId, transactionsScope, horizon),
-    getAccountBalances(supabase, householdId, balanceScope),
+    getAccountBalances(supabase, householdId, fullBalanceScope),
     supabase
       .from("accounts")
       .select("id, name, type, owner_id, institution")
@@ -318,8 +334,8 @@ export default async function MesPage({
       .eq("is_archived", false)
       .in(
         "id",
-        balanceScope.ids.length > 0
-          ? balanceScope.ids
+        fullBalanceScope.ids.length > 0
+          ? fullBalanceScope.ids
           : ["00000000-0000-0000-0000-000000000000"],
       )
       .order("sort_order")
@@ -399,13 +415,22 @@ export default async function MesPage({
           : (memberNames.get(a.owner_id as string) ?? "Pessoal"),
     balance: balances.get(a.id as string) ?? 0,
   }));
+  const filtered = accountFilter
+    ? (accounts.find((a) => a.id === accountFilter) ?? null)
+    : null;
+  // Mantém a conta escolhida ao trocar de mês, e vice-versa.
+  const accountQS = accountFilter ? `&account=${accountFilter}` : "";
 
   // Vencimentos: o que já passou, o que cai nesta semana e o que entra.
   // Compra prevista no cartão vai dentro da fatura, que entra como um
   // item só (das faturas que esta pessoa paga ou pode ver por inteiro).
   const cardIds = new Set(cards.map((c) => c.id));
   const billRows: PendingRow[] = cardBills(
-    cards.filter((c) => c.canEdit || c.canSeeTransactions),
+    cards.filter(
+      (c) =>
+        (c.canEdit || c.canSeeTransactions) &&
+        (!accountFilter || c.paymentAccountId === accountFilter),
+    ),
   )
     .filter((b) => b.date <= horizon)
     .map((b) => ({
@@ -482,11 +507,26 @@ export default async function MesPage({
           </h1>
           <p className="text-page-subtitle">{headline}</p>
         </div>
-        <MonthSelector
-          label={monthLabel(year, monthIndex)}
-          prevHref={`/mes?month=${monthParam(prev.year, prev.monthIndex)}`}
-          nextHref={`/mes?month=${monthParam(next.year, next.monthIndex)}`}
-        />
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {accounts.length > 1 ? (
+            <AccountFilter
+              value={accountFilter}
+              accounts={accounts.map((a) => ({
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                institution: a.institution,
+              }))}
+            />
+          ) : null}
+          <MonthSelector
+            label={monthLabel(year, monthIndex)}
+            prevHref={`/mes?month=${monthParam(prev.year, prev.monthIndex)}${accountQS}`}
+            nextHref={`/mes?month=${monthParam(next.year, next.monthIndex)}${accountQS}`}
+            month={selected}
+            today={today}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
@@ -494,13 +534,16 @@ export default async function MesPage({
         <section className="relative flex min-h-[236px] flex-col overflow-hidden rounded-[24px] bg-(--primary) p-6 text-white md:p-7 lg:col-span-5">
           <BrandMotif className="pointer-events-none absolute -top-20 -right-24 h-[340px] w-[340px] opacity-[0.16]" />
           <span className="text-[14px] font-medium text-white/85">
-            Saldo total · hoje
+            {filtered ? `Saldo · ${filtered.name} · hoje` : "Saldo total · hoje"}
           </span>
           <span className="mt-2 text-[34px] leading-tight font-extrabold tracking-[-0.03em] tabular-nums md:text-[40px]">
             <Signed cents={cashFlow.currentTotal} currency={currency} />
           </span>
           <span className="mt-1 text-[13px] text-white/80">
-            {accounts.length} {accounts.length === 1 ? "conta" : "contas"} · em{" "}
+            {filtered
+              ? "Só esta conta"
+              : `${accounts.length} ${accounts.length === 1 ? "conta" : "contas"}`}{" "}
+            · em{" "}
             {CASH_FLOW_PREVIEW_DAYS} dias:{" "}
             <Signed
               cents={cashFlow.finalPoint.balance_cents}
@@ -522,7 +565,7 @@ export default async function MesPage({
 
         {/* Cartão de crédito: o primeiro cartão desenhado, com a fatura
             aberta. Sem cartão, o espaço mostra o saldo dos próximos 30 dias. */}
-        {cards.length > 0 ? (
+        {cards.length > 0 && !accountFilter ? (
           <CardStack
             className="lg:col-span-4"
             title={cards.length === 1 ? "Cartão" : `Cartões · ${cards.length}`}
@@ -634,9 +677,17 @@ export default async function MesPage({
               </p>
             ) : (
               accounts.slice(0, MAX_DASHBOARD_ACCOUNTS).map((account) => (
-                <div
+                // Um clique na conta filtra o Dashboard por ela; outro tira.
+                <Link
                   key={account.id}
-                  className="flex min-h-[60px] items-center gap-3"
+                  href={`/mes?month=${selected}${account.id === accountFilter ? "" : `&account=${account.id}`}`}
+                  aria-current={account.id === accountFilter ? "true" : undefined}
+                  title={account.id === accountFilter ? "Ver todas as contas" : `Ver só ${account.name}`}
+                  className={`-mx-2 flex min-h-[60px] items-center gap-3 rounded-[14px] px-2 transition-colors ${
+                    account.id === accountFilter
+                      ? "bg-(--primary-soft)"
+                      : "hover:bg-[#F7F8FA]"
+                  }`}
                 >
                   <AccountAvatar
                     institution={account.institution}
@@ -660,7 +711,7 @@ export default async function MesPage({
                   >
                     <Signed cents={account.balance} currency={currency} />
                   </span>
-                </div>
+                </Link>
               ))
             )}
             {accounts.length > MAX_DASHBOARD_ACCOUNTS ? (
@@ -757,6 +808,7 @@ export default async function MesPage({
                 colors={WHERE_COLORS}
                 uncategorized={uncategorized}
                 month={selected}
+                accountId={accountFilter}
                 currency={currency}
               />
             </div>
@@ -767,7 +819,7 @@ export default async function MesPage({
           <CardContent className="flex h-full flex-col">
             <div className="mb-1 flex items-center justify-between gap-2">
               <h2 className="text-card-title">Últimos lançamentos</h2>
-              <SectionLink href={`/transacoes?month=${selected}`}>
+              <SectionLink href={`/transacoes?month=${selected}${accountQS}`}>
                 Ver todos
               </SectionLink>
             </div>

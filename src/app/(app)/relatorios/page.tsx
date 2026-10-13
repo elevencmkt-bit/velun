@@ -155,6 +155,8 @@ export default async function RelatoriosPage({
             label={monthLabel(year, monthIndex)}
             prevHref={`/relatorios?month=${monthParam(prev.year, prev.monthIndex)}${viewQuery}`}
             nextHref={`/relatorios?month=${monthParam(next.year, next.monthIndex)}${viewQuery}`}
+            month={monthParam(year, monthIndex)}
+            today={today}
           />
         </div>
       </div>
