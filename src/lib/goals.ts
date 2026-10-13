@@ -30,7 +30,17 @@ export type GoalRow = {
   created_at: string;
 };
 
-export type GoalDeposit = { id: string; goal_id: string; amount_cents: number; date: string; note: string | null };
+export type GoalDeposit = {
+  id: string;
+  goal_id: string;
+  amount_cents: number;
+  date: string;
+  note: string | null;
+  /** Vinculado a um lançamento: valor e data vêm dele. */
+  transaction_id: string | null;
+  /** Descrição e conta do lançamento, quando quem vê enxerga o lançamento. */
+  linked: { description: string; account_name: string } | null;
+};
 
 export type GoalView = GoalRow & {
   /** Do casal, minha ou de quem é. */
@@ -92,15 +102,42 @@ export async function loadGoals(params: {
     ]);
 
   const goalIds = goals.map((g) => g.id);
-  const deposits = await fetchAll<GoalDeposit>((from, to) =>
+  type RawDeposit = {
+    id: string;
+    goal_id: string;
+    amount_cents: number;
+    date: string;
+    note: string | null;
+    transaction_id: string | null;
+    tx: RawTx | RawTx[] | null;
+  };
+  type RawTx = { amount_cents: number; date: string; description: string; account: { name: string } | { name: string }[] | null };
+  const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+  const rawDeposits = await fetchAll<RawDeposit>((from, to) =>
     supabase
       .from("goal_deposits")
-      .select("id, goal_id, amount_cents, date, note")
+      .select("id, goal_id, amount_cents, date, note, transaction_id, tx:transactions(amount_cents, date, description, account:accounts(name))")
       .in("goal_id", goalIds)
       .order("date", { ascending: false })
       .order("id")
       .range(from, to),
   );
+  // Vinculado: o lançamento manda (se ele for editado, a meta acompanha).
+  // Se quem vê não enxerga o lançamento, fica o valor guardado na hora.
+  const deposits: GoalDeposit[] = rawDeposits
+    .map((d) => {
+      const tx = one(d.tx);
+      return {
+        id: d.id,
+        goal_id: d.goal_id,
+        amount_cents: tx ? tx.amount_cents : d.amount_cents,
+        date: tx ? tx.date : d.date,
+        note: d.note,
+        transaction_id: d.transaction_id,
+        linked: tx ? { description: tx.description, account_name: one(tx.account)?.name ?? "" } : null,
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const balances = await getAccountBalances(supabase, householdId, balanceScope);
   const visibleBalance = new Set(balanceScope.ids);
