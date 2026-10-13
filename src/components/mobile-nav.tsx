@@ -93,7 +93,7 @@ export function MobileNav() {
 
       <nav
         aria-label="Navegação"
-        className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 flex h-[68px] items-center rounded-[22px] bg-white/95 px-1.5 shadow-[0_10px_30px_rgba(16,24,40,0.12)] backdrop-blur md:hidden"
+        className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 flex h-[68px] items-center rounded-[22px] bg-(--bg-surface)/95 px-1.5 shadow-[0_10px_30px_rgba(16,24,40,0.12)] backdrop-blur md:hidden"
       >
         {tab(primary[0].href, "Início", primary[0].icon)}
         {tab(primary[1].href, "Transações", primary[1].icon)}

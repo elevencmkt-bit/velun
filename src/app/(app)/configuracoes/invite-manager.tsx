@@ -71,7 +71,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
   return (
     <div
       id="convite"
-      className="flex scroll-mt-24 flex-col gap-3 rounded-[18px] bg-white/75 p-5 shadow-[0_1px_3px_rgba(16,24,40,.05)] md:p-6"
+      className="flex scroll-mt-24 flex-col gap-3 rounded-[18px] bg-(--bg-surface)/75 p-5 shadow-[0_1px_3px_rgba(16,24,40,.05)] md:p-6"
     >
       <h3 className="text-sm font-bold text-(--text-primary)">Convite</h3>
 

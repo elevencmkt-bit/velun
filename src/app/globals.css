@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark:not(:has([data-force-light])) *));
 
 @theme inline {
   --color-background: var(--background);
@@ -75,6 +75,7 @@
   /* Brand — paleta Velun */
   --primary: #536dfe;
   --primary-hover: #4257cb;
+  --primary-pressed: #4257cb; /* fundo do botão azul ao passar o mouse */
   --primary-light: #eef1ff;
   --primary-soft: #f5f6ff;
   --electric-blue: #6c83ff;
@@ -198,38 +199,79 @@
   --sidebar-ring: var(--primary);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* Tema escuro (aprovado no canvas "Velun — redesenho"): grafite
+   levemente azulado, não preto; cartão um tom acima do fundo, com borda
+   sutil no lugar da sombra; azul da marca igual; verde/vermelho mais
+   claros pra manter o contraste. PDF e login marcam [data-force-light]
+   e continuam claros. */
+.dark:not(:has([data-force-light])) {
+  color-scheme: dark;
+
+  --bg-app: #0e1016;
+  --bg-surface: #171a22;
+  --bg-subtle: #1c2029;
+  --bg-track: #12151c;
+  --bg-hover: #232733;
+  --bg-strong: #2a2f3b;
+  --bg-inverse: #2c3140;
+
+  --text-primary: #eceef3;
+  --text-body: #c3c8d2;
+  --text-secondary: #b4bac6;
+  --text-muted: #8c93a1;
+  --text-light: #6b7385;
+
+  --border-primary: #2a2f3b;
+  --border-soft: #232733;
+  --border-strong: #3a404d;
+
+  --primary-hover: #8c9cff;
+  --primary-pressed: #6c83ff;
+  --primary-light: rgba(108, 131, 255, 0.16);
+  --primary-soft: rgba(108, 131, 255, 0.1);
+  --primary-border: rgba(108, 131, 255, 0.45);
+
+  --income-dark: #3dd9a8;
+  --income-soft: rgba(39, 196, 153, 0.14);
+  --income-icon: rgba(39, 196, 153, 0.35);
+  --expense-dark: #ff8a9a;
+  --expense-soft: rgba(255, 100, 124, 0.14);
+  --expense-icon: rgba(255, 100, 124, 0.35);
+  --warning-dark: #fdb022;
+  --warning-soft: rgba(247, 144, 9, 0.12);
+  --info-soft: rgba(46, 144, 250, 0.14);
+  --purple-soft: rgba(127, 86, 217, 0.18);
+
+  --danger-text: #ff8a80;
+  --danger-ink: #fda29b;
+  --danger-soft: rgba(240, 68, 56, 0.12);
+  --danger-badge: rgba(240, 68, 56, 0.2);
+  --warning-ink: #fec84b;
+  --warning-badge: rgba(247, 144, 9, 0.2);
+  --warning-banner: rgba(247, 144, 9, 0.12);
+  --success-text: #47cd89;
+  --success-soft: rgba(18, 183, 106, 0.14);
+
+  --badge-green-bg: rgba(39, 196, 153, 0.16);
+  --badge-green-fg: #3dd9a8;
+  --badge-red-bg: rgba(255, 100, 124, 0.16);
+  --badge-red-fg: #ff8a9a;
+  --badge-blue-bg: rgba(108, 131, 255, 0.18);
+  --badge-blue-fg: #8c9cff;
+  --table-amount-in: #3dd9a8;
+  --table-amount-out: #ff8a9a;
+
+  --shadow-xs: 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  --input: #3a404d;
+}
+
+/* Páginas que ficam sempre claras (PDF, login). */
+[data-force-light] {
+  color-scheme: light;
 }
 
 @layer base {
