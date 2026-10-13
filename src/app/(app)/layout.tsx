@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // nela — oferecer na lista seria convidar um erro.
     supabase
       .from("accounts")
-      .select("id, name, type")
+      .select("id, name, type, institution")
       .eq("household_id", member.householdId)
       .eq("is_archived", false)
       .or(`owner_id.is.null,owner_id.eq.${member.memberId}`)
@@ -36,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .order("name"),
     supabase
       .from("categories")
-      .select("id, name, kind")
+      .select("id, name, kind, icon, color")
       .eq("household_id", member.householdId)
       .eq("is_archived", false)
       .order("name"),
@@ -70,7 +70,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {/* O formulário fica montado nos dois tamanhos; no celular quem
                 abre é o "+" da barra de baixo. */}
             <div className="hidden md:block">
-              <ManualTransactionButton accounts={accounts ?? []} categories={categories ?? []} />
+              <ManualTransactionButton
+                accounts={accounts ?? []}
+                categories={categories ?? []}
+                currency={member.currency}
+              />
             </div>
             <HideValuesButton initialHidden={hideValues} />
             <NotificationBell

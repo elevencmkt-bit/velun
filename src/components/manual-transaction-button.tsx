@@ -1,81 +1,197 @@
 "use client";
 
 import { localToday } from "@/lib/today";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Plus, X } from "lucide-react";
 import { createTransaction, createTransfer } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NEW_TRANSACTION_EVENT } from "@/components/nav-items";
 import { DateInput } from "@/components/date-input";
+import { AccountAvatar } from "@/components/account-avatar";
+import { buildCategoryColorMap } from "@/lib/category-colors";
+import { getCategoryIcon } from "@/lib/category-icons";
+import { amountToCents, normalizeAmount } from "@/lib/amount-input";
+import { formatCents, type CurrencyCode } from "@/lib/money";
 
-type Account = { id: string; name: string; type?: string };
-type Category = { id: string; name: string; kind: "income" | "expense" };
+type Account = { id: string; name: string; type?: string; institution?: string | null };
+type Category = {
+  id: string;
+  name: string;
+  kind: "income" | "expense";
+  icon?: string | null;
+  color?: string | null;
+};
 type Mode = "in" | "out" | "transfer";
 
-function todayISO() {
-  return localToday();
+const LAST_ACCOUNT_KEY = "velun:last-account";
+
+// Cor de cada tipo: o tipo escolhido pinta a aba, o bloco do valor e a
+// categoria marcada, pra não ter dúvida do que se está lançando.
+const TONE: Record<Mode, { bg: string; fg: string; strong: string; label: string; sign: string }> = {
+  out: { bg: "#FEF3F2", fg: "#B42318", strong: "#D92D20", label: "saída", sign: "−" },
+  in: { bg: "#ECFDF3", fg: "#067647", strong: "#079455", label: "entrada", sign: "+" },
+  transfer: { bg: "#EEF1FF", fg: "#3538CD", strong: "#536DFE", label: "transferência", sign: "" },
+};
+
+const MODES: { value: Mode; label: string; Icon: typeof ArrowUpRight }[] = [
+  { value: "out", label: "Saída", Icon: ArrowUpRight },
+  { value: "in", label: "Entrada", Icon: ArrowDownLeft },
+  { value: "transfer", label: "Transferência", Icon: ArrowLeftRight },
+];
+
+function readLastAccount(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_ACCOUNT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveLastAccount(id: string) {
+  try {
+    window.localStorage.setItem(LAST_ACCOUNT_KEY, id);
+  } catch {
+    // sem armazenamento: só não lembra a conta da próxima vez
+  }
+}
+
+/** Contas em blocos: com poucas contas, um clique vale mais que uma lista. */
+function AccountPicker({
+  accounts,
+  value,
+  onChange,
+  exclude,
+  label,
+}: {
+  accounts: Account[];
+  value: string;
+  onChange: (id: string) => void;
+  exclude?: string;
+  label: string;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {accounts
+        .filter((a) => a.id !== exclude)
+        .map((a) => {
+          const on = a.id === value;
+          return (
+            <button
+              key={a.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(a.id)}
+              className={`flex h-14 items-center gap-2.5 rounded-[14px] border-[1.5px] px-3 text-left transition-colors ${
+                on
+                  ? "border-(--primary) bg-(--primary-soft) shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
+                  : "border-[#E4E7EC] bg-white hover:border-[#C7D0FF]"
+              }`}
+            >
+              <AccountAvatar institution={a.institution ?? null} type={a.type ?? "checking"} size={32} />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-(--text-primary)">{a.name}</span>
+                <span className="block text-xs text-(--text-muted)">
+                  {a.type === "credit_card" ? "Cartão" : a.type === "investment" ? "Investimento" : "Conta"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+    </div>
+  );
+}
+
+/** Interruptor de liga/desliga com explicação curta. */
+function ToggleRow({
+  checked,
+  onChange,
+  title,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between gap-3 border-t border-[#F2F4F7] py-3.5 text-left"
+    >
+      <span>
+        <span className="block text-sm font-semibold text-(--text-primary)">{title}</span>
+        <span className="block text-xs text-(--text-muted)">{hint}</span>
+      </span>
+      <span
+        aria-hidden
+        className={`relative h-[26px] w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-(--primary)" : "bg-[#D0D5DD]"}`}
+      >
+        <span
+          className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-sm transition-all ${checked ? "left-[21px]" : "left-[3px]"}`}
+        />
+      </span>
+    </button>
+  );
 }
 
 export function ManualTransactionButton({
   accounts,
   categories: initialCategories,
+  currency = "USD",
 }: {
   accounts: Account[];
   categories: Category[];
+  currency?: CurrencyCode;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("out");
   const [categories, setCategories] = useState(initialCategories);
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [amount, setAmount] = useState("");
+  // Já vem marcada a última conta usada (ou a primeira conta corrente).
+  // O formulário só aparece aberto, no navegador, então ler o
+  // armazenamento aqui não dá diferença entre servidor e navegador.
+  const [defaultAccount] = useState(() => {
+    const last = typeof window === "undefined" ? null : readLastAccount();
+    if (last && accounts.some((a) => a.id === last)) return last;
+    return accounts.find((a) => a.type !== "credit_card")?.id ?? accounts[0]?.id ?? "";
+  });
+  const [accountId, setAccountId] = useState(defaultAccount);
+  const [fromAccountId, setFromAccountId] = useState(defaultAccount);
+  const [toAccountId, setToAccountId] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [pending, setPending] = useState(false);
   const [makeRecurring, setMakeRecurring] = useState(false);
-  // Conta escolhida: se for cartão, a compra pode ser parcelada.
-  const [accountId, setAccountId] = useState("");
-  const [installments, setInstallments] = useState("1");
-  const isCard =
-    accounts.find((a) => a.id === accountId)?.type === "credit_card";
-  const parcelado = mode === "out" && isCard && Number(installments) > 1;
   const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
+  const [installments, setInstallments] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
 
+  const tone = TONE[mode];
+  const isCard = accounts.find((a) => a.id === accountId)?.type === "credit_card";
+  const parcelado = mode === "out" && isCard && Number(installments) > 1;
+  const cents = amountToCents(amount);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const isTyping =
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable);
-      if (
-        event.key === "n" &&
-        !isTyping &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey
-      ) {
+        target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (event.key === "n" && !isTyping && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
         setOpen(true);
       }
@@ -92,28 +208,58 @@ export function ManualTransactionButton({
     };
   }, []);
 
-  const categoriesForDirection = categories.filter(
-    (c) => c.kind === (mode === "in" ? "income" : "expense"),
+  const colors = useMemo(
+    () => buildCategoryColorMap(categories.map((c) => ({ name: c.name, kind: c.kind, color: c.color ?? null }))),
+    [categories],
   );
+  const categoriesForDirection = categories.filter((c) => c.kind === (mode === "in" ? "income" : "expense"));
+
+  function reset() {
+    formRef.current?.reset();
+    setCategoryId("");
+    setAmount("");
+    setNotesOpen(false);
+    setPending(false);
+    setMakeRecurring(false);
+    setRecurrenceFrequency("monthly");
+    setInstallments("1");
+    setToAccountId("");
+    setNewCategoryOpen(false);
+  }
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (cents <= 0) {
+      setError("Coloque o valor.");
+      return;
+    }
     const formData = new FormData(event.currentTarget);
+    formData.set("amount", normalizeAmount(amount));
+    if (mode === "transfer") {
+      if (!fromAccountId || !toAccountId) {
+        setError("Escolha de qual conta sai e pra qual vai.");
+        return;
+      }
+      formData.set("from_account_id", fromAccountId);
+      formData.set("to_account_id", toAccountId);
+    } else {
+      if (!accountId) {
+        setError("Escolha a conta.");
+        return;
+      }
+      formData.set("account_id", accountId);
+      formData.set("direction", mode);
+      formData.set("category_id", categoryId);
+      if (pending && !parcelado) formData.set("is_pending", "on");
+      if (makeRecurring && !parcelado) formData.set("make_recurring", "on");
+    }
     startTransition(async () => {
       try {
-        if (mode === "transfer") {
-          await createTransfer(formData);
-        } else {
-          formData.set("direction", mode);
-          await createTransaction(formData);
-        }
-        formRef.current?.reset();
-        setSelectedCategoryId("");
-        setMakeRecurring(false);
-        setRecurrenceFrequency("monthly");
-        setAccountId("");
-        setInstallments("1");
+        if (mode === "transfer") await createTransfer(formData);
+        else await createTransaction(formData);
+        saveLastAccount(mode === "transfer" ? fromAccountId : accountId);
+        reset();
         setOpen(false);
         router.refresh();
       } catch (err) {
@@ -125,26 +271,28 @@ export function ManualTransactionButton({
   function onCreateCategory() {
     const name = newCategoryName.trim();
     if (!name) return;
+    const kind = mode === "in" ? "income" : "expense";
     startTransition(async () => {
       try {
         const formData = new FormData();
         formData.set("name", name);
-        formData.set("kind", mode === "in" ? "income" : "expense");
+        formData.set("kind", kind);
         const id = await createCategory(formData);
-        setCategories((prev) => [
-          ...prev,
-          { id, name, kind: mode === "in" ? "income" : "expense" },
-        ]);
-        setSelectedCategoryId(id);
+        setCategories((prev) => [...prev, { id, name, kind }]);
+        setCategoryId(id);
         setNewCategoryName("");
         setNewCategoryOpen(false);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Erro ao criar categoria.",
-        );
+        setError(err instanceof Error ? err.message : "Erro ao criar categoria.");
       }
     });
   }
+
+  const submitLabel = isPending
+    ? "Lançando…"
+    : cents > 0
+      ? `Lançar ${tone.label} de ${formatCents(cents, currency)}`
+      : `Lançar ${tone.label}`;
 
   return (
     <Dialog
@@ -155,246 +303,257 @@ export function ManualTransactionButton({
       }}
     >
       <DialogTrigger asChild>
-        <Button
-          title="Atalho: n"
-          className="h-11 rounded-[14px] px-4.5 text-[14px] font-semibold"
-        >
+        <Button title="Atalho: n" className="h-11 rounded-[14px] px-4.5 text-[14px] font-semibold">
           + Lançamento
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Lançamento manual</DialogTitle>
-        </DialogHeader>
-        <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4">
-          <Tabs
-            value={mode}
-            onValueChange={(v) => {
-              setMode(v as Mode);
-              setSelectedCategoryId("");
-            }}
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-white p-5 sm:max-w-[540px] sm:p-7"
+      >
+        <div className="flex items-center justify-between">
+          <DialogTitle className="text-[21px] font-extrabold tracking-[-0.02em] text-(--text-primary)">
+            Novo lançamento
+          </DialogTitle>
+          <button
+            type="button"
+            aria-label="Fechar"
+            onClick={() => setOpen(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#F2F4F7] text-(--text-secondary) hover:bg-[#E4E7EC]"
           >
-            <TabsList className="w-full">
-              <TabsTrigger value="out" className="flex-1">
-                Saída
-              </TabsTrigger>
-              <TabsTrigger value="in" className="flex-1">
-                Entrada
-              </TabsTrigger>
-              <TabsTrigger value="transfer" className="flex-1">
-                Transferência
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <X className="h-[18px] w-[18px]" />
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="date">Data</Label>
-              <DateInput
-                id="date"
-                name="date"
-                defaultValue={todayISO()}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">Valor (USD)</Label>
-              <Input
+        <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
+          <div role="tablist" aria-label="Tipo" className="flex gap-1.5 rounded-[16px] bg-[#F2F4F7] p-[5px]">
+            {MODES.map(({ value, label, Icon }) => {
+              const on = value === mode;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => {
+                    setMode(value);
+                    setCategoryId("");
+                  }}
+                  className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[12px] text-[14px] font-semibold transition-colors sm:text-[15px] ${
+                    on ? "bg-white shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
+                  }`}
+                  style={on ? { color: TONE[value].fg } : undefined}
+                >
+                  <Icon className="h-4 w-4" strokeWidth={2.4} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-col gap-1 rounded-[18px] px-5 py-4" style={{ backgroundColor: tone.bg }}>
+            <label htmlFor="amount" className="text-[13px] font-semibold" style={{ color: tone.fg }}>
+              Valor
+            </label>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[28px] font-bold" style={{ color: tone.strong }}>
+                {tone.sign}$
+              </span>
+              <input
                 id="amount"
-                name="amount"
+                name="amount_display"
                 type="text"
                 inputMode="decimal"
-                placeholder="0.00"
-                required
+                autoComplete="off"
+                autoFocus
+                placeholder="0,00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full min-w-0 border-0 bg-transparent p-0 text-[38px] font-extrabold tracking-[-0.03em] tabular-nums outline-none placeholder:opacity-35"
+                style={{ color: tone.fg }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="date" className="text-[13px] font-semibold text-[#344054]">
+                Data
+              </Label>
+              <DateInput id="date" name="date" defaultValue={localToday()} required className="[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px]" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="description" className="text-[13px] font-semibold text-[#344054]">
+                Descrição
+              </Label>
+              <Input
+                id="description"
+                name="description"
+                required={mode !== "transfer"}
+                placeholder={mode === "transfer" ? "Transferência" : "Ex.: Walmart"}
+                className="h-12 rounded-[12px] text-[15px]"
               />
             </div>
           </div>
 
           {mode === "transfer" ? (
-            <div className="grid grid-cols-2 gap-4">
+            <>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="from_account_id">De</Label>
-                <Select name="from_account_id" required>
-                  <SelectTrigger id="from_account_id">
-                    <SelectValue placeholder="Conta de origem" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="text-[13px] font-semibold text-[#344054]">Sai de</span>
+                <AccountPicker
+                  label="Sai de"
+                  accounts={accounts}
+                  value={fromAccountId}
+                  onChange={(id) => {
+                    setFromAccountId(id);
+                    if (id === toAccountId) setToAccountId("");
+                  }}
+                />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="to_account_id">Para</Label>
-                <Select name="to_account_id" required>
-                  <SelectTrigger id="to_account_id">
-                    <SelectValue placeholder="Conta de destino" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="text-[13px] font-semibold text-[#344054]">Vai pra</span>
+                <AccountPicker
+                  label="Vai pra"
+                  accounts={accounts}
+                  value={toAccountId}
+                  onChange={setToAccountId}
+                  exclude={fromAccountId}
+                />
               </div>
-            </div>
+            </>
           ) : (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="account_id">Conta</Label>
-              <Select
-                name="account_id"
-                required
-                value={accountId}
-                onValueChange={setAccountId}
-              >
-                <SelectTrigger id="account_id">
-                  <SelectValue placeholder="Selecione a conta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-[13px] font-semibold text-[#344054]">Conta</span>
+              <AccountPicker label="Conta" accounts={accounts} value={accountId} onChange={setAccountId} />
             </div>
           )}
 
           {mode !== "transfer" ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="category_id">Categoria</Label>
-              <Select
-                name="category_id"
-                value={selectedCategoryId}
-                onValueChange={setSelectedCategoryId}
-              >
-                <SelectTrigger id="category_id">
-                  <SelectValue placeholder="Sem categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categoriesForDirection.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {newCategoryOpen ? (
-                <div className="flex gap-2">
-                  <Input
-                    autoFocus
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Nome da nova categoria"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        onCreateCategory();
-                      }
-                    }}
-                  />
-                  <Button
+              <span className="text-[13px] font-semibold text-[#344054]">Categoria</span>
+              <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
+                {categoriesForDirection.map((c) => {
+                  const on = c.id === categoryId;
+                  const color = colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" };
+                  const Icon = getCategoryIcon(c.name, mode === "in" ? "in" : "out", c.icon ?? null);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => setCategoryId(on ? "" : c.id)}
+                      className={`inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] pr-3.5 pl-2 text-sm transition-colors ${
+                        on ? "font-semibold" : "border-[#E4E7EC] bg-white font-medium text-[#344054] hover:border-[#C7D0FF]"
+                      }`}
+                      style={on ? { borderColor: color.fg, backgroundColor: color.bg, color: color.fg } : undefined}
+                    >
+                      <span
+                        className="flex h-6 w-6 items-center justify-center rounded-full"
+                        style={{ backgroundColor: color.bg, color: color.fg }}
+                      >
+                        <Icon className="h-3.5 w-3.5" strokeWidth={2.4} />
+                      </span>
+                      {c.name}
+                    </button>
+                  );
+                })}
+                {newCategoryOpen ? (
+                  <div className="flex w-full gap-2">
+                    <Input
+                      autoFocus
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nome da nova categoria"
+                      className="h-10 rounded-[12px]"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          onCreateCategory();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={onCreateCategory} disabled={isPending} className="h-10 rounded-[12px]">
+                      Criar
+                    </Button>
+                  </div>
+                ) : (
+                  <button
                     type="button"
-                    size="sm"
-                    onClick={onCreateCategory}
-                    disabled={isPending}
+                    onClick={() => setNewCategoryOpen(true)}
+                    className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-[#C7D0FF] px-3.5 text-sm font-semibold text-(--primary) hover:bg-(--primary-soft)"
                   >
-                    Criar
-                  </Button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="w-fit text-left text-sm text-(--ink)/60 underline-offset-2 hover:underline"
-                  onClick={() => setNewCategoryOpen(true)}
-                >
-                  + nova categoria
-                </button>
-              )}
+                    <Plus className="h-4 w-4" />
+                    Nova categoria
+                  </button>
+                )}
+              </div>
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Input
-              id="description"
-              name="description"
-              required={mode !== "transfer"}
-              placeholder={mode === "transfer" ? "Transferência" : undefined}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="notes">Notas (opcional)</Label>
-            <Input id="notes" name="notes" />
-          </div>
-
           {mode === "out" && isCard ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="installments">Parcelas</Label>
-              <Select
-                name="installments"
-                value={installments}
-                onValueChange={setInstallments}
-              >
-                <SelectTrigger id="installments">
+              <Label htmlFor="installments" className="text-[13px] font-semibold text-[#344054]">
+                Parcelas
+              </Label>
+              <Select name="installments" value={installments} onValueChange={setInstallments}>
+                <SelectTrigger id="installments" className="h-12! w-full rounded-[12px] text-[15px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">À vista</SelectItem>
-                  {Array.from({ length: 23 }, (_, i) => String(i + 2)).map(
-                    (n) => (
-                      <SelectItem key={n} value={n}>
-                        {n} vezes
-                      </SelectItem>
-                    ),
-                  )}
+                  {Array.from({ length: 23 }, (_, i) => String(i + 2)).map((n) => (
+                    <SelectItem key={n} value={n}>
+                      {n} vezes
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {parcelado ? (
-                <p className="text-xs text-(--text-muted)">
-                  O valor acima é o total. Cada parcela entra na fatura do seu
-                  mês.
-                </p>
+                <p className="text-xs text-(--text-muted)">O valor acima é o total. Cada parcela entra na fatura do seu mês.</p>
               ) : null}
             </div>
           ) : null}
 
-          {mode !== "transfer" && !parcelado ? (
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox name="is_pending" />
-              Ainda não caiu (pendente)
-            </label>
-          ) : null}
+          {notesOpen ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="notes" className="text-[13px] font-semibold text-[#344054]">
+                Nota
+              </Label>
+              <Input id="notes" name="notes" autoFocus className="h-12 rounded-[12px] text-[15px]" />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNotesOpen(true)}
+              className="w-fit text-sm font-semibold text-(--primary) hover:underline"
+            >
+              + Adicionar nota
+            </button>
+          )}
 
           {mode !== "transfer" && !parcelado ? (
-            <div className="flex flex-col gap-3 rounded-md border border-(--border-soft) p-3">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  name="make_recurring"
-                  checked={makeRecurring}
-                  onCheckedChange={(checked) =>
-                    setMakeRecurring(checked === true)
-                  }
-                />
-                Repetir esse lançamento
-              </label>
+            <div className="flex flex-col">
+              <ToggleRow
+                checked={pending}
+                onChange={setPending}
+                title="Ainda não caiu"
+                hint="Fica como pendente até você confirmar"
+              />
+              <ToggleRow
+                checked={makeRecurring}
+                onChange={setMakeRecurring}
+                title="Repetir esse lançamento"
+                hint="Toda semana, mês ou ano"
+              />
               {makeRecurring ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3.5 pb-1">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="recurrence_frequency">Frequência</Label>
-                    <Select
-                      name="recurrence_frequency"
-                      value={recurrenceFrequency}
-                      onValueChange={setRecurrenceFrequency}
-                    >
-                      <SelectTrigger id="recurrence_frequency">
+                    <Label htmlFor="recurrence_frequency" className="text-[13px] font-semibold text-[#344054]">
+                      Frequência
+                    </Label>
+                    <Select name="recurrence_frequency" value={recurrenceFrequency} onValueChange={setRecurrenceFrequency}>
+                      <SelectTrigger id="recurrence_frequency" className="h-12! w-full rounded-[12px] text-[15px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -405,12 +564,13 @@ export function ManualTransactionButton({
                     </Select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="recurrence_ends_on">
+                    <Label htmlFor="recurrence_ends_on" className="text-[13px] font-semibold text-[#344054]">
                       Repetir até (opcional)
                     </Label>
                     <DateInput
                       id="recurrence_ends_on"
                       name="recurrence_ends_on"
+                      className="[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px]"
                     />
                   </div>
                 </div>
@@ -418,10 +578,14 @@ export function ManualTransactionButton({
             </div>
           ) : null}
 
-          {error ? <p className="text-sm text-(--out)">{error}</p> : null}
+          {error ? <p className="text-sm font-medium text-(--expense-dark)">{error}</p> : null}
 
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Lançando..." : "Lançar"}
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="h-[54px] rounded-[14px] text-base font-bold shadow-[0_8px_20px_rgba(83,109,254,.3)]"
+          >
+            {submitLabel}
           </Button>
         </form>
       </DialogContent>
