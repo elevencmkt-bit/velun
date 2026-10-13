@@ -356,7 +356,7 @@ export function ManualTransactionButton({
               Valor
             </label>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[28px] font-bold" style={{ color: tone.strong }}>
+              <span className="shrink-0 text-[28px] font-bold whitespace-nowrap" style={{ color: tone.strong }}>
                 {tone.sign}$
               </span>
               <input
