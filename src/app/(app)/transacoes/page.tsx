@@ -262,6 +262,8 @@ export default async function TransacoesPage({
       accounts={(accounts ?? []).map((a) => ({
         id: a.id as string,
         name: a.name as string,
+        type: a.type as string,
+        institution: (a.institution as string | null) ?? null,
       }))}
       editableAccounts={(accounts ?? [])
         .filter((a) => writableIds.has(a.id as string))
