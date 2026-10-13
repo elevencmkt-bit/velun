@@ -12,7 +12,8 @@ export type ReportPeriod = {
   /** "Setembro de 2026", "Janeiro a setembro de 2026", "01/03/2026 a 15/04/2026". */
   label: string;
   kind: "month" | "year" | "custom";
-  prev: { from: string; to: string; label: string };
+  /** label: "agosto"; inLabel: "em agosto" / "no mesmo período de 2025". */
+  prev: { from: string; to: string; label: string; inLabel: string };
   /** Mais de um mês: tabelas categoria × mês e evolução por mês. */
   multiMonth: boolean;
   /** Meses cobertos, "2026-01"…, em ordem. */
@@ -89,7 +90,12 @@ export function buildPeriod(from: string, to: string): ReportPeriod {
       to,
       kind: "month",
       label: cap(monthName(`${fy}-${pad(fm)}`)),
-      prev: { from: iso(py, pm, 1), to: iso(py, pm, lastDay(py, pm)), label: MONTHS[pm - 1] },
+      prev: {
+        from: iso(py, pm, 1),
+        to: iso(py, pm, lastDay(py, pm)),
+        label: MONTHS[pm - 1],
+        inLabel: `em ${MONTHS[pm - 1]}`,
+      },
       multiMonth: false,
       months,
     };
@@ -108,8 +114,13 @@ export function buildPeriod(from: string, to: string): ReportPeriod {
         ? `Ano de ${ty}`
         : lastFull
           ? `Janeiro a ${MONTHS[tm - 1]} de ${ty}`
-          : `01/01/${ty} a ${br(to)}`,
-      prev: { from: iso(fy - 1, 1, 1), to: toPrev, label: `mesmo período de ${fy - 1}` },
+          : `1º de janeiro a ${td} de ${MONTHS[tm - 1]} de ${ty}`,
+      prev: {
+        from: iso(fy - 1, 1, 1),
+        to: toPrev,
+        label: `mesmo período de ${fy - 1}`,
+        inLabel: `no mesmo período de ${fy - 1}`,
+      },
       multiMonth: months.length > 1,
       months,
     };
@@ -123,7 +134,7 @@ export function buildPeriod(from: string, to: string): ReportPeriod {
     to,
     kind: "custom",
     label: `${br(from)} a ${br(to)}`,
-    prev: { from: addDays(prevTo, -(len - 1)), to: prevTo, label: "período anterior" },
+    prev: { from: addDays(prevTo, -(len - 1)), to: prevTo, label: "período anterior", inLabel: "no período anterior" },
     multiMonth: months.length > 1,
     months,
   };

@@ -157,7 +157,7 @@ function CategoryTable({
 }
 
 export default async function RelatorioPdfPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { householdId, memberId, currency, today, displayName } = await getCurrentMember();
+  const { householdId, memberId, currency, today, displayName, timezone } = await getCurrentMember();
   const supabase = await createClient();
   const sp = await searchParams;
 
@@ -177,8 +177,9 @@ export default async function RelatorioPdfPage({ searchParams }: { searchParams:
   ]);
 
   const money = (c: number) => formatCents(c, currency);
-  const now = new Date();
-  const generated = `${formatDateBr(today)} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  // Hora no fuso da casa (o servidor roda em UTC).
+  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(new Date());
+  const generated = `${formatDateBr(today)} às ${time}`;
   const { totals } = data;
   const hasPrev = totals.incomePrev !== 0 || totals.expensePrev !== 0;
   const sobra = totals.balance >= 0;
@@ -232,7 +233,7 @@ export default async function RelatorioPdfPage({ searchParams }: { searchParams:
             <div className="text-[28px] font-extrabold tracking-[-0.03em]">{money(Math.abs(totals.balance))}</div>
             {hasPrev ? (
               <div className="text-[11px] opacity-85">
-                {totals.balancePrev < 0 ? `Faltaram ${money(-totals.balancePrev)}` : `Sobraram ${money(totals.balancePrev)}`} em {period.prev.label}.
+                {totals.balancePrev < 0 ? `Faltaram ${money(-totals.balancePrev)}` : `Sobraram ${money(totals.balancePrev)}`} {period.prev.inLabel}.
               </div>
             ) : null}
           </div>
@@ -268,7 +269,7 @@ export default async function RelatorioPdfPage({ searchParams }: { searchParams:
 
         <section className="rp-sec">
           <h2>Despesas por categoria</h2>
-          <div className="sub">Quanto saiu em cada categoria, a fatia do total e a diferença pro {period.prev.label}.</div>
+          <div className="sub">Quanto saiu em cada categoria, a fatia do total e a diferença {period.kind === "month" ? `pra ${period.prev.label}` : `pro ${period.prev.label}`}.</div>
           {data.expense.length === 0 ? (
             <p className="mt-3 text-[12px] text-[#667085]">Nenhuma despesa no período.</p>
           ) : (
@@ -291,8 +292,9 @@ export default async function RelatorioPdfPage({ searchParams }: { searchParams:
         <section className="rp-sec">
           <h2>{period.multiMonth ? "Evolução mês a mês" : "Evolução do período"}</h2>
           <div className="sub">
-            Entradas <span className="rp-dot ml-1" style={{ background: "#12B76A" }} /> e saídas{" "}
-            <span className="rp-dot ml-1" style={{ background: "#F04438" }} /> {period.multiMonth ? "de cada mês" : "de cada dia"}.
+            <span className="rp-dot" style={{ background: "#12B76A" }} />
+            entradas e <span className="rp-dot ml-1" style={{ background: "#F04438" }} />
+            saídas {period.multiMonth ? "de cada mês" : "de cada dia"}.
           </div>
           <div className="mt-3">
             <Bars data={data.evolution} multiMonth={period.multiMonth} />
