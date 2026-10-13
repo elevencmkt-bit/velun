@@ -42,6 +42,9 @@ export type GoalDeposit = {
   linked: { description: string; account_name: string } | null;
 };
 
+/** Lançamento parecido com os já vinculados a uma meta (sugestão). */
+export type GoalSuggestion = { id: string; date: string; description: string; account_name: string; amount_cents: number };
+
 export type GoalView = GoalRow & {
   /** Do casal, minha ou de quem é. */
   ownerLabel: string;
@@ -51,6 +54,8 @@ export type GoalView = GoalRow & {
   accountName: string | null;
   categoryName: string | null;
   deposits: GoalDeposit[];
+  /** "Parece pagamento desta meta": mesmo nome e valor parecido. */
+  suggestions: GoalSuggestion[];
   // juntar
   savedCents: number;
   // dívida
@@ -97,7 +102,7 @@ export async function loadGoals(params: {
       accountScope(supabase, householdId, memberId, "balance"),
       accountScope(supabase, householdId, memberId, "categories"),
       supabase.from("members").select("id, display_name").eq("household_id", householdId),
-      supabase.from("accounts").select("id, name, type").eq("household_id", householdId),
+      supabase.from("accounts").select("id, name, type, owner_id").eq("household_id", householdId),
       supabase.from("categories").select("id, name").eq("household_id", householdId),
     ]);
 
@@ -199,6 +204,56 @@ export async function loadGoals(params: {
   const accountName = new Map((accounts ?? []).map((a) => [a.id as string, a.name as string]));
   const categoryName = new Map((categories ?? []).map((c) => [c.id as string, c.name as string]));
 
+  // Sugestões: pra metas por valores registrados que já têm lançamento
+  // vinculado, procura nos últimos 60 dias outro lançamento com o MESMO
+  // nome e valor até 15% diferente da média dos vinculados. Respeita a
+  // regra de conta (meta do casal só com conta do casal).
+  const accountOwner = new Map((accounts ?? []).map((a) => [a.id as string, (a.owner_id as string | null) ?? null]));
+  const allowedFor = (g: GoalRow) => (accountId: string) => {
+    if (!accountOwner.has(accountId)) return false;
+    const owner = accountOwner.get(accountId);
+    return owner === null || (g.owner_id !== null && owner === memberId);
+  };
+  const linkedByGoal = new Map<string, GoalDeposit[]>();
+  for (const d of deposits) if (d.transaction_id && d.linked) linkedByGoal.set(d.goal_id, [...(linkedByGoal.get(d.goal_id) ?? []), d]);
+  const names = [...new Set([...linkedByGoal.values()].flat().map((d) => d.linked!.description))];
+  const candidates: { id: string; date: string; description: string; account_id: string; amount_cents: number }[] = [];
+  if (names.length > 0) {
+    const since = new Date(`${today}T12:00:00Z`);
+    since.setUTCDate(since.getUTCDate() - 60);
+    const { data } = await supabase
+      // limite: 60 dias, só os nomes já vinculados a alguma meta
+      .from("transactions")
+      .select("id, date, description, account_id, amount_cents")
+      .eq("household_id", householdId)
+      .eq("status", "cleared")
+      .eq("direction", "out")
+      .in("description", names.slice(0, 50))
+      .gte("date", since.toISOString().slice(0, 10))
+      .order("date", { ascending: false })
+      .limit(200);
+    candidates.push(...((data ?? []) as typeof candidates));
+  }
+  function suggestionsFor(g: GoalRow): GoalSuggestion[] {
+    const linked = linkedByGoal.get(g.id);
+    if (!linked || g.tracking !== "deposits" || g.kind === "limit") return [];
+    if (!(g.owner_id === null || g.owner_id === memberId)) return [];
+    const taken = new Set(linked.map((d) => d.transaction_id));
+    const wanted = new Set(linked.map((d) => d.linked!.description));
+    const avg = linked.reduce((n, d) => n + Math.abs(d.amount_cents), 0) / linked.length;
+    const ok = allowedFor(g);
+    return candidates
+      .filter(
+        (t) =>
+          !taken.has(t.id) &&
+          wanted.has(t.description) &&
+          ok(t.account_id) &&
+          Math.abs(t.amount_cents - avg) <= avg * 0.15,
+      )
+      .slice(0, 3)
+      .map((t) => ({ id: t.id, date: t.date, description: t.description, account_name: accountName.get(t.account_id) ?? "", amount_cents: t.amount_cents }));
+  }
+
   return goals.map((g) => {
     const mine = g.owner_id === memberId;
     const createdOn = g.created_at.slice(0, 10);
@@ -224,6 +279,7 @@ export async function loadGoals(params: {
       monthsLeft: null,
       perMonthCents: null,
       history: [],
+      suggestions: suggestionsFor(g),
     };
     if (hidden) return base;
 

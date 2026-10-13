@@ -280,3 +280,63 @@ export async function linkTransactionToGoal(goalId: string, transactionId: strin
   if (!data || data.length === 0) return { ok: false, error: "Você não pode mexer nessa meta." };
   return done();
 }
+
+export type TransactionGoalLinks = {
+  /** Metas por valores registrados em que este lançamento pode entrar. */
+  options: { id: string; name: string; kind: "save" | "debt" }[];
+  linked: string[];
+};
+
+/**
+ * Pra caixa de editar lançamento: em que metas ele pode entrar e em quais
+ * já está. Mesma regra do vínculo pela meta (meta do casal só com conta
+ * do casal; a minha, do casal ou minha).
+ */
+export async function goalLinksForTransaction(transactionId: string): Promise<TransactionGoalLinks> {
+  const { householdId, memberId } = await getCurrentMember();
+  const supabase = await createClient();
+  const { data: tx } = await supabase
+    .from("transactions")
+    .select("id, account:accounts(owner_id)")
+    .eq("id", transactionId)
+    .maybeSingle();
+  if (!tx) return { options: [], linked: [] };
+  const acc = Array.isArray(tx.account) ? tx.account[0] : tx.account;
+  const accountOwner = (acc?.owner_id as string | null | undefined) ?? null;
+  if (accountOwner !== null && accountOwner !== memberId) return { options: [], linked: [] };
+
+  const [{ data: goals }, { data: links }] = await Promise.all([
+    supabase
+      // limite: metas de uma casa são poucas
+      .from("goals")
+      .select("id, name, kind, owner_id")
+      .eq("household_id", householdId)
+      .eq("is_archived", false)
+      .eq("tracking", "deposits")
+      .in("kind", ["save", "debt"])
+      .order("created_at"),
+    supabase
+      // limite: as metas de um lançamento só
+      .from("goal_deposits")
+      .select("goal_id")
+      .eq("transaction_id", transactionId),
+  ]);
+  const options = (goals ?? [])
+    .filter((g) => (g.owner_id === null ? accountOwner === null : g.owner_id === memberId))
+    .map((g) => ({ id: g.id as string, name: g.name as string, kind: g.kind as "save" | "debt" }));
+  return { options, linked: (links ?? []).map((l) => l.goal_id as string) };
+}
+
+/** Tira o lançamento da meta (o lançamento continua). */
+export async function unlinkTransactionFromGoal(goalId: string, transactionId: string): Promise<Result> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("goal_deposits")
+    .delete()
+    .eq("goal_id", goalId)
+    .eq("transaction_id", transactionId)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+  if (!data || data.length === 0) return { ok: false, error: "Não estava vinculado." };
+  return done();
+}

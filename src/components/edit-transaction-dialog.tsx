@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateInput } from "@/components/date-input";
 import { fitsDirection } from "@/lib/category-kind";
+import { GoalLinkField } from "@/components/goal-link-field";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean };
@@ -248,6 +249,8 @@ export function EditTransactionDialog({
             <Label htmlFor="notes">Notas (opcional)</Label>
             <Input id="notes" name="notes" defaultValue={transaction.notes ?? ""} />
           </div>
+
+          {transaction.status === "cleared" ? <GoalLinkField transactionId={transaction.id} /> : null}
 
           <label className="flex items-center gap-2 text-sm">
             <Checkbox name="is_pending" defaultChecked={transaction.status === "pending"} />

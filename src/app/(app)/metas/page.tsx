@@ -10,6 +10,7 @@ import { monthRange } from "@/lib/month";
 import { Money } from "@/components/money";
 import { NewGoalDialog, type GoalAccountOption, type GoalCategoryOption } from "./new-goal-dialog";
 import { DepositButton, EditGoalButton, type GoalActionData } from "./goal-actions";
+import { GoalSuggestions } from "./goal-suggestions";
 
 const RING_COLORS = ["var(--primary)", "#27C499", "#A78BFA", "#FF8A5C"];
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -46,24 +47,65 @@ function Ring({ progress, color }: { progress: number; color: string }) {
   );
 }
 
-/** Saldo devedor caindo: linha cheia até hoje, pontilhada até a data. */
-function DebtChart({ goal }: { goal: GoalView }) {
+/**
+ * Saldo devedor caindo: linha cheia até hoje, pontilhada até a data.
+ * Com pouco tempo de meta (e sem data), uma linha não diz nada — fica uma
+ * barra do quanto já foi pago, e o gráfico aparece com os meses.
+ */
+function DebtChart({ goal, currency }: { goal: GoalView; currency: CurrencyCode }) {
   const pts = goal.history;
   if (pts.length < 1) return null;
-  const end = goal.target_date && goal.target_date > pts[pts.length - 1].date ? goal.target_date : null;
+  const last = pts[pts.length - 1];
+  const end = goal.target_date && goal.target_date > last.date ? goal.target_date : null;
   const t0 = Date.parse(pts[0].date);
-  const t1 = Date.parse(end ?? pts[pts.length - 1].date);
+  const t1 = Date.parse(end ?? last.date);
+  const DAY = 86_400_000;
+
+  if (t1 - t0 < 14 * DAY) {
+    const paid = Math.max(0, goal.start_cents - goal.remainingCents);
+    return (
+      <div className="flex flex-col gap-3 rounded-[16px] bg-(--bg-subtle) p-5">
+        <div className="flex items-baseline justify-between text-[13px] text-(--text-muted)">
+          <span>Pago</span>
+          <span className="font-semibold text-(--text-primary) tabular-nums">{Math.round(goal.progress * 100)}%</span>
+        </div>
+        <div className="h-3 overflow-hidden rounded-full bg-(--bg-strong)">
+          <div className="h-full rounded-full bg-(--income)" style={{ width: `${Math.min(100, goal.progress * 100)}%` }} />
+        </div>
+        <div className="flex justify-between text-xs text-(--text-muted)">
+          <span>
+            <Money cents={paid} currency={currency} /> pagos
+          </span>
+          <span>
+            de <Money cents={goal.start_cents} currency={currency} />
+          </span>
+        </div>
+        <p className="text-xs text-(--text-light)">A linha do saldo caindo aparece conforme os meses passam.</p>
+      </div>
+    );
+  }
+
   const span = Math.max(1, t1 - t0);
   const max = Math.max(1, ...pts.map((p) => p.cents), goal.start_cents);
   const W = 480;
   const H = 150;
-  const x = (d: string) => 20 + ((Date.parse(d) - t0) / span) * (W - 40);
+  const x = (d: string) => 28 + ((Date.parse(d) - t0) / span) * (W - 56);
   const y = (c: number) => 16 + (1 - c / max) * (H - 30);
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)} ${y(p.cents).toFixed(1)}`).join(" ");
-  const last = pts[pts.length - 1];
-  const ticks = [pts[0].date, last.date, ...(end ? [end] : [])];
+
+  // Rótulos: começo, hoje e a data; some o que ficaria por cima de outro.
+  const marks: { date: string; text: string; strong?: boolean; good?: boolean }[] = [];
+  const fmt = (d: string) => {
+    const [yy, mm] = d.split("-").map(Number);
+    return `${MONTHS[mm - 1]}/${String(yy).slice(2)}`;
+  };
+  marks.push({ date: pts[0].date, text: fmt(pts[0].date) });
+  marks.push({ date: last.date, text: "hoje", strong: true });
+  if (end) marks.push({ date: end, text: fmt(end), good: true });
+  const ticks = marks.filter((m, i) => !marks.some((o, j) => j > i && Math.abs(x(o.date) - x(m.date)) < 48));
+
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H + 20}`} role="img" aria-label={`Saldo devedor: ${formatCents(goal.start_cents)} no começo, ${formatCents(goal.remainingCents)} hoje`}>
+    <svg width="100%" viewBox={`0 0 ${W} ${H + 20}`} role="img" aria-label={`Saldo devedor: ${formatCents(goal.start_cents, currency)} no começo, ${formatCents(goal.remainingCents, currency)} hoje`}>
       <line x1="0" y1={H} x2={W} y2={H} stroke="var(--border-soft)" />
       <path d={line} fill="none" stroke="var(--primary)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
       {end ? (
@@ -71,14 +113,19 @@ function DebtChart({ goal }: { goal: GoalView }) {
       ) : null}
       <circle cx={x(last.date)} cy={y(last.cents)} r="6" fill="var(--primary)" />
       {end ? <circle cx={x(end)} cy={y(0)} r="6" fill="var(--bg-surface)" stroke="var(--income)" strokeWidth="3" /> : null}
-      {ticks.map((d, i) => {
-        const [yy, mm] = d.split("-").map(Number);
-        return (
-          <text key={`${d}-${i}`} x={x(d)} y={H + 16} fontSize="11" textAnchor="middle" fill={i === 1 ? "var(--text-primary)" : "var(--text-light)"} fontWeight={i === 1 ? 700 : 400}>
-            {i === 1 ? "hoje" : `${MONTHS[mm - 1]}/${String(yy).slice(2)}`}
-          </text>
-        );
-      })}
+      {ticks.map((m) => (
+        <text
+          key={`${m.date}-${m.text}`}
+          x={x(m.date)}
+          y={H + 16}
+          fontSize="11"
+          textAnchor="middle"
+          fill={m.strong ? "var(--text-primary)" : m.good ? "var(--income-dark)" : "var(--text-light)"}
+          fontWeight={m.strong || m.good ? 700 : 400}
+        >
+          {m.text}
+        </text>
+      ))}
     </svg>
   );
 }
@@ -282,6 +329,7 @@ export default async function MetasPage() {
                     </div>
                   </div>
                 )}
+                {g.suggestions.length > 0 ? <GoalSuggestions goalId={g.id} kind={g.kind} suggestions={g.suggestions} currency={currency} /> : null}
                 {g.canEdit ? (
                   <div className="flex flex-wrap gap-2 border-t border-(--border-soft) pt-3.5">
                     {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} currency={currency} /> : null}
@@ -403,6 +451,7 @@ export default async function MetasPage() {
                       </div>
                     </>
                   )}
+                  {g.suggestions.length > 0 ? <GoalSuggestions goalId={g.id} kind={g.kind} suggestions={g.suggestions} currency={currency} /> : null}
                   {g.canEdit ? (
                     <div className="mt-1 flex flex-wrap gap-2">
                       {g.tracking === "deposits" ? <DepositButton goal={actionData(g, memberId)} today={today} currency={currency} /> : null}
@@ -410,7 +459,7 @@ export default async function MetasPage() {
                     </div>
                   ) : null}
                 </div>
-                {!g.hidden ? <DebtChart goal={g} /> : null}
+                {!g.hidden ? <DebtChart goal={g} currency={currency} /> : null}
               </article>
             ))}
           </div>
