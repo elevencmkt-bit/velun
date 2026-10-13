@@ -344,7 +344,7 @@ export function AccountForm({
             ) : null}
           </div>
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}
-          <Button type="submit" disabled={isPending}>
+          <Button type="submit" size="form" disabled={isPending} className="mt-1 w-full">
             {isPending ? "Salvando..." : isEdit ? "Salvar alterações" : "Criar conta"}
           </Button>
         </form>

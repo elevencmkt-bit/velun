@@ -145,13 +145,13 @@ export function CategoryRow({
                 <IconSwatchGrid value={icon} onChange={setIcon} />
               </div>
               {error ? <p className="text-sm text-(--expense)">{error}</p> : null}
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" size="form" disabled={isPending} className="mt-1 w-full">
                 {isPending ? "Salvando..." : "Salvar"}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                className="text-(--expense-dark) hover:bg-(--expense-soft) hover:text-(--expense-dark)"
+                className="h-11 rounded-[12px] text-[14px] text-(--expense-dark) hover:bg-(--expense-soft) hover:text-(--expense-dark)"
                 onClick={() => {
                   setEditOpen(false);
                   setDeleteOpen(true);

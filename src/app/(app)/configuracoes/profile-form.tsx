@@ -87,7 +87,7 @@ export function ProfileForm({
         <Label htmlFor="name">Nome</Label>
         <div className="flex gap-2.5">
           <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} required className="min-w-0 flex-1" />
-          <Button type="submit" disabled={isPending} className="shrink-0">
+          <Button type="submit" disabled={isPending} className="h-12 shrink-0 rounded-[12px] px-5 text-[14px]">
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
         </div>

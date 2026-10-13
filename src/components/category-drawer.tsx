@@ -166,7 +166,7 @@ export function CategoryDrawer({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="flex flex-col gap-0 overflow-hidden bg-(--bg-surface) p-0 data-open:zoom-in-100 data-closed:zoom-out-100 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:h-[88dvh] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[24px] max-sm:rounded-b-none sm:top-0 sm:right-0 sm:left-auto sm:h-dvh sm:w-[460px] sm:max-w-[460px] sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:rounded-l-[24px]"
+        className="flex max-h-none flex-col gap-0 overflow-hidden overflow-y-hidden bg-(--bg-surface) p-0 sm:p-0 data-open:zoom-in-100 data-closed:zoom-out-100 max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:h-[88dvh] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-[24px] max-sm:rounded-b-none sm:top-0 sm:right-0 sm:left-auto sm:h-dvh sm:w-[460px] sm:max-w-[460px] sm:translate-x-0 sm:translate-y-0 sm:rounded-none sm:rounded-l-[24px]"
       >
         <div className="flex flex-col gap-4 border-b border-(--border-soft) px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
           <div className="flex items-center justify-between gap-3">

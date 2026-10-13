@@ -1,18 +1,8 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Landmark } from "lucide-react";
-import { AccountAvatar } from "@/components/account-avatar";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AccountOptions } from "@/components/account-options";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const ALL = "__all__";
 
@@ -54,22 +44,7 @@ export function AccountFilter({
         sideOffset={8}
         className="max-h-[min(420px,var(--radix-select-content-available-height))] min-w-[280px]"
       >
-        <SelectGroup>
-          <SelectLabel>Mostrar</SelectLabel>
-          <SelectItem value={ALL}>
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-(--bg-hover)">
-              <Landmark className="h-4 w-4 text-(--text-secondary)" />
-            </span>
-            Todas as contas
-          </SelectItem>
-        </SelectGroup>
-        {accounts.length > 0 ? <SelectSeparator /> : null}
-        {accounts.map((a) => (
-          <SelectItem key={a.id} value={a.id}>
-            <AccountAvatar institution={a.institution} type={a.type} size={28} />
-            <span className="truncate">{a.name}</span>
-          </SelectItem>
-        ))}
+        <AccountOptions accounts={accounts} allValue={ALL} />
       </SelectContent>
     </Select>
   );

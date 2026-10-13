@@ -205,7 +205,7 @@ export function RecurrenceForm({
 
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}
 
-          <Button type="submit" disabled={isPending}>
+          <Button type="submit" size="form" disabled={isPending} className="mt-1 w-full">
             {isPending ? "Criando..." : "Criar recorrência"}
           </Button>
         </form>
