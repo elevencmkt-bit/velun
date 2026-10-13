@@ -10,6 +10,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
 import { fetchDeletionRequests, fetchVisibilityNotifications } from "@/lib/notifications";
 import { UserMenu } from "@/components/user-menu";
+import { CalculatorButton } from "@/components/calculator-button";
 import { HideValuesButton } from "@/components/hide-values-button";
 import { HIDE_VALUES_COOKIE } from "@/lib/hide-values";
 import { cookies } from "next/headers";
@@ -76,6 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 currency={member.currency}
               />
             </div>
+            <CalculatorButton />
             <HideValuesButton initialHidden={hideValues} />
             <NotificationBell
               notifications={notifications}
