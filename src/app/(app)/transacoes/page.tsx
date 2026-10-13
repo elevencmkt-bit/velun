@@ -26,6 +26,41 @@ function monthHref(params: Record<string, string | undefined>, month: string) {
   return `/transacoes?${search.toString()}`;
 }
 
+// Filtros da tela (conta, categoria, quem lançou, origem, direção,
+// busca). Ficam numa função só porque duas consultas usam: a da lista e
+// a que procura o mês mais perto com lançamento quando a lista vem vazia.
+type Filterable<Q> = {
+  eq(column: string, value: string): Q;
+  is(column: string, value: null): Q;
+  not(column: string, operator: string, value: null): Q;
+  or(filters: string): Q;
+};
+function applyFilters<Q extends Filterable<Q>>(
+  query: Q,
+  params: Record<string, string | undefined>,
+): Q {
+  if (params.account) query = query.eq("account_id", params.account);
+  if (params.category === "none") query = query.is("category_id", null);
+  else if (params.category) query = query.eq("category_id", params.category);
+  if (params.member) query = query.eq("created_by", params.member);
+  if (params.origin === "manual") query = query.is("import_id", null);
+  if (params.origin === "imported") query = query.not("import_id", "is", null);
+  if (params.direction === "in" || params.direction === "out") {
+    query = query.eq("direction", params.direction);
+  }
+  if (params.q) {
+    // Procura no nome e no texto do banco: quem lembra de "Card Purchase
+    // Fxreplay" também acha. Aspas protegem vírgula e parênteses, que a
+    // sintaxe do filtro usaria como separador.
+    const term = `"%${params.q.replace(/["\\]/g, "")}%"`;
+    query = query.or(
+      `description.ilike.${term},bank_description.ilike.${term}`,
+    );
+  }
+
+  return query;
+}
+
 export default async function TransacoesPage({
   searchParams,
 }: {
@@ -94,24 +129,7 @@ export default async function TransacoesPage({
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (params.account) query = query.eq("account_id", params.account);
-  if (params.category === "none") query = query.is("category_id", null);
-  else if (params.category) query = query.eq("category_id", params.category);
-  if (params.member) query = query.eq("created_by", params.member);
-  if (params.origin === "manual") query = query.is("import_id", null);
-  if (params.origin === "imported") query = query.not("import_id", "is", null);
-  if (params.direction === "in" || params.direction === "out") {
-    query = query.eq("direction", params.direction);
-  }
-  if (params.q) {
-    // Procura no nome e no texto do banco: quem lembra de "Card Purchase
-    // Fxreplay" também acha. Aspas protegem vírgula e parênteses, que a
-    // sintaxe do filtro usaria como separador.
-    const term = `"%${params.q.replace(/["\\]/g, "")}%"`;
-    query = query.or(
-      `description.ilike.${term},bank_description.ilike.${term}`,
-    );
-  }
+  query = applyFilters(query, params);
 
   if (hasCustomRange) {
     if (params.from) query = query.gte("date", params.from);
@@ -170,6 +188,45 @@ export default async function TransacoesPage({
       : "all";
   const shown = activeStatus === "all" ? rows : rows.filter((r) => statusOf(r) === activeStatus);
 
+  // Lista vazia no mês: diz de quem e de quando, e aponta o mês mais
+  // perto que tem lançamento com os mesmos filtros. Sem isso, "nenhuma
+  // transação" com a Regions selecionada parece filtro quebrado quando é
+  // só o mês que ainda não tem extrato importado.
+  let emptyState: {
+    accountName: string | null;
+    monthLabel: string;
+    nearest: { label: string; href: string } | null;
+  } | null = null;
+  if (rows.length === 0 && !hasCustomRange) {
+    const dateQuery = () =>
+      supabase
+        .from("transactions")
+        .select("date")
+        .eq("household_id", householdId)
+        .in("account_id", visibleIds);
+    const base = () => applyFilters<ReturnType<typeof dateQuery>>(dateQuery(), params);
+    const [{ data: before }, { data: after }] = await Promise.all([
+      base().lt("date", start).order("date", { ascending: false }).limit(1),
+      base().gt("date", end).order("date", { ascending: true }).limit(1),
+    ]);
+    const date = (before?.[0]?.date ?? after?.[0]?.date) as string | undefined;
+    let nearest: { label: string; href: string } | null = null;
+    if (date) {
+      const [y, m] = date.split("-").map(Number);
+      nearest = {
+        label: monthLabel(y, m - 1).replace(/ de \d{4}$/, (x) => (y === year ? "" : x)),
+        href: monthHref(params, monthParam(y, m - 1)),
+      };
+    }
+    emptyState = {
+      accountName: params.account
+        ? ((accounts ?? []).find((a) => a.id === params.account)?.name as string | undefined) ?? null
+        : null,
+      monthLabel: monthLabel(year, monthIndex).toLowerCase(),
+      nearest,
+    };
+  }
+
   // O resumo é sempre do período inteiro, qualquer que seja a aba.
   const ins = rows.filter((r) => r.direction === "in");
   const outs = rows.filter((r) => r.direction === "out");
@@ -204,6 +261,7 @@ export default async function TransacoesPage({
       }}
       counts={counts}
       activeStatus={activeStatus}
+      emptyState={emptyState}
     />
   );
 }
