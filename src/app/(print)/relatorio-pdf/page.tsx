@@ -7,9 +7,25 @@ import { buildReportData, type ReportCategoryRow, type ReportData } from "@/lib/
 import { monthRange, parseMonthParam } from "@/lib/month";
 import { PrintToolbar } from "./print-toolbar";
 
-export const metadata: Metadata = { title: "Relatório — Velun" };
-
 type Search = { from?: string; to?: string; mode?: string; accounts?: string; print?: string };
+
+// O título da página vira o nome do arquivo ao salvar o PDF:
+// "Velun - Relatório Setembro de 2026 - gerado em 13-10-2026".
+// Sem barras (o navegador as troca por "_" no nome do arquivo).
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Search> }): Promise<Metadata> {
+  const { today } = await getCurrentMember();
+  const sp = await searchParams;
+  const { year, monthIndex } = parseMonthParam(undefined, today);
+  const fallback = monthRange(year, monthIndex);
+  const period = buildPeriod(
+    isValidDate(sp.from) ? sp.from : fallback.start,
+    isValidDate(sp.to) ? sp.to : fallback.end,
+  );
+  const dmy = (iso: string) => iso.split("-").reverse().join("-");
+  const what = period.kind === "custom" ? `${dmy(period.from)} a ${dmy(period.to)}` : period.label;
+  const resumo = sp.mode === "summary" ? " (resumo)" : "";
+  return { title: `Velun - Relatório ${what}${resumo} - gerado em ${dmy(today)}` };
+}
 
 const TYPE_LABEL: Record<string, string> = {
   checking: "Conta",
