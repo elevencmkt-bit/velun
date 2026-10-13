@@ -297,7 +297,7 @@ export function CategoryDrawer({
                         >
                           <SelectTrigger
                             aria-label={`Categoria de ${r.description}`}
-                            className="h-8! max-w-[132px] rounded-full border-[1.5px] border-(--border-primary) px-2.5 text-xs font-semibold text-(--text-secondary)"
+                            className="h-8! w-fit max-w-[132px] rounded-full border-[1.5px] border-(--border-primary) px-2.5 text-xs font-semibold text-(--text-secondary)"
                           >
                             <SelectValue placeholder="Sem categoria" />
                           </SelectTrigger>
