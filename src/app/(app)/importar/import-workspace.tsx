@@ -468,28 +468,50 @@ export function ImportWorkspace({
             <div>
               <div className="mb-2.5 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase md:text-xs">
                 2 · {isCardChosen ? "Mande a fatura" : "Mande o PDF"}
+                {chosen ? <span className="normal-case tracking-normal text-(--primary)"> da {chosen.name}</span> : null}
               </div>
+              {/* Só abre depois de escolher a conta: com mais de uma conta,
+                  é fácil mandar o extrato de uma pra outra. */}
               <label
+                aria-disabled={!chosen}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setDragging(true);
+                  if (chosen) setDragging(true);
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={(e) => {
                   e.preventDefault();
                   setDragging(false);
+                  if (!chosen) return setError("Escolha primeiro de qual conta é o extrato.");
                   pickFile(e.dataTransfer.files?.[0]);
                 }}
-                className={`flex cursor-pointer items-center gap-3 rounded-[18px] border-2 border-dashed px-4 transition-colors max-md:h-[76px] md:h-[200px] md:flex-col md:justify-center md:gap-2.5 md:px-6 md:text-center ${
-                  dragging ? "border-(--primary) bg-[#EEF1FF]" : "border-[#C7D0FF] bg-[#F8F9FF] hover:bg-[#F3F5FF]"
+                className={`flex items-center gap-3 rounded-[18px] border-2 border-dashed px-4 transition-colors max-md:h-[76px] md:h-[200px] md:flex-col md:justify-center md:gap-2.5 md:px-6 md:text-center ${
+                  !chosen
+                    ? "cursor-not-allowed border-[#E4E7EC] bg-[#F9FAFB]"
+                    : dragging
+                      ? "cursor-pointer border-(--primary) bg-[#EEF1FF]"
+                      : "cursor-pointer border-[#C7D0FF] bg-[#F8F9FF] hover:bg-[#F3F5FF]"
                 }`}
               >
                 <input
                   type="file"
                   accept="application/pdf"
                   className="sr-only"
+                  disabled={!chosen}
                   onChange={(e) => pickFile(e.target.files?.[0])}
                 />
+                {!chosen ? (
+                  <>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F2F4F7] text-(--text-light) md:h-[52px] md:w-[52px] md:rounded-[16px]">
+                      <Lock className="h-5 w-5 md:h-6 md:w-6" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-semibold text-(--text-muted)">Escolha a conta acima primeiro</span>
+                      <span className="block text-[13px] text-(--text-light)">Assim o extrato não cai na conta errada.</span>
+                    </span>
+                  </>
+                ) : (
+                <>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-(--primary-light) text-(--primary) md:h-[52px] md:w-[52px] md:rounded-[16px]">
                   {file ? <FileText className="h-5 w-5 md:h-6 md:w-6" /> : <Upload className="h-5 w-5 md:h-6 md:w-6" />}
                 </span>
@@ -503,16 +525,20 @@ export function ImportWorkspace({
                 ) : (
                   <span className="min-w-0">
                     <span className="block text-[15px] font-semibold text-(--text-primary)">
-                      <span className="max-md:hidden">Arraste {isCardChosen ? "a fatura do cartão" : "o extrato"} aqui</span>
+                      <span className="max-md:hidden">
+                        Arraste {isCardChosen ? "a fatura" : "o extrato"} da {chosen.name} aqui
+                      </span>
                       <span className="md:hidden">Escolher {isCardChosen ? "a fatura" : "o extrato"}</span>
                     </span>
                     <span className="block text-[13px] text-(--text-muted)">
                       <span className="max-md:hidden">
                         ou <span className="font-semibold text-(--primary)">clique pra escolher</span> · só PDF
                       </span>
-                      <span className="md:hidden">Regions, Nomad ou Nubank, em PDF</span>
+                      <span className="md:hidden">da {chosen.name}, em PDF</span>
                     </span>
                   </span>
+                )}
+                </>
                 )}
               </label>
               <div className="mt-3 flex flex-wrap items-center gap-2 max-md:hidden">
@@ -539,7 +565,7 @@ export function ImportWorkspace({
               </p>
             ) : null}
 
-            <Button type="submit" disabled={isPending || accounts.length === 0} className="h-12 rounded-[14px] text-[15px]">
+            <Button type="submit" disabled={isPending || !chosen || !file} className="h-12 rounded-[14px] text-[15px]">
               {isPending ? "Lendo o PDF…" : "Ler e revisar"}
             </Button>
 
