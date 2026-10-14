@@ -151,7 +151,7 @@ select top_up_recurrences();
 do $$
 begin
   if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
-    create extension if not exists pg_cron;
+    create extension if not exists pg_cron with schema pg_catalog;
     perform cron.schedule('velun-recorrencias', '15 8 * * *', 'select public.top_up_recurrences()');
   end if;
 end;
