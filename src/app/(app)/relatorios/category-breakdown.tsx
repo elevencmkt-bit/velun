@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-import type { CurrencyCode } from "@/lib/money";
+import { currencySymbol, type CurrencyCode } from "@/lib/money";
 import { Money } from "@/components/money";
 import { CategoryDrawer, type CategoryDrawerQuery } from "@/components/category-drawer";
 import { ChevronDown } from "lucide-react";
@@ -172,7 +172,7 @@ export function CategoryBreakdown({
         </div>
         <div role="radiogroup" aria-label="Mostrar em" className="flex gap-1 rounded-[13px] bg-(--bg-track) p-1">
           <button type="button" role="radio" aria-checked={unit === "value"} aria-label="Valor" className={unitClass(unit === "value")} onClick={() => chooseUnit("value")}>
-            $
+            {currencySymbol(currency)}
           </button>
           <button type="button" role="radio" aria-checked={unit === "percent"} aria-label="Percentual" className={unitClass(unit === "percent")} onClick={() => chooseUnit("percent")}>
             %

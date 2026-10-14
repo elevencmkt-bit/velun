@@ -344,6 +344,7 @@ export default async function AVencerPage({
                 name: a.name as string,
               }))}
               categories={categories ?? []}
+              currency={currency}
             />
           </div>
           <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">

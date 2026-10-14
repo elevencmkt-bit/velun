@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { parseToCents } from "@/lib/money";
 import { computeFingerprint } from "@/lib/fingerprint";
-import { clampedDate } from "@/lib/credit-card";
+import { clampedDate, MAX_INSTALLMENTS } from "@/lib/credit-card";
 import { rememberMerchantName } from "@/lib/merchant-names";
 import { merchantKey, rememberMerchantCategory } from "@/lib/merchant-categories";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -75,7 +75,7 @@ export async function createTransaction(formData: FormData) {
     Number.isInteger(installments) &&
     installments > 1
   ) {
-    if (installments > 48) throw new Error("No máximo 48 parcelas.");
+    if (installments > MAX_INSTALLMENTS) throw new Error(`No máximo ${MAX_INSTALLMENTS} parcelas.`);
     const base = Math.floor(amountCents / installments);
     const groupId = crypto.randomUUID();
     const [y, m, d] = date.split("-").map(Number);
