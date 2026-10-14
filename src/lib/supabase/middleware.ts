@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { classifyClaims } from "@/lib/auth-check";
 
+const AUTH_ROUTES = ["/login", "/convite", "/esqueci-senha"];
+const OPEN_ROUTES = ["/auth/confirm", "/nova-senha"];
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -32,11 +35,16 @@ export async function updateSession(request: NextRequest) {
   // token está pra vencer — que é o trabalho do porteiro.
   const auth = classifyClaims(await supabase.auth.getClaims());
 
-  // /convite é a página pública de aceite de convite — quem não tem
-  // conta ainda precisa conseguir abri-la sem ser jogado pro /login.
-  const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/convite");
+  // Telas de entrada: abrem sem sessão e, com sessão, mandam pro app.
+  // /convite é o aceite de convite — quem não tem conta ainda precisa
+  // conseguir abri-la; /esqueci-senha pede o link de troca de senha.
+  const path = request.nextUrl.pathname;
+  const isAuthRoute = AUTH_ROUTES.some((p) => path === p || path.startsWith(`${p}/`));
+  // Abertas com ou sem sessão: a volta do link do email (que cria a
+  // sessão) e a tela de senha nova (que confere a sessão ela mesma).
+  if (OPEN_ROUTES.some((p) => path === p || path.startsWith(`${p}/`))) {
+    return supabaseResponse;
+  }
 
   // Erro de rede/timeout ao consultar o Supabase (ex.: Gateway Timeout) não
   // significa que a sessão expirou — só que não deu pra confirmar agora.
