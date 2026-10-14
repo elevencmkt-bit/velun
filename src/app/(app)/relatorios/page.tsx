@@ -39,6 +39,7 @@ import { CategoryBreakdown } from "./category-breakdown";
 import { PeriodEvolutionChart } from "./period-evolution-chart";
 import { InsightVelunCard } from "./bottom-cards";
 import { Money } from "@/components/money";
+import { ScreenHelp } from "@/components/screen-help";
 
 function CardSurface({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -281,7 +282,10 @@ export default async function RelatoriosPage({
     <div className="flex flex-col gap-5 md:gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2.5">
           <h1 className="text-page-title">Relatórios</h1>
+          <ScreenHelp screen="relatorios" />
+        </div>
           <p className="text-page-subtitle max-sm:hidden">
             {view === "a-vencer"
               ? "O que ainda vai vencer ou entrar, por categoria."

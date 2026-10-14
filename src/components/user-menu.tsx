@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, LogOut } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, CircleHelp, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +56,12 @@ export function UserMenu({
           <span className="text-xs font-normal text-(--text-muted)">{subtitle}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/ajuda">
+            <CircleHelp className="h-4 w-4" />
+            Central de ajuda
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onSelect={() => onLogout()}>
           <LogOut className="h-4 w-4" />
           Sair

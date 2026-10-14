@@ -38,6 +38,7 @@ import { CashFlowChart } from "../fluxo-de-caixa/cash-flow-chart";
 import { cardBills, loadCards } from "@/lib/cards";
 import { CardStack } from "@/components/card-stack";
 import { themedPair } from "@/lib/theme-color";
+import { ScreenHelp } from "@/components/screen-help";
 
 const CASH_FLOW_PREVIEW_DAYS = 30;
 const TREND_MONTHS = 6;
@@ -503,9 +504,12 @@ export default async function MesPage({
     <div className="flex flex-col gap-6 md:gap-7">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-page-title">
-            {firstName ? `Olá, ${firstName}` : "Início"}
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-page-title">
+              {firstName ? `Olá, ${firstName}` : "Início"}
+            </h1>
+            <ScreenHelp screen="mes" />
+          </div>
           <p className="text-page-subtitle">{headline}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">

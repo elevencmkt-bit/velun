@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MoreHorizontal, Plus, X } from "lucide-react";
+import { CircleHelp, MoreHorizontal, Plus, X } from "lucide-react";
 import {
   MOBILE_PRIMARY,
   NAV_ITEMS,
@@ -86,6 +86,14 @@ export function MobileNav() {
                   </Link>
                 );
               })}
+              <Link
+                href="/ajuda"
+                onClick={() => setMoreOpen(false)}
+                className="flex h-12 items-center gap-3.5 rounded-[10px] px-3 text-[15px] font-medium text-(--text-primary)"
+              >
+                <CircleHelp size={20} strokeWidth={1.8} className="shrink-0" />
+                Central de ajuda
+              </Link>
             </nav>
           </div>
         </div>

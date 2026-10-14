@@ -17,6 +17,7 @@ import { AccountForm } from "../contas/account-form";
 import { PayBillDialog } from "./pay-bill-dialog";
 import { themedPair } from "@/lib/theme-color";
 import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
+import { ScreenHelp } from "@/components/screen-help";
 
 function shortDate(date: string) {
   return new Date(`${date}T12:00:00`)
@@ -108,7 +109,10 @@ export default async function CartoesPage({
   const header = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-page-title">Cartões</h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-page-title">Cartões</h1>
+          <ScreenHelp screen="cartoes" />
+        </div>
         <p className="text-page-subtitle">
           Cada compra entra na fatura certa. Pagar a fatura não conta como gasto
           de novo.

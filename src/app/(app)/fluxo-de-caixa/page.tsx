@@ -9,6 +9,7 @@ import { formatCents } from "@/lib/money";
 import { ProjectionChart } from "./projection-chart";
 import { PeriodSummaryCard, UpcomingEventsCard } from "./support-cards";
 import { Money } from "@/components/money";
+import { ScreenHelp } from "@/components/screen-help";
 
 const PERIODS = [
   { days: 30, label: "30 dias" },
@@ -96,7 +97,10 @@ export default async function FluxoDeCaixaPage({
   return (
     <div className="flex flex-col gap-5 md:gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-page-title">Fluxo de caixa</h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-page-title">Fluxo de caixa</h1>
+          <ScreenHelp screen="fluxo-de-caixa" />
+        </div>
         <p className="text-page-subtitle max-sm:hidden">
           Quanto vai ter na conta nos próximos dias, com o que já está previsto.
         </p>
