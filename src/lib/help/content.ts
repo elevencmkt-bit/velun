@@ -740,6 +740,10 @@ export const HELP_FAQ: HelpFaq[] = [
     link: "importar/desfazer",
   },
   {
+    q: "Esqueci minha senha. E agora?",
+    a: "Na tela de entrar, toque em \"Esqueci minha senha\" e informe seu email. Chega um link pra criar uma senha nova; ele vale por 1 hora. Abra no mesmo navegador em que pediu.",
+  },
+  {
     q: "Trocar a moeda converte os valores?",
     a: "Não. A moeda só muda o símbolo e o formato dos números. Os valores continuam os mesmos.",
     link: "configuracoes/moeda-fuso-e-aparencia",

@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { classifyClaims } from "@/lib/auth-check";
 
 const AUTH_ROUTES = ["/login", "/convite", "/esqueci-senha"];
-const OPEN_ROUTES = ["/auth/confirm", "/nova-senha"];
+const OPEN_ROUTES = ["/auth/confirm", "/nova-senha", "/ajuda"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -41,13 +41,9 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthRoute = AUTH_ROUTES.some((p) => path === p || path.startsWith(`${p}/`));
   // Abertas com ou sem sessão: a volta do link do email (que cria a
-  // sessão) e a tela de senha nova (que confere a sessão ela mesma).
+  // sessão), a tela de senha nova (que confere a sessão ela mesma) e a
+  // central de ajuda (pública).
   if (OPEN_ROUTES.some((p) => path === p || path.startsWith(`${p}/`))) {
-    return supabaseResponse;
-  }
-
-  // Central de ajuda: pública, abre com ou sem sessão.
-  if (request.nextUrl.pathname === "/ajuda" || request.nextUrl.pathname.startsWith("/ajuda/")) {
     return supabaseResponse;
   }
 
