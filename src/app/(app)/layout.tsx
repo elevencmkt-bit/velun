@@ -10,6 +10,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
 import { fetchDeletionRequests, fetchVisibilityNotifications } from "@/lib/notifications";
 import { UserMenu } from "@/components/user-menu";
+import { CategoryUsageProvider } from "@/components/category-usage";
 import { CalculatorButton } from "@/components/calculator-button";
 import { HideValuesButton } from "@/components/hide-values-button";
 import { HIDE_VALUES_COOKIE } from "@/lib/hide-values";
@@ -23,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   const hideValues = (await cookies()).get(HIDE_VALUES_COOKIE)?.value === "1";
 
-  const [{ data: accounts }, { data: categories }, notifications, deletionRequests] = await Promise.all([
+  const [{ data: accounts }, { data: categories }, notifications, deletionRequests, { data: recentCategories }] = await Promise.all([
     // Só contas em que dá pra lançar: a do casal e as próprias. A conta
     // pessoal do outro pode estar visível, mas o banco recusa lançamento
     // nela — oferecer na lista seria convidar um erro.
@@ -48,9 +49,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       member.notificationsSeenAt,
     ),
     fetchDeletionRequests(supabase, member.householdId, member.memberId),
+    supabase
+      // limite: só os 400 lançamentos mais recentes, pra saber as
+      // categorias do dia a dia (o formulário mostra essas primeiro)
+      .from("transactions")
+      .select("category_id")
+      .eq("household_id", member.householdId)
+      .not("category_id", "is", null)
+      .order("date", { ascending: false })
+      .limit(400),
   ]);
 
+  // Uso por categoria principal: sub conta pra principal.
+  const parentOf = new Map((categories ?? []).map((c) => [c.id as string, (c.parent_id as string | null) ?? null]));
+  const categoryUsage: Record<string, number> = {};
+  for (const row of recentCategories ?? []) {
+    const id = row.category_id as string;
+    const top = parentOf.get(id) ?? id;
+    categoryUsage[top] = (categoryUsage[top] ?? 0) + 1;
+  }
+
   return (
+    <CategoryUsageProvider usage={categoryUsage}>
     <div
       id="app-root"
       data-hide-values={hideValues ? "" : undefined}
@@ -97,5 +117,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <MobileNav />
     </div>
+    </CategoryUsageProvider>
   );
 }
