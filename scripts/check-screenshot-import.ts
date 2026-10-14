@@ -71,6 +71,17 @@ assert.equal(r.statement.beginningBalanceCents, -4308, "saldo antes do mais anti
 assert.equal(r.statement.endingBalanceCents, -28401);
 assert.equal(verifyStatement(r.statement).matches, true, "a conferência dia a dia fecha");
 
+// A mesma linha lida diferente em cada print ("-$9.99" num, "39.99" no
+// outro, o "-$" virou 3) continua sendo a mesma: entra uma vez só.
+const a1 = screen([{ date: "10/6/2026" }, { name: "Uber", amount: "-$29.05", balance: "-$35.15" }, { date: "10/5/2026" }, { name: "Dash Pass", amount: "-$9.99", balance: "-$6.10" }]);
+const a2 = screen([{ date: "10/5/2026" }, { name: "Dash Pass", amount: "39.99", balance: "-$6.10", conf: 60 }, { name: "Prime", amount: "-$15.16", balance: "$3.89" }]);
+const misread = screensToStatement([a1, a2]);
+assert.deepEqual(
+  misread.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`),
+  ["out 1516 Prime", "out 999 Dash Pass", "out 2905 Uber"],
+  "sem o +39.99 fantasma",
+);
+
 // Sem saldo na tela: vale o que foi lido, sem conferir.
 const plain = screensToStatement([
   screen([{ date: "9/30/2026" }, { name: "Netflix", amount: "-$15.49" }, { name: "Salario", amount: "$2,500.00" }]),
