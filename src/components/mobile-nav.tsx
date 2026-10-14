@@ -10,6 +10,7 @@ import {
   NEW_TRANSACTION_EVENT,
   isActive,
 } from "@/components/nav-items";
+import { ThemeSwitch } from "@/components/theme-switch";
 
 // Barra de baixo do celular, como no Organizze e no celular do brand
 // book: os três destinos do dia a dia, o botão de lançar no centro — é a
@@ -95,6 +96,10 @@ export function MobileNav() {
                 Central de ajuda
               </Link>
             </nav>
+            <div className="mt-2 flex items-center justify-between border-t border-(--border-soft) px-3 pt-3">
+              <span className="text-[15px] font-medium text-(--text-primary)">Tema</span>
+              <ThemeSwitch compact />
+            </div>
           </div>
         </div>
       ) : null}
