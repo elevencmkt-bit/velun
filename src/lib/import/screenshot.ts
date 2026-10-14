@@ -158,8 +158,20 @@ export function rowsFromScreen(screen: OcrScreen): ScreenRow[] {
   return rows.filter((r) => r.description.length > 0);
 }
 
+/** Só os dígitos do valor: "-$9.99", "$9.99" e "39.99" (o "-$" lido como 3) dão "999"/"3999". */
+const digits = (m: Money) => m.raw.replace(/\D/g, "");
+
+/**
+ * Chave pra achar a mesma linha em dois prints. A mesma linha pode ser
+ * lida diferente em cada print ("-$9.99" num, "39.99" no outro), então
+ * a chave usa o nome e os dígitos do SALDO, que é único na lista; sem
+ * saldo, os dígitos do valor sem o primeiro caractere duvidoso.
+ */
 function rowKey(r: ScreenRow): string {
-  return `${r.description.toLowerCase()}|${r.amount.raw}|${r.balance?.raw ?? ""}`;
+  const name = r.description.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (r.balance) return `${name}|b${digits(r.balance)}`;
+  const a = digits(r.amount);
+  return `${name}|a${a.length > 3 ? a.slice(-4) : a}`;
 }
 
 /**

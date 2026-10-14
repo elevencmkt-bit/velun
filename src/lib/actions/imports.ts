@@ -127,6 +127,35 @@ export async function importStatement(input: {
   }
 }
 
+/** Saldo da conta no Velun no fim do dia anterior a `date` (só confirmados). */
+async function balanceBefore(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  accountId: string,
+  date: string,
+): Promise<number> {
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("opening_balance_cents")
+    .eq("id", accountId)
+    .maybeSingle();
+  const rows = await fetchAll<{ amount_cents: number; direction: string }>((from, to) =>
+    supabase
+      .from("transactions")
+      .select("amount_cents, direction")
+      .eq("household_id", householdId)
+      .eq("account_id", accountId)
+      .eq("status", "cleared")
+      .lt("date", date)
+      .order("id")
+      .range(from, to),
+  );
+  return rows.reduce(
+    (n, r) => n + (r.direction === "in" ? r.amount_cents : -r.amount_cents),
+    (account?.opening_balance_cents as number | undefined) ?? 0,
+  );
+}
+
 /** Prints vêm do navegador: confere o formato antes de confiar. */
 function validScreens(screens: unknown): OcrScreen[] | null {
   if (!Array.isArray(screens) || screens.length === 0 || screens.length > 12) return null;
@@ -262,6 +291,20 @@ async function runImportStatement(input: {
         parts.push(
           `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,
         );
+      }
+      // O print mostra o saldo antes do lançamento mais antigo. Se o
+      // Velun tem outro saldo nesse ponto, faltam (ou sobram) lançamentos
+      // ANTES do período do print — melhor avisar já.
+      if (read.hasBalances) {
+        const before = await balanceBefore(supabase, householdId, accountId, statement.periodStart);
+        const diff = statement.beginningBalanceCents - before;
+        if (Math.abs(diff) >= 1) {
+          const fmt = (c: number) => `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+          const [y, m, d] = statement.periodStart.split("-");
+          parts.push(
+            `Atenção: antes de ${d}/${m}/${y} o app mostra saldo de ${fmt(statement.beginningBalanceCents)} e o Velun tem ${fmt(before)} (diferença de ${fmt(diff)}). Faltam ou sobram lançamentos antes dessa data: importe um print ou extrato dos dias anteriores.`,
+          );
+        }
       }
       screensNote = parts.join(" ");
     } else if (isCard) {
