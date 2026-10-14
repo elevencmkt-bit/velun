@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, isActive } from "@/components/nav-items";
+import { ThemeSwitch } from "@/components/theme-switch";
 
 // Menu lateral do computador. Claro, como no brand book: superfície
 // branca sobre o fundo cinza-claro do app (sem fio separando — o
@@ -45,7 +46,11 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="p-4">
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-xs font-medium text-(--text-muted)">Tema</span>
+          <ThemeSwitch compact />
+        </div>
         <div className="flex flex-col gap-1 rounded-2xl bg-(--primary-soft) p-4">
           <span className="text-[13px] font-semibold text-(--text-primary)">Juntos, cada um com o seu</span>
           <span className="text-xs leading-relaxed text-(--text-muted)">

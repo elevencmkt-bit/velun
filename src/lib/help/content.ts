@@ -684,7 +684,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         ["País", "EUA ou Brasil."],
         ["Fuso horário", "Decide o que é \"hoje\" pra casa: o que vence hoje, o que está atrasado."],
         ["Moeda", "Como os valores aparecem. Trocar a moeda não converte nada: só muda o símbolo."],
-        ["Aparência", "Sistema, Claro ou Escuro. Vale só pro aparelho em que você escolheu."],
+        ["Aparência", "Sistema, Claro ou Escuro. Vale só pro aparelho em que você escolheu. Também dá pra trocar no pé do menu lateral (ou no \"Mais\", no celular)."],
       ] },
       { p: "Em **Perfil**, você muda seu nome e sua foto (PNG, JPG ou WEBP, até 2 MB)." },
     ],
