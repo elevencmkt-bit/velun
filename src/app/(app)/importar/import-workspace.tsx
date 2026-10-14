@@ -500,7 +500,7 @@ export function ImportWorkspace({
           <ScreenHelp screen="importar" />
         </div>
           <p className="text-page-subtitle">
-            Traga o extrato do banco ou a fatura do cartão. Nada entra sem você revisar.
+            Traga o extrato do banco, prints do app ou a fatura do cartão. Nada entra sem você revisar.
           </p>
         </div>
 
@@ -530,7 +530,7 @@ export function ImportWorkspace({
 
             <div>
               <div className="mb-2.5 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase md:text-xs">
-                2 · {isCardChosen ? "Mande a fatura" : "Mande o PDF"}
+                2 · {isCardChosen ? "Mande a fatura" : "Mande o PDF ou os prints"}
                 {chosen ? <span className="normal-case tracking-normal text-(--primary)"> da {chosen.name}</span> : null}
               </div>
               {/* Só abre depois de escolher a conta: com mais de uma conta,
@@ -644,7 +644,7 @@ export function ImportWorkspace({
 
             <p className="flex items-start gap-2 text-xs leading-relaxed text-(--text-muted) lg:hidden">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-(--primary)" />
-              O arquivo é lido aqui no aparelho e não sai dele. Só os lançamentos que você aprovar são salvos.
+              O arquivo ou print é lido aqui no aparelho e não sai dele. Só os lançamentos que você aprovar são salvos.
             </p>
           </form>
 
@@ -652,7 +652,7 @@ export function ImportWorkspace({
             <h2 className="text-card-title">Como funciona</h2>
             {[
               ["Escolha a conta", "Conta corrente recebe extrato; cartão recebe fatura."],
-              ["Mande o PDF do banco", "O mesmo que você baixa no app ou no site do banco."],
+              ["Mande o PDF ou prints", "O extrato em PDF que você baixa no banco, ou prints da lista de lançamentos do app (até 10, pode rolar e tirar vários)."],
               [
                 "Revise antes de entrar",
                 "O Velun sugere categoria, junta o que já foi lançado e marca pagamento de fatura. Você confirma.",
@@ -671,7 +671,7 @@ export function ImportWorkspace({
             <div className="flex items-start gap-2.5 rounded-[14px] bg-(--primary-soft) p-3.5 text-[13px] leading-relaxed text-(--text-secondary)">
               <Lock className="mt-0.5 h-4 w-4 shrink-0 text-(--primary-hover)" />
               <span>
-                O arquivo é lido no seu navegador e <b>não sai da sua máquina</b>. Só os lançamentos que você aprovar
+                O arquivo ou print é lido no seu navegador e <b>não sai da sua máquina</b>. Só os lançamentos que você aprovar
                 são salvos.
               </span>
             </div>
