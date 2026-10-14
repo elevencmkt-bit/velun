@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NEW_TRANSACTION_EVENT } from "@/components/nav-items";
 import { DateInput } from "@/components/date-input";
-import { AccountAvatar } from "@/components/account-avatar";
 import { buildCategoryColorMap } from "@/lib/category-colors";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { currencySymbol, formatCents, type CurrencyCode } from "@/lib/money";
@@ -22,6 +21,9 @@ import { fitsDirection } from "@/lib/category-kind";
 import { topOf } from "@/lib/subcategories";
 import { SubcategoryChips } from "@/components/subcategory-chips";
 import { CategoryQuickPicker } from "@/components/category-quick-picker";
+import { AccountSelect } from "@/components/account-select";
+import { ReceiptReader, type ReceiptRead } from "@/components/receipt-reader";
+import { suggestCategoryForMerchant } from "@/lib/actions/receipt";
 import { themedBg, themedFg, themedPair } from "@/lib/theme-color";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
@@ -69,49 +71,6 @@ function saveLastAccount(id: string) {
   }
 }
 
-/** Contas em blocos: com poucas contas, um clique vale mais que uma lista. */
-export function AccountPicker({
-  accounts,
-  value,
-  onChange,
-  exclude,
-  label,
-}: {
-  accounts: Account[];
-  value: string;
-  onChange: (id: string) => void;
-  exclude?: string;
-  label: string;
-}) {
-  return (
-    <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-2">
-      {accounts
-        .filter((a) => a.id !== exclude)
-        .map((a) => {
-          const on = a.id === value;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => onChange(a.id)}
-              title={a.name}
-              className={`flex h-12 min-w-0 items-center gap-2 rounded-[14px] border-[1.5px] px-2.5 text-left transition-colors ${
-                on
-                  ? "border-(--primary) bg-(--primary-soft) shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
-                  : "border-(--border-primary) bg-(--bg-surface) hover:border-(--primary-border)"
-              }`}
-            >
-              <AccountAvatar institution={a.institution ?? null} type={a.type ?? "checking"} size={28} />
-              <span className="min-w-0 truncate text-sm font-semibold text-(--text-primary)">{a.name}</span>
-            </button>
-          );
-        })}
-    </div>
-  );
-}
-
 /** Interruptor de liga/desliga com explicação curta. */
 export function ToggleRow({
   checked,
@@ -148,6 +107,28 @@ export function ToggleRow({
   );
 }
 
+/** Marca dos campos que vieram do recibo. */
+function ReceiptMark() {
+  return (
+    <span className="ml-1.5 text-[12px] font-semibold text-(--income-dark)" title="Lido do recibo">
+      ✦ do recibo
+    </span>
+  );
+}
+
+function receiptSummary(found: { amount: boolean; date: boolean; description: boolean; category: boolean }) {
+  const got = [found.amount && "valor", found.date && "data", found.description && "loja", found.category && "categoria"].filter(
+    Boolean,
+  ) as string[];
+  const missing = [!found.amount && "o valor", !found.date && "a data", !found.description && "a loja"].filter(
+    Boolean,
+  ) as string[];
+  const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}` : xs[0]);
+  const a = got.length ? `Preenchi ${list(got)}.` : "";
+  const b = missing.length ? ` Não achei ${list(missing)}: preencha.` : "";
+  return (a + b).trim();
+}
+
 export function ManualTransactionButton({
   accounts,
   categories: initialCategories,
@@ -164,6 +145,17 @@ export function ManualTransactionButton({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState(() => localToday());
+  // Trocar a chave remonta o campo de data com o valor novo (vindo do recibo).
+  const [dateKey, setDateKey] = useState(0);
+  // O que veio do recibo: miniatura, quais campos ele preencheu e o que
+  // havia antes, pro "Desfazer".
+  const [receipt, setReceipt] = useState<{
+    previewUrl: string;
+    found: { amount: boolean; date: boolean; description: boolean; category: boolean };
+    before: { amount: string; date: string; description: string; categoryId: string };
+  } | null>(null);
   // Já vem marcada a última conta usada (ou a primeira conta corrente).
   // O formulário só aparece aberto, no navegador, então ler o
   // armazenamento aqui não dá diferença entre servidor e navegador.
@@ -220,8 +212,54 @@ export function ManualTransactionButton({
   // Categoria principal escolhida (a própria, ou a "mãe" da sub escolhida).
   const selectedTop = topOf(categories, categoryId);
 
+  function clearReceipt() {
+    if (receipt) URL.revokeObjectURL(receipt.previewUrl);
+    setReceipt(null);
+  }
+
+  function applyReceipt(r: ReceiptRead) {
+    if (receipt) URL.revokeObjectURL(receipt.previewUrl);
+    const before = { amount, date, description, categoryId };
+    if (r.amountCents) setAmount((r.amountCents / 100).toFixed(2).replace(".", ","));
+    if (r.date) {
+      setDate(r.date);
+      setDateKey((k) => k + 1);
+    }
+    if (r.merchant) setDescription(r.merchant);
+    setReceipt({
+      previewUrl: r.previewUrl,
+      found: { amount: Boolean(r.amountCents), date: Boolean(r.date), description: Boolean(r.merchant), category: false },
+      before,
+    });
+    // Categoria: a que você já usou pra essa loja (só o nome vai pro servidor).
+    if (r.merchant && !categoryId) {
+      const direction = mode === "in" ? "in" : "out";
+      void suggestCategoryForMerchant(r.merchant, direction).then((id) => {
+        if (id && categories.some((c) => c.id === id)) {
+          setCategoryId(id);
+          setReceipt((cur) => (cur ? { ...cur, found: { ...cur.found, category: true } } : cur));
+        }
+      });
+    }
+  }
+
+  function undoReceipt() {
+    if (!receipt) return;
+    const b = receipt.before;
+    setAmount(b.amount);
+    setDescription(b.description);
+    setDate(b.date);
+    setDateKey((k) => k + 1);
+    setCategoryId(b.categoryId);
+    clearReceipt();
+  }
+
   function reset() {
     formRef.current?.reset();
+    clearReceipt();
+    setDescription("");
+    setDate(localToday());
+    setDateKey((k) => k + 1);
     setCategoryId("");
     setAmount("");
     setNotesOpen(false);
@@ -357,9 +395,31 @@ export function ManualTransactionButton({
             })}
           </div>
 
+          {mode !== "transfer" ? (
+            receipt ? (
+              <div className="flex items-center gap-3 rounded-[14px] bg-(--income-soft) px-3 py-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={receipt.previewUrl} alt="Recibo lido" className="h-10 w-8 shrink-0 rounded-[6px] object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-bold text-(--income-dark)">Lido do recibo · confira antes de lançar</p>
+                  <p className="text-[12px] leading-snug text-(--text-muted)">{receiptSummary(receipt.found)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={undoReceipt}
+                  className="h-8 shrink-0 rounded-[9px] px-2.5 text-[13px] font-semibold text-(--text-secondary) hover:bg-(--bg-hover)"
+                >
+                  Desfazer
+                </button>
+              </div>
+            ) : (
+              <ReceiptReader order={currency === "BRL" ? "dmy" : "mdy"} today={localToday()} onRead={applyReceipt} />
+            )
+          ) : null}
+
           <div className="flex flex-col gap-0.5 rounded-[18px] px-5 py-3" style={{ backgroundColor: tone.bg }}>
             <label htmlFor="amount" className="text-[13px] font-semibold" style={{ color: tone.fg }}>
-              Valor
+              Valor{receipt?.found.amount ? <ReceiptMark /> : null}
             </label>
             <div className="flex items-baseline gap-1.5">
               <span className="shrink-0 text-[28px] font-bold whitespace-nowrap" style={{ color: tone.strong }}>
@@ -384,29 +444,42 @@ export function ManualTransactionButton({
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor="date" className="text-[13px] font-semibold text-(--text-body)">
-                Data
+                Data{receipt?.found.date ? <ReceiptMark /> : null}
               </Label>
-              <DateInput id="date" name="date" defaultValue={localToday()} required className="[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px]" />
+              <DateInput
+                key={dateKey}
+                id="date"
+                name="date"
+                defaultValue={date}
+                onChange={setDate}
+                required
+                className={`[&_input]:h-12 [&_input]:rounded-[12px] [&_input]:text-[15px] ${receipt?.found.date ? "[&_input]:border-(--income)" : ""}`}
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="description" className="text-[13px] font-semibold text-(--text-body)">
-                Descrição
+                Descrição{receipt?.found.description ? <ReceiptMark /> : null}
               </Label>
               <Input
                 id="description"
                 name="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 required={mode !== "transfer"}
                 placeholder={mode === "transfer" ? "Transferência" : "Ex.: Walmart"}
-                className="h-12 rounded-[12px] text-[15px]"
+                className={`h-12 rounded-[12px] text-[15px] ${receipt?.found.description ? "border-(--income)" : ""}`}
               />
             </div>
           </div>
 
           {mode === "transfer" ? (
-            <>
+            <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-2">
-                <span className="text-[13px] font-semibold text-(--text-body)">Sai de</span>
-                <AccountPicker
+                <Label htmlFor="from-account" className="text-[13px] font-semibold text-(--text-body)">
+                  Sai de
+                </Label>
+                <AccountSelect
+                  id="from-account"
                   label="Sai de"
                   accounts={accounts}
                   value={fromAccountId}
@@ -417,20 +490,26 @@ export function ManualTransactionButton({
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <span className="text-[13px] font-semibold text-(--text-body)">Vai pra</span>
-                <AccountPicker
+                <Label htmlFor="to-account" className="text-[13px] font-semibold text-(--text-body)">
+                  Vai pra
+                </Label>
+                <AccountSelect
+                  id="to-account"
                   label="Vai pra"
                   accounts={accounts}
                   value={toAccountId}
                   onChange={setToAccountId}
                   exclude={fromAccountId}
+                  placeholder="Escolha"
                 />
               </div>
-            </>
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <span className="text-[13px] font-semibold text-(--text-body)">Conta</span>
-              <AccountPicker label="Conta" accounts={accounts} value={accountId} onChange={setAccountId} />
+              <Label htmlFor="account" className="text-[13px] font-semibold text-(--text-body)">
+                Conta
+              </Label>
+              <AccountSelect id="account" label="Conta" accounts={accounts} value={accountId} onChange={setAccountId} />
             </div>
           )}
 
