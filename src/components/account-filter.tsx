@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/
 const ALL = "__all__";
 
 
-// Filtro de conta do Dashboard: os totais, o saldo e as listas passam a
-// ser de uma conta só. Fica na URL (?account=), junto com o mês.
+// Filtro de conta (Dashboard, Relatórios e A vencer): os totais, o saldo
+// e as listas passam a ser de uma conta só. Fica na URL (?account=).
 export function AccountFilter({
   accounts,
   value,

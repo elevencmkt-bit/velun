@@ -464,6 +464,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         "Cada **fatura de cartão** aparece numa linha só, com a situação (aberta ou fechada), e não compra por compra.",
         "**Pagar** e **Recebi** confirmam o lançamento na hora.",
         "Se o saldo projetado ficar negativo em algum dia, um aviso mostra quando.",
+        "O filtro de conta, ao lado das abas, mostra só o que sai ou entra numa conta. Escolhendo uma conta, as faturas dos cartões pagos por ela entram junto.",
       ] },
     ],
     related: ["a-vencer/recorrencias", "lancamentos/pendente-e-confirmado"],
