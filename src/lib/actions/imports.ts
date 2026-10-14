@@ -30,6 +30,7 @@ import {
 import { verifyStatement } from "@/lib/import/verify";
 import { looksLikeNomad, parseNomadStatementText } from "@/lib/import/nomad-pdf";
 import { suggestCategoryId } from "@/lib/import/mcc";
+import { screensToStatement, type OcrScreen } from "@/lib/import/screenshot";
 import { duplicateCounter } from "@/lib/import/duplicates";
 import { fitsDirection } from "@/lib/category-kind";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -111,7 +112,10 @@ async function attempt(
 export async function importStatement(input: {
   accountId: string;
   fileName: string;
-  text: string;
+  /** Texto do PDF (extraído no navegador). */
+  text?: string;
+  /** Ou: palavras reconhecidas em prints da lista do app (no navegador). */
+  screens?: OcrScreen[];
 }): Promise<ImportResult> {
   try {
     return await runImportStatement(input);
@@ -123,21 +127,45 @@ export async function importStatement(input: {
   }
 }
 
+/** Prints vêm do navegador: confere o formato antes de confiar. */
+function validScreens(screens: unknown): OcrScreen[] | null {
+  if (!Array.isArray(screens) || screens.length === 0 || screens.length > 12) return null;
+  const out: OcrScreen[] = [];
+  for (const s of screens) {
+    if (!s || typeof s !== "object") return null;
+    const { width, height, words } = s as OcrScreen;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || !Array.isArray(words) || words.length > 4000) return null;
+    const clean = [];
+    for (const w of words) {
+      if (!w || typeof w.text !== "string" || w.text.length > 80) return null;
+      const nums = [w.confidence, w.x0, w.y0, w.x1, w.y1];
+      if (!nums.every((n) => typeof n === "number" && Number.isFinite(n))) return null;
+      clean.push({ text: w.text, confidence: w.confidence, x0: w.x0, y0: w.y0, x1: w.x1, y1: w.y1 });
+    }
+    out.push({ width, height, words: clean });
+  }
+  return out;
+}
+
 async function runImportStatement(input: {
   accountId: string;
   fileName: string;
-  text: string;
+  text?: string;
+  screens?: OcrScreen[];
 }): Promise<ImportResult> {
   const { householdId, memberId, timezone } = await getCurrentMember();
   const supabase = await createClient();
 
-  const { accountId, fileName, text } = input;
+  const { accountId, fileName } = input;
+  const text = input.text ?? "";
+  const screens = input.screens ? validScreens(input.screens) : null;
+  if (input.screens && !screens) return { ok: false, error: "Não consegui ler esses prints. Tente de novo." };
 
   // Falhas previsíveis voltam como resultado, não como exceção: o Next
   // mascara erro de server action em produção, e o usuário acabaria
   // vendo um código do React no lugar da causa.
   if (!accountId) return { ok: false, error: "Escolha a conta do extrato." };
-  if (!text.trim()) {
+  if (!screens && !text.trim()) {
     return {
       ok: false,
       error:
@@ -183,6 +211,7 @@ async function runImportStatement(input: {
   const isCard = account.type === "credit_card";
 
   let statement: ParsedStatement;
+  let screensNote: string | null = null;
   let cardDaysNote: string | null = null;
   let nomadNote: string | null = null;
   // `matches` null: o documento não traz como conferir (Nomad).
@@ -192,7 +221,50 @@ async function runImportStatement(input: {
     firstDivergence?: { date: string } | null;
   };
   try {
-    if (isCard) {
+    if (screens) {
+      if (isCard) {
+        return {
+          ok: false,
+          error: "Print funciona pra conta. Pra fatura de cartão, use o PDF da fatura do Nubank.",
+        };
+      }
+      const read = screensToStatement(screens);
+      if (read.statement.transactions.length === 0) {
+        return {
+          ok: false,
+          error:
+            "Não achei lançamentos nesses prints. Use prints da lista de lançamentos do app, com a data e os valores aparecendo.",
+        };
+      }
+      statement = read.statement;
+      verification = read.hasBalances
+        ? verifyStatement(statement)
+        : {
+            matches: null,
+            extractedSumCents: statement.transactions.reduce(
+              (n, t) => n + (t.direction === "in" ? t.amountCents : -t.amountCents),
+              0,
+            ),
+          };
+      const parts: string[] = [];
+      parts.push(
+        `Lido de ${screens.length} ${screens.length === 1 ? "print" : "prints"}: ${statement.transactions.length} lançamentos.`,
+      );
+      if (read.hasBalances && read.corrected > 0) {
+        parts.push(
+          read.corrected === 1
+            ? "1 valor mal lido foi corrigido pelo saldo que o app mostra."
+            : `${read.corrected} valores mal lidos foram corrigidos pelo saldo que o app mostra.`,
+        );
+      }
+      if (!read.hasBalances) parts.push("Os prints não mostram o saldo de cada linha, então não deu pra conferir: revise os valores.");
+      if (read.undated > 0) {
+        parts.push(
+          `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,
+        );
+      }
+      screensNote = parts.join(" ");
+    } else if (isCard) {
       if (!looksLikeNubank(text)) {
         return {
           ok: false,
@@ -288,7 +360,7 @@ async function runImportStatement(input: {
       household_id: householdId,
       account_id: accountId,
       file_path: fileName,
-      file_type: "pdf",
+      file_type: screens ? "image" : "pdf",
       status: "review",
       statement_start: statement.periodStart,
       statement_end: statement.periodEnd,
@@ -337,10 +409,16 @@ async function runImportStatement(input: {
   // Em páginas: o Supabase devolve no máximo 1000 linhas por consulta, e
   // um extrato de anos passa disso fácil — sem paginar, o que passasse
   // de 1000 entraria em dobro.
-  const existing = await fetchAll<{ fingerprint: string }>((from, to) =>
+  const existing = await fetchAll<{
+    fingerprint: string;
+    date: string;
+    amount_cents: number;
+    direction: string;
+    status: string;
+  }>((from, to) =>
     supabase
       .from("transactions")
-      .select("fingerprint")
+      .select("fingerprint, date, amount_cents, direction, status")
       .eq("household_id", householdId)
       .eq("account_id", accountId)
       .gte("date", statement.periodStart)
@@ -350,9 +428,24 @@ async function runImportStatement(input: {
   );
 
   // Por contagem: três saques iguais no mesmo dia são três lançamentos.
-  const isExistingDuplicate = duplicateCounter(
-    existing.map((t) => t.fingerprint),
-  );
+  //
+  // Print: o nome que o app mostra ("DoorDash") não é o texto do banco do
+  // extrato em PDF ("DOORDASH*ARENA ..."), então a impressão digital não
+  // reconhece o que já veio do PDF. Ali vale dia + valor + direção,
+  // contra o que já está confirmado — também por contagem.
+  const looseKey = (date: string, direction: string, cents: number) => `${date}|${direction}|${cents}`;
+  const isExistingDuplicate = screens
+    ? (() => {
+        const loose = duplicateCounter(
+          existing.filter((t) => t.status === "cleared").map((t) => looseKey(t.date, t.direction, t.amount_cents)),
+        );
+        return (_fp: string, t: { date: string; direction: string; amountCents: number }) =>
+          loose(looseKey(t.date, t.direction, t.amountCents));
+      })()
+    : (() => {
+        const strict = duplicateCounter(existing.map((t) => t.fingerprint));
+        return (fp: string) => strict(fp);
+      })();
 
   // Previsões em aberto no período: lançamento `pending` que veio de
   // recorrência. São elas que o extrato pode estar vindo quitar.
@@ -421,7 +514,7 @@ async function runImportStatement(input: {
       amountCents: t.amountCents,
       description: t.description,
     });
-    const isDuplicate = isExistingDuplicate(fingerprint);
+    const isDuplicate = isExistingDuplicate(fingerprint, t);
     const learnedId = learnedFor(t.description, t.direction);
     const suggested =
       learnedId ?? suggestCategoryId(t.mcc, categoriesByName, t.direction);
@@ -613,6 +706,7 @@ async function runImportStatement(input: {
   if (cardDaysNote)
     message = message ? `${message} ${cardDaysNote}` : cardDaysNote;
   if (nomadNote) message = message ? `${message} ${nomadNote}` : nomadNote;
+  if (screensNote) message = message ? `${screensNote} ${message}` : screensNote;
 
   revalidatePath("/importar");
   revalidatePath("/cartoes");

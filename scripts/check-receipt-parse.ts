@@ -1,7 +1,7 @@
 // Rodar: npx tsx scripts/check-receipt-parse.ts
 // Textos inventados no formato que o reconhecimento devolve.
 import assert from "node:assert/strict";
-import { moneyToCents, parseReceipt } from "../src/lib/receipt-parse";
+import { looksLikeList, moneyToCents, parseReceipt } from "../src/lib/receipt-parse";
 
 const US = { order: "mdy" as const, today: "2026-10-14" };
 const BR = { order: "dmy" as const, today: "2026-10-14" };
@@ -79,5 +79,12 @@ assert.equal(loose.merchant, "Joe's Tacos");
 assert.deepEqual(parseReceipt("~~ ### ~~", US), { amountCents: null, date: null, merchant: null });
 // Data no futuro distante é ignorada.
 assert.equal(parseReceipt("Total 10.00\n12/25/2030", US).date, null);
+
+// Print da lista do banco: vários valores, sem total → é lista, não recibo.
+assert.equal(
+  looksLikeList("10/7/2026\nSnack Bar -$4.21\n$22.04\nDoorDash -$38.60\n$26.25\nZelle Credit $100.00\n$64.85\n10/6/2026\nDoorDash -$29.05\n-$35.15"),
+  true,
+);
+assert.equal(looksLikeList("PUBLIX\nBANANAS 1.29\nMILK 4.59\nCHICKEN 38.50\nSUBTOTAL 44.38\nTAX 3.45\nTOTAL 47.83"), false);
 
 console.log("check-receipt-parse: ok");

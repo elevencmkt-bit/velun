@@ -160,6 +160,17 @@ function findMerchant(lines: string[]): string | null {
   return null;
 }
 
+/**
+ * Lista de lançamentos (print do extrato no app), e não um recibo: várias
+ * linhas com valor e nenhuma linha de total.
+ */
+export function looksLikeList(text: string): boolean {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const withMoney = lines.filter((l) => amountsIn(l).length > 0).length;
+  const hasTotal = lines.some((l) => TOTAL_WORDS.test(l) && !NOT_TOTAL.test(l));
+  return withMoney >= 6 && !hasTotal;
+}
+
 export function parseReceipt(
   text: string,
   options: { order: "mdy" | "dmy"; today: string },
