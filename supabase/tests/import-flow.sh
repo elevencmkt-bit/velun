@@ -436,6 +436,37 @@ admin "insert into transactions (id, household_id, account_id, category_id, date
 as_user $ESPOSA "delete from categories where id = '50b00000-0000-0000-0000-000000000002';" >/dev/null
 check "apagou a sub: lançamento (até de conta pessoal do outro) sobe pra principal" "$(admin "select category_id from transactions where id='f0000000-0000-0000-0000-0000000000d1'")" "50b00000-0000-0000-0000-000000000001"
 
+echo "recorrências continuam:"
+A1=acc00000-0000-0000-0000-000000000001
+TODAY=$(admin "select (now() at time zone timezone)::date from households where id='$H'")
+# Mensal dia 31, criada há mais de um ano: a última prevista ficou no passado.
+admin "insert into recurrences (id, household_id, template, frequency, day_of_month, starts_on) values ('7ec00000-0000-0000-0000-000000000001', '$H', '{\"account_id\":\"$A1\",\"category_id\":\"ca700000-0000-0000-0000-00000000000a\",\"direction\":\"out\",\"amount_cents\":170000,\"description\":\"Aluguel\",\"notes\":null}', 'monthly', 31, '2025-01-31');" >/dev/null
+admin "insert into transactions (household_id, account_id, date, amount_cents, direction, description, status, recurrence_id, fingerprint, created_by) values ('$H', '$A1', '2025-12-31', 170000, 'out', 'Aluguel', 'cleared', '7ec00000-0000-0000-0000-000000000001', 'fp-aluguel', '$LEVI');" >/dev/null
+# Semanal com uma ocorrência apagada no meio (hoje+14 dias não existe).
+admin "insert into recurrences (id, household_id, template, frequency, starts_on) values ('7ec00000-0000-0000-0000-000000000002', '$H', '{\"account_id\":\"$A1\",\"category_id\":\"ca7fffff-0000-0000-0000-000000000000\",\"direction\":\"in\",\"amount_cents\":5000,\"description\":\"Mesada\",\"notes\":null}', 'weekly', '$TODAY'::date - 70);" >/dev/null
+admin "insert into transactions (household_id, account_id, date, amount_cents, direction, description, status, recurrence_id, fingerprint, created_by) select '$H', '$A1', d, 5000, 'in', 'Mesada', 'pending', '7ec00000-0000-0000-0000-000000000002', 'fp-mesada', '$LEVI' from (values ('$TODAY'::date + 7), ('$TODAY'::date + 21)) v(d);" >/dev/null
+# Termina daqui a 2 meses; e uma desativada.
+admin "insert into recurrences (id, household_id, template, frequency, day_of_month, starts_on, ends_on) values ('7ec00000-0000-0000-0000-000000000003', '$H', '{\"account_id\":\"$A1\",\"direction\":\"out\",\"amount_cents\":999,\"description\":\"Netflix\"}', 'monthly', 5, '2025-01-05', '$TODAY'::date + 60);" >/dev/null
+admin "insert into recurrences (id, household_id, template, frequency, day_of_month, starts_on, is_active) values ('7ec00000-0000-0000-0000-000000000004', '$H', '{\"account_id\":\"$A1\",\"direction\":\"out\",\"amount_cents\":1500,\"description\":\"Spotify\"}', 'monthly', 10, '2025-01-10', false);" >/dev/null
+admin "insert into transactions (household_id, account_id, date, amount_cents, direction, description, status, recurrence_id, fingerprint, created_by) values ('$H', '$A1', '2025-03-05', 999, 'out', 'Netflix', 'cleared', '7ec00000-0000-0000-0000-000000000003', 'fp-n', '$LEVI'), ('$H', '$A1', '2025-03-10', 1500, 'out', 'Spotify', 'cleared', '7ec00000-0000-0000-0000-000000000004', 'fp-s', '$LEVI');" >/dev/null
+admin "select top_up_recurrences();" >/dev/null
+R1="recurrence_id='7ec00000-0000-0000-0000-000000000001'"
+check "mensal: nada criado no passado" "$(admin "select count(*) from transactions where $R1 and status='pending' and date < '$TODAY'")" "0"
+check "mensal: 12 meses à frente" "$(admin "select count(*) between 12 and 13 from transactions where $R1 and status='pending'")" "t"
+check "mensal: chega até um ano" "$(admin "select max(date) > '$TODAY'::date + 330 from transactions where $R1")" "t"
+check "mensal: dia 31 cai no último dia do mês" "$(admin "select count(*) from transactions where $R1 and status='pending' and extract(day from date) <> least(31, extract(day from date_trunc('month', date) + interval '1 month - 1 day'))")" "0"
+check "usa valor, categoria e impressão certos" "$(admin "select count(*) from transactions where $R1 and status='pending' and (amount_cents <> 170000 or category_id <> 'ca700000-0000-0000-0000-00000000000a' or fingerprint <> transaction_fingerprint(account_id, date, amount_cents, description) or created_by <> '$LEVI')")" "0"
+R2="recurrence_id='7ec00000-0000-0000-0000-000000000002'"
+check "semanal: a apagada no meio não volta" "$(admin "select count(*) from transactions where $R2 and date = '$TODAY'::date + 14")" "0"
+check "semanal: continua depois da última, de 7 em 7 dias" "$(admin "select count(*) from transactions where $R2 and date > '$TODAY'::date + 21 and (date - ('$TODAY'::date - 70)) % 7 <> 0")/$(admin "select count(*) > 45 from transactions where $R2")" "0/t"
+check "categoria que não existe vira sem categoria" "$(admin "select count(*) from transactions where $R2 and date > '$TODAY'::date + 21 and category_id is not null")" "0"
+check "respeita o Termina em" "$(admin "select count(*) from transactions where recurrence_id='7ec00000-0000-0000-0000-000000000003' and date > '$TODAY'::date + 60")/$(admin "select count(*) >= 1 from transactions where recurrence_id='7ec00000-0000-0000-0000-000000000003' and status='pending'")" "0/t"
+check "desativada não ganha nada" "$(admin "select count(*) from transactions where recurrence_id='7ec00000-0000-0000-0000-000000000004'")" "1"
+BEFORE=$(admin "select count(*) from transactions where recurrence_id is not null")
+admin "select top_up_recurrences();" >/dev/null
+check "rodar de novo não duplica" "$(admin "select count(*) from transactions where recurrence_id is not null")" "$BEFORE"
+check "usuário do app não chama a rotina" "$(as_user $LEVI "select top_up_recurrences();" | grep -c 'permission denied')" "1"
+
 echo; [ $FAIL = 0 ] && echo "TUDO PASSOU" || echo "HÁ FALHAS"
 su postgres -c "$B/pg_ctl -D $D/data stop -m fast" >/dev/null 2>&1
 exit $FAIL
