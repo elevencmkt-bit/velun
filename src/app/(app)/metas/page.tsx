@@ -11,6 +11,7 @@ import { Money } from "@/components/money";
 import { NewGoalDialog, type GoalAccountOption, type GoalCategoryOption } from "./new-goal-dialog";
 import { DepositButton, EditGoalButton, ScheduleButton, SchedulePlan, type GoalActionData } from "./goal-actions";
 import { GoalSuggestions } from "./goal-suggestions";
+import { ScreenHelp } from "@/components/screen-help";
 
 const RING_COLORS = ["var(--primary)", "#27C499", "#A78BFA", "#FF8A5C"];
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -238,7 +239,10 @@ export default async function MetasPage() {
     <div className="flex flex-col gap-6 md:gap-7">
       <div className="flex items-start justify-between gap-3 sm:items-end">
         <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-2.5">
           <h1 className="text-page-title">Metas</h1>
+          <ScreenHelp screen="metas" />
+        </div>
           <p className="text-page-subtitle max-sm:hidden">O que vocês querem juntar, até onde gastar e o que falta quitar.</p>
         </div>
         <NewGoalDialog {...formProps} />

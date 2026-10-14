@@ -11,6 +11,7 @@ import { fetchDeletionRequests } from "@/lib/notifications";
 import { AccountForm } from "./account-form";
 import { AccountRowActions, ClickableAccountRow } from "./account-row-actions";
 import { Money } from "@/components/money";
+import { ScreenHelp } from "@/components/screen-help";
 
 // Texto curto pro badge da conta pessoal do outro membro. Diz o que ele
 // escolheu mostrar, sem revelar nada além disso.
@@ -180,7 +181,10 @@ export default async function ContasPage() {
     <div className="flex flex-col gap-7">
       <div className="flex items-start justify-between gap-3 sm:items-end">
         <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-2.5">
           <h1 className="text-page-title">Contas</h1>
+          <ScreenHelp screen="contas" />
+        </div>
           <p className="text-page-subtitle max-sm:hidden">Saldo de cada conta, a partir dos lançamentos confirmados.</p>
         </div>
         <AccountForm paymentAccounts={paymentAccounts} />

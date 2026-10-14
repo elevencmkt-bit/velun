@@ -10,6 +10,7 @@ import { InviteManager } from "./invite-manager";
 import { HouseholdSettingsForm } from "./household-settings-form";
 import { themedBg, themedFg } from "@/lib/theme-color";
 import { AppearancePicker } from "./appearance-picker";
+import { ScreenHelp } from "@/components/screen-help";
 
 const BENEFITS = [
   { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
@@ -120,7 +121,10 @@ export default async function ConfiguracoesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-page-title">Configurações</h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-page-title">Configurações</h1>
+          <ScreenHelp screen="configuracoes" />
+        </div>
         <p className="text-page-subtitle">Você, sua casa, quem divide com você e as categorias.</p>
       </div>
 

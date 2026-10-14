@@ -46,6 +46,11 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Central de ajuda: pública, abre com ou sem sessão.
+  if (request.nextUrl.pathname === "/ajuda" || request.nextUrl.pathname.startsWith("/ajuda/")) {
+    return supabaseResponse;
+  }
+
   // Erro de rede/timeout ao consultar o Supabase (ex.: Gateway Timeout) não
   // significa que a sessão expirou — só que não deu pra confirmar agora.
   // Nesse caso deixamos a navegação passar em vez de chutar pro login;

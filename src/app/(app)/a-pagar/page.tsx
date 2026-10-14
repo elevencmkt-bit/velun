@@ -14,6 +14,7 @@ import { RecurrenceForm } from "./recurrence-form";
 import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
 import { UpcomingGroups, type Group, type PendingRow } from "./upcoming-groups";
 import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
+import { ScreenHelp } from "@/components/screen-help";
 
 const HORIZON_DAYS = 30;
 
@@ -301,7 +302,10 @@ export default async function AVencerPage({
     <div className="flex flex-col gap-6 md:gap-7">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2.5">
           <h1 className="text-page-title">A vencer</h1>
+          <ScreenHelp screen="a-vencer" />
+        </div>
           <p className="text-page-subtitle">
             O que sai e o que entra nos próximos {HORIZON_DAYS} dias.
           </p>

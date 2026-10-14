@@ -19,6 +19,7 @@ import type {
   TransactionRow,
   TransactionsSummary,
 } from "./types";
+import { ScreenHelp } from "@/components/screen-help";
 
 const TABS: { key: StatusKey | "all"; label: string; badge: string }[] = [
   { key: "all", label: "Todas", badge: "bg-(--bg-strong) text-(--text-secondary)" },
@@ -98,7 +99,10 @@ export function TransactionsWorkspace({
     <div className="flex flex-col gap-5 md:gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2.5">
           <h1 className="text-page-title">Transações</h1>
+          <ScreenHelp screen="transacoes" />
+        </div>
           <p className="text-page-subtitle max-sm:hidden">Tudo o que entrou e saiu, dia a dia.</p>
         </div>
         <div className="flex items-center gap-3">

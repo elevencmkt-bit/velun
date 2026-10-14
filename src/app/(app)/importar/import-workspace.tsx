@@ -47,6 +47,7 @@ import { Money } from "@/components/money";
 import { AccountAvatar } from "@/components/account-avatar";
 import { fitsDirection } from "@/lib/category-kind";
 import { CategorySelectItems } from "@/components/category-select-items";
+import { ScreenHelp } from "@/components/screen-help";
 
 type Account = { id: string; name: string; isPersonal: boolean; type: string; institution: string | null };
 type Category = { id: string; name: string; kind: string; is_transfer?: boolean; parent_id?: string | null };
@@ -433,7 +434,10 @@ export function ImportWorkspace({
     return (
       <div className="flex flex-col gap-5 md:gap-6">
         <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2.5">
           <h1 className="text-page-title">Importar</h1>
+          <ScreenHelp screen="importar" />
+        </div>
           <p className="text-page-subtitle">
             Traga o extrato do banco ou a fatura do cartão. Nada entra sem você revisar.
           </p>
