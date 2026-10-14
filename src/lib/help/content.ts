@@ -359,12 +359,20 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "extratos-aceitos",
     topic: "importar",
     title: "Quais extratos dá pra importar",
-    summary: "Extrato em PDF do Regions e da Nomad, e fatura do cartão Nubank. Mais bancos em breve.",
+    summary: "Extrato em PDF do Regions e da Nomad, fatura do cartão Nubank e prints do app do banco.",
     body: [
       { table: [
         ["Regions", "Extrato da conta. O Velun refaz o saldo dia a dia pra conferir que nada ficou de fora."],
         ["Nomad", "Extrato da conta. Linhas canceladas ficam de fora; as \"Processando\" entram."],
         ["Nubank (cartão)", "Fatura do cartão de crédito. Só numa conta do tipo cartão; ajusta os dias de fechamento e vencimento pelos da fatura."],
+        ["Prints do app", "Prints da lista de lançamentos do app do banco (até 10 de uma vez). Quando o app mostra o saldo embaixo de cada valor, como o da Regions, o Velun confere cada linha por ele."],
+      ] },
+      { h2: "Prints do app", id: "prints" },
+      { list: [
+        "Tire o print da lista de lançamentos, com as datas aparecendo. Pode rolar e tirar vários: o trecho repetido entre um print e outro entra uma vez só.",
+        "Comece o primeiro print com uma data à vista; uma linha sem data acima dela fica de fora.",
+        "O que já está no Velun (inclusive o que veio do extrato em PDF) vem marcado como **Já existe**, pelo dia, valor e tipo.",
+        "Os prints são lidos no seu aparelho; só as palavras reconhecidas vão pro Velun, e as imagens não ficam guardadas.",
       ] },
       { h2: "O que não funciona", id: "nao-funciona" },
       { list: [
@@ -746,7 +754,7 @@ export const HELP_FAQ: HelpFaq[] = [
   },
   {
     q: "De quais bancos dá pra importar extrato?",
-    a: "Por enquanto: extrato do Regions e da Nomad, e fatura do cartão Nubank, sempre em PDF. Outros bancos estão a caminho.",
+    a: "Em PDF: extrato do Regions e da Nomad, e fatura do cartão Nubank. Também dá pra mandar prints da lista de lançamentos do app do banco. Outros bancos estão a caminho.",
     link: "importar/extratos-aceitos",
   },
   {
@@ -869,7 +877,7 @@ export const SCREEN_HELP: Record<ScreenHelpKey, { title: string; points: string[
   importar: {
     title: "Como funciona a importação",
     points: [
-      "Aceita PDF do Regions, da Nomad e a fatura do Nubank.",
+      "Aceita PDF do Regions, da Nomad, fatura do Nubank e prints do app do banco.",
       "Nada entra sem você revisar; repetidos vêm desmarcados.",
       "Importações recentes podem ser desfeitas.",
     ],

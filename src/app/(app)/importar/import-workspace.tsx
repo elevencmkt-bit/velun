@@ -330,20 +330,41 @@ export function ImportWorkspace({
   // Conta escolhida e arquivo, fora de um <form>: o arquivo pode chegar
   // arrastado pra área, não só pelo seletor.
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  // Um PDF, ou vários prints da lista de lançamentos do app.
+  const [files, setFiles] = useState<File[]>([]);
+  const file = files[0] ?? null;
+  const isImages = files.length > 0 && files.every((f) => f.type.startsWith("image/"));
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const chosen = accounts.find((a) => a.id === accountId) ?? null;
   const isCardChosen = chosen?.type === "credit_card";
 
-  function pickFile(f: File | null | undefined) {
-    if (!f) return;
+  function pickFiles(list: FileList | File[] | null | undefined) {
+    const picked = Array.from(list ?? []);
+    if (picked.length === 0) return;
     setError(null);
-    if (!f.name.toLowerCase().endsWith(".pdf")) {
-      setFile(null);
-      setError("Por enquanto só PDF: extrato da Regions ou da Nomad, ou fatura do Nubank.");
+    const pdfs = picked.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+    const images = picked.filter((f) => f.type.startsWith("image/"));
+    if (pdfs.length === 1 && picked.length === 1) {
+      setFiles(pdfs);
       return;
     }
-    setFile(f);
+    if (images.length === picked.length) {
+      if (isCardChosen) {
+        setFiles([]);
+        setError("Print funciona pra conta. Pra fatura de cartão, use o PDF da fatura do Nubank.");
+        return;
+      }
+      if (images.length > 10) {
+        setFiles([]);
+        setError("Até 10 prints por vez.");
+        return;
+      }
+      setFiles(images);
+      return;
+    }
+    setFiles([]);
+    setError("Mande um PDF (extrato da Regions ou da Nomad, ou fatura do Nubank) ou prints da lista de lançamentos do app.");
   }
 
   function onUpload(event: React.FormEvent<HTMLFormElement>) {
@@ -351,7 +372,47 @@ export function ImportWorkspace({
     setError(null);
 
     if (!accountId) return setError("Escolha de qual conta é o extrato.");
-    if (!file || file.size === 0) return setError("Escolha o arquivo PDF.");
+    if (!file || file.size === 0) return setError("Escolha o PDF ou os prints.");
+
+    if (isImages) {
+      startTransition(async () => {
+        // Os prints são lidos aqui, no navegador. Pro servidor vão só as
+        // palavras reconhecidas e onde estão — a imagem não sai da máquina.
+        const { recognizeScreen } = await import("@/lib/ocr-client");
+        const screens = [];
+        try {
+          for (let i = 0; i < files.length; i++) {
+            const label = files.length > 1 ? `Lendo print ${i + 1} de ${files.length}` : "Lendo o print";
+            setOcrStatus(`${label}…`);
+            screens.push(await recognizeScreen(files[i], (pct) => setOcrStatus(`${label}… ${pct}%`)));
+          }
+        } catch {
+          setOcrStatus(null);
+          setError("Não consegui ler esses prints. Tente de novo.");
+          return;
+        }
+        setOcrStatus("Montando a revisão…");
+        try {
+          const result = await importStatement({
+            accountId,
+            fileName: files.length === 1 ? "1 print" : `${files.length} prints`,
+            screens,
+          });
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          setNotice(result.message);
+          setFiles([]);
+          router.refresh();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Algo deu errado ao ler os prints.");
+        } finally {
+          setOcrStatus(null);
+        }
+      });
+      return;
+    }
 
     startTransition(async () => {
       // O PDF é lido aqui, no navegador. Pro servidor vai só o texto
@@ -379,7 +440,7 @@ export function ImportWorkspace({
           return;
         }
         setNotice(result.message);
-        setFile(null);
+        setFiles([]);
         router.refresh();
       } catch (err) {
         setError(
@@ -485,7 +546,7 @@ export function ImportWorkspace({
                   e.preventDefault();
                   setDragging(false);
                   if (!chosen) return setError("Escolha primeiro de qual conta é o extrato.");
-                  pickFile(e.dataTransfer.files?.[0]);
+                  pickFiles(e.dataTransfer.files);
                 }}
                 className={`flex items-center gap-3 rounded-[18px] border-2 border-dashed px-4 transition-colors max-md:h-[76px] md:h-[200px] md:flex-col md:justify-center md:gap-2.5 md:px-6 md:text-center ${
                   !chosen
@@ -497,10 +558,14 @@ export function ImportWorkspace({
               >
                 <input
                   type="file"
-                  accept="application/pdf"
+                  accept={isCardChosen ? "application/pdf" : "application/pdf,image/*"}
+                  multiple={!isCardChosen}
                   className="sr-only"
                   disabled={!chosen}
-                  onChange={(e) => pickFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    pickFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                 />
                 {!chosen ? (
                   <>
@@ -519,7 +584,9 @@ export function ImportWorkspace({
                 </span>
                 {file ? (
                   <span className="min-w-0">
-                    <span className="block truncate text-[15px] font-semibold text-(--text-primary)">{file.name}</span>
+                    <span className="block truncate text-[15px] font-semibold text-(--text-primary)">
+                      {isImages ? (files.length === 1 ? "1 print" : `${files.length} prints`) : file.name}
+                    </span>
                     <span className="block text-[13px] text-(--text-muted)">
                       Pronto pra ler · <span className="font-semibold text-(--primary)">trocar arquivo</span>
                     </span>
@@ -534,9 +601,10 @@ export function ImportWorkspace({
                     </span>
                     <span className="block text-[13px] text-(--text-muted)">
                       <span className="max-md:hidden">
-                        ou <span className="font-semibold text-(--primary)">clique pra escolher</span> · só PDF
+                        ou <span className="font-semibold text-(--primary)">clique pra escolher</span> ·{" "}
+                        {isCardChosen ? "só PDF" : "PDF ou prints do app"}
                       </span>
-                      <span className="md:hidden">da {chosen.name}, em PDF</span>
+                      <span className="md:hidden">da {chosen.name}, em PDF{isCardChosen ? "" : " ou prints"}</span>
                     </span>
                   </span>
                 )}
@@ -554,6 +622,9 @@ export function ImportWorkspace({
                 <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
                   Fatura Nubank
                 </span>
+                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
+                  Prints do app
+                </span>
                 <span className="inline-flex h-7 items-center rounded-full border-[1.5px] border-dashed border-(--border-strong) px-2.5 text-xs font-semibold text-(--text-light)">
                   mais bancos em breve
                 </span>
@@ -568,7 +639,7 @@ export function ImportWorkspace({
             ) : null}
 
             <Button type="submit" disabled={isPending || !chosen || !file} className="h-12 rounded-[14px] text-[15px]">
-              {isPending ? "Lendo o PDF…" : "Ler e revisar"}
+              {ocrStatus ?? (isPending ? (isImages ? "Lendo os prints…" : "Lendo o PDF…") : "Ler e revisar")}
             </Button>
 
             <p className="flex items-start gap-2 text-xs leading-relaxed text-(--text-muted) lg:hidden">

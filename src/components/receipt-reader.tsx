@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { Camera, Info, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { parseReceipt, type ReceiptGuess } from "@/lib/receipt-parse";
+import { looksLikeList, parseReceipt, type ReceiptGuess } from "@/lib/receipt-parse";
+import { recognizeText } from "@/lib/ocr-client";
 
 export type ReceiptRead = ReceiptGuess & {
   /** Miniatura pra mostrar no formulário (URL local, do próprio navegador). */
@@ -39,20 +40,12 @@ export function ReceiptReader({
     setProgress(0);
     try {
       // O leitor só é baixado na primeira vez que alguém usa.
-      const { createWorker } = await import("tesseract.js");
-      // Tudo servido pelo próprio Velun (public/ocr), sem CDN de fora.
-      const worker = await createWorker(["eng", "por"], 1, {
-        workerPath: "/ocr/worker.min.js",
-        corePath: "/ocr/core",
-        langPath: "/ocr/lang",
-        gzip: true,
-        logger: (m: { status: string; progress: number }) => {
-          if (m.status === "recognizing text") setProgress(Math.round(m.progress * 100));
-        },
-      });
-      const { data } = await worker.recognize(file);
-      await worker.terminate();
-      const guess = parseReceipt(data.text ?? "", { order, today });
+      const text = await recognizeText(file, setProgress);
+      if (looksLikeList(text)) {
+        setError("Parece uma lista com vários lançamentos. Pra lançar todos de uma vez, use Importar: ele aceita prints.");
+        return;
+      }
+      const guess = parseReceipt(text, { order, today });
       if (!guess.amountCents && !guess.date && !guess.merchant) {
         setError("Não consegui ler essa imagem. Tente um print ou uma foto mais nítida.");
         return;
