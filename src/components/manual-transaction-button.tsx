@@ -3,7 +3,7 @@
 import { localToday } from "@/lib/today";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Plus, X } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, X } from "lucide-react";
 import { createTransaction, createTransfer } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
@@ -15,13 +15,13 @@ import { NEW_TRANSACTION_EVENT } from "@/components/nav-items";
 import { DateInput } from "@/components/date-input";
 import { AccountAvatar } from "@/components/account-avatar";
 import { buildCategoryColorMap } from "@/lib/category-colors";
-import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { currencySymbol, formatCents, type CurrencyCode } from "@/lib/money";
 import { MAX_INSTALLMENTS } from "@/lib/credit-card";
 import { fitsDirection } from "@/lib/category-kind";
 import { topOf } from "@/lib/subcategories";
 import { SubcategoryChips } from "@/components/subcategory-chips";
+import { CategoryQuickPicker } from "@/components/category-quick-picker";
 import { themedBg, themedFg, themedPair } from "@/lib/theme-color";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
@@ -84,7 +84,7 @@ export function AccountPicker({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-2">
       {accounts
         .filter((a) => a.id !== exclude)
         .map((a) => {
@@ -96,19 +96,15 @@ export function AccountPicker({
               role="radio"
               aria-checked={on}
               onClick={() => onChange(a.id)}
-              className={`flex h-14 items-center gap-2.5 rounded-[14px] border-[1.5px] px-3 text-left transition-colors ${
+              title={a.name}
+              className={`flex h-12 min-w-0 items-center gap-2 rounded-[14px] border-[1.5px] px-2.5 text-left transition-colors ${
                 on
                   ? "border-(--primary) bg-(--primary-soft) shadow-[0_0_0_3px_rgba(83,109,254,.12)]"
                   : "border-(--border-primary) bg-(--bg-surface) hover:border-(--primary-border)"
               }`}
             >
-              <AccountAvatar institution={a.institution ?? null} type={a.type ?? "checking"} size={32} />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-(--text-primary)">{a.name}</span>
-                <span className="block text-xs text-(--text-muted)">
-                  {a.type === "credit_card" ? "Cartão" : a.type === "investment" ? "Investimento" : "Conta"}
-                </span>
-              </span>
+              <AccountAvatar institution={a.institution ?? null} type={a.type ?? "checking"} size={28} />
+              <span className="min-w-0 truncate text-sm font-semibold text-(--text-primary)">{a.name}</span>
             </button>
           );
         })}
@@ -134,7 +130,7 @@ export function ToggleRow({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-3 border-t border-(--border-soft) py-3.5 text-left"
+      className="flex w-full items-center justify-between gap-3 border-t border-(--border-soft) py-3 text-left"
     >
       <span>
         <span className="block text-sm font-semibold text-(--text-primary)">{title}</span>
@@ -319,7 +315,7 @@ export function ManualTransactionButton({
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[92dvh] gap-5 overflow-y-auto rounded-[24px] bg-(--bg-surface) p-5 sm:max-w-[540px] sm:p-7"
+        className="max-h-[94dvh] gap-4 overflow-y-auto rounded-[24px] bg-(--bg-surface) p-5 sm:max-w-[540px] sm:px-7 sm:py-6"
       >
         <div className="flex items-center justify-between">
           <DialogTitle className="text-[21px] font-extrabold tracking-[-0.02em] text-(--text-primary)">
@@ -335,7 +331,7 @@ export function ManualTransactionButton({
           </button>
         </div>
 
-        <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
+        <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4">
           <div role="tablist" aria-label="Tipo" className="flex gap-1.5 rounded-[16px] bg-(--bg-hover) p-[5px]">
             {MODES.map(({ value, label, Icon }) => {
               const on = value === mode;
@@ -361,7 +357,7 @@ export function ManualTransactionButton({
             })}
           </div>
 
-          <div className="flex flex-col gap-1 rounded-[18px] px-5 py-4" style={{ backgroundColor: tone.bg }}>
+          <div className="flex flex-col gap-0.5 rounded-[18px] px-5 py-3" style={{ backgroundColor: tone.bg }}>
             <label htmlFor="amount" className="text-[13px] font-semibold" style={{ color: tone.fg }}>
               Valor
             </label>
@@ -379,13 +375,13 @@ export function ManualTransactionButton({
                 placeholder="0,00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full min-w-0 border-0 bg-transparent p-0 text-[38px] font-extrabold tracking-[-0.03em] tabular-nums outline-none placeholder:opacity-35"
+                className="w-full min-w-0 border-0 bg-transparent p-0 text-[34px] font-extrabold tracking-[-0.03em] tabular-nums outline-none placeholder:opacity-35"
                 style={{ color: tone.fg }}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor="date" className="text-[13px] font-semibold text-(--text-body)">
                 Data
@@ -441,35 +437,17 @@ export function ManualTransactionButton({
           {mode !== "transfer" ? (
             <div className="flex flex-col gap-2">
               <span className="text-[13px] font-semibold text-(--text-body)">Categoria</span>
-              <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
-                {categoriesForDirection.filter((c) => !c.parent_id).map((c) => {
-                  const on = c.id === categoryId || c.id === selectedTop?.id;
-                  const color = themedPair(colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" });
-                  const Icon = getCategoryIcon(c.name, mode === "in" ? "in" : "out", c.icon ?? null);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      onClick={() => setCategoryId(on ? "" : c.id)}
-                      className={`inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] pr-3.5 pl-2 text-sm transition-colors ${
-                        on ? "font-semibold" : "border-(--border-primary) bg-(--bg-surface) font-medium text-(--text-body) hover:border-(--primary-border)"
-                      }`}
-                      style={on ? { borderColor: color.fg, backgroundColor: color.bg, color: color.fg } : undefined}
-                    >
-                      <span
-                        className="flex h-6 w-6 items-center justify-center rounded-full"
-                        style={{ backgroundColor: color.bg, color: color.fg }}
-                      >
-                        <Icon className="h-3.5 w-3.5" strokeWidth={2.4} />
-                      </span>
-                      {c.name}
-                    </button>
-                  );
-                })}
-                {newCategoryOpen ? (
-                  <div className="flex w-full gap-2">
+              <CategoryQuickPicker
+                categories={categoriesForDirection.filter((c) => !c.parent_id)}
+                allCategories={categories}
+                direction={mode === "in" ? "in" : "out"}
+                selectedTopId={selectedTop?.id ?? null}
+                colors={colors}
+                onSelect={setCategoryId}
+                onNewCategory={() => setNewCategoryOpen(true)}
+              />
+              {newCategoryOpen ? (
+                <div className="flex w-full gap-2">
                     <Input
                       autoFocus
                       value={newCategoryName}
@@ -487,17 +465,7 @@ export function ManualTransactionButton({
                       Criar
                     </Button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setNewCategoryOpen(true)}
-                    className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-(--primary-border) px-3.5 text-sm font-semibold text-(--primary) hover:bg-(--primary-soft)"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nova categoria
-                  </button>
-                )}
-              </div>
+              ) : null}
               {selectedTop ? (
                 <SubcategoryChips
                   parent={selectedTop}

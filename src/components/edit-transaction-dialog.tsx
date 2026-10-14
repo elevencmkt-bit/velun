@@ -3,7 +3,7 @@
 import { currencySymbol, type CurrencyCode } from "@/lib/money";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowUpRight, Pencil, Plus, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, X } from "lucide-react";
 import { updateTransaction } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,11 @@ import { DateInput } from "@/components/date-input";
 import { AccountPicker, TONE, ToggleRow } from "@/components/manual-transaction-button";
 import { GoalLinkField } from "@/components/goal-link-field";
 import { buildCategoryColorMap } from "@/lib/category-colors";
-import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { fitsDirection } from "@/lib/category-kind";
 import { topOf } from "@/lib/subcategories";
 import { SubcategoryChips } from "@/components/subcategory-chips";
+import { CategoryQuickPicker } from "@/components/category-quick-picker";
 import { themedPair } from "@/lib/theme-color";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
@@ -276,32 +276,17 @@ export function EditTransactionDialog({
 
           <div className="flex flex-col gap-2">
             <span className={fieldLabel}>Categoria</span>
-            <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap gap-2">
-              {categoriesForDirection.filter((c) => !c.parent_id).map((c) => {
-                const on = c.id === categoryId || c.id === selectedTop?.id;
-                const color = themedPair(colors.get(c.name) ?? { bg: "#F2F4F7", fg: "#475467" });
-                const Icon = getCategoryIcon(c.name, direction, c.icon ?? null);
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    onClick={() => setCategoryId(on ? "" : c.id)}
-                    className={`inline-flex h-10 items-center gap-2 rounded-full border-[1.5px] pr-3.5 pl-2 text-sm transition-colors ${
-                      on ? "font-semibold" : "border-(--border-primary) bg-(--bg-surface) font-medium text-(--text-body) hover:border-(--primary-border)"
-                    }`}
-                    style={on ? { borderColor: color.fg, backgroundColor: color.bg, color: color.fg } : undefined}
-                  >
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: color.bg, color: color.fg }}>
-                      <Icon className="h-3.5 w-3.5" strokeWidth={2.4} />
-                    </span>
-                    {c.name}
-                  </button>
-                );
-              })}
-              {newCategoryOpen ? (
-                <div className="flex w-full gap-2">
+            <CategoryQuickPicker
+              categories={categoriesForDirection.filter((c) => !c.parent_id)}
+              allCategories={categories}
+              direction={direction}
+              selectedTopId={selectedTop?.id ?? null}
+              colors={colors}
+              onSelect={setCategoryId}
+              onNewCategory={() => setNewCategoryOpen(true)}
+            />
+            {newCategoryOpen ? (
+              <div className="flex w-full gap-2">
                   <Input
                     autoFocus
                     value={newCategoryName}
@@ -319,17 +304,7 @@ export function EditTransactionDialog({
                     Criar
                   </Button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setNewCategoryOpen(true)}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-(--primary-border) px-3.5 text-sm font-semibold text-(--primary) hover:bg-(--primary-soft)"
-                >
-                  <Plus className="h-4 w-4" />
-                  Nova categoria
-                </button>
-              )}
-            </div>
+            ) : null}
             {selectedTop ? (
               <SubcategoryChips
                 parent={selectedTop}

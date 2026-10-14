@@ -117,7 +117,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         "Escolha **Saída**, **Entrada** ou **Transferência**.",
         "Digite o **Valor** (aceita vírgula: 85,15) e confira a **Data**.",
         "Escreva uma **Descrição** curta, como \"Mercado\".",
-        "Escolha a **Conta** e a **Categoria**. Se a categoria tiver subcategorias, elas aparecem logo abaixo.",
+        "Escolha a **Conta** e a **Categoria**. As que você mais usa ficam à mostra; as outras estão em **Outras**, com busca. Se a categoria tiver subcategorias, elas aparecem logo abaixo.",
         "Salve.",
       ] },
       { h2: "Opções", id: "opcoes" },
