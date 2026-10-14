@@ -277,3 +277,65 @@ export function buildCashFlowNote(input: {
     fallsAgain ? "Depois volta a ficar no vermelho em alguns dias — vale olhar o gráfico." : "Depois disso, não volta a ficar no vermelho."
   }`;
 }
+
+// ── Por conta ───────────────────────────────────────────────────────────
+
+export type CashAccount = { id: string; name: string; type: string; payment_account_id: string | null };
+
+/**
+ * Escopo do saldo projetado de UMA conta: ela mais os cartões que ela
+ * paga (a fatura sai dela no vencimento). Só estreita: o que não está em
+ * `full` fica de fora.
+ */
+export function scopeForAccount(full: AccountScope, accountId: string, accounts: CashAccount[]): AccountScope {
+  const allowed = new Set(full.ids);
+  const ids = [
+    accountId,
+    ...accounts
+      .filter((a) => a.type === "credit_card" && a.payment_account_id === accountId)
+      .map((a) => a.id),
+  ].filter((id) => allowed.has(id));
+  return { ids, excludedCount: 0 };
+}
+
+export type NegativeAccount = {
+  id: string;
+  name: string;
+  /** Primeiro dia em que o saldo projetado fica abaixo de zero. */
+  firstNegativeDate: string;
+  lowestCents: number;
+  lowestDate: string;
+};
+
+/**
+ * Contas (não cartão) que ficam negativas no período, mesmo quando o
+ * total da casa continua positivo: o banco cobra o cheque especial conta
+ * por conta.
+ */
+export async function findNegativeAccounts(
+  supabase: SupabaseClient,
+  householdId: string,
+  horizonDays: number,
+  full: AccountScope,
+  accounts: CashAccount[],
+  todayISO: string,
+): Promise<NegativeAccount[]> {
+  const cash = accounts.filter((a) => a.type !== "credit_card" && full.ids.includes(a.id));
+  const results = await Promise.all(
+    cash.map(async (a) => {
+      const p = await getCashFlowProjection(supabase, householdId, horizonDays, scopeForAccount(full, a.id, accounts), todayISO);
+      const first = p.points.find((pt) => pt.balance_cents < 0);
+      if (!first) return null;
+      return {
+        id: a.id,
+        name: a.name,
+        firstNegativeDate: first.date,
+        lowestCents: p.lowestPoint.balance_cents,
+        lowestDate: p.lowestPoint.date,
+      } satisfies NegativeAccount;
+    }),
+  );
+  return results
+    .filter((r): r is NegativeAccount => r !== null)
+    .sort((x, y) => x.firstNegativeDate.localeCompare(y.firstNegativeDate));
+}

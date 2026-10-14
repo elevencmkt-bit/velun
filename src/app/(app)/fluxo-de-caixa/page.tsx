@@ -3,13 +3,20 @@ import { TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { addDaysISO } from "@/lib/today";
-import { buildCashFlowNote, getCashFlowProjection } from "@/lib/cash-flow";
+import {
+  buildCashFlowNote,
+  findNegativeAccounts,
+  getCashFlowProjection,
+  scopeForAccount,
+  type CashAccount,
+} from "@/lib/cash-flow";
 import { accountScope } from "@/lib/visibility";
 import { formatCents } from "@/lib/money";
 import { ProjectionChart } from "./projection-chart";
 import { PeriodSummaryCard, UpcomingEventsCard } from "./support-cards";
 import { Money } from "@/components/money";
 import { ScreenHelp } from "@/components/screen-help";
+import { AccountFilter } from "@/components/account-filter";
 
 const PERIODS = [
   { days: 30, label: "30 dias" },
@@ -24,9 +31,9 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: 
 export default async function FluxoDeCaixaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; atrasados?: string }>;
+  searchParams: Promise<{ period?: string; atrasados?: string; account?: string }>;
 }) {
-  const { period, atrasados } = await searchParams;
+  const { period, atrasados, account: accountParam } = await searchParams;
   const parsedDays = Number(period);
   const selectedPeriod =
     PERIODS.find((p) => p.days === parsedDays) ?? PERIODS.find((p) => p.days === DEFAULT_DAYS)!;
@@ -35,6 +42,28 @@ export default async function FluxoDeCaixaPage({
 
   const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
+
+  // Contas que entram no saldo de quem está vendo (cartões incluídos, pra
+  // saber de qual conta sai cada fatura).
+  const fullScope = await accountScope(supabase, householdId, memberId, "balance");
+  const { data: accountRows } = await supabase
+    .from("accounts")
+    .select("id, name, type, institution, payment_account_id")
+    .eq("household_id", householdId)
+    .eq("is_archived", false)
+    .in("id", fullScope.ids.length > 0 ? fullScope.ids : ["00000000-0000-0000-0000-000000000000"])
+    .order("name");
+  const accounts: (CashAccount & { institution: string | null })[] = (accountRows ?? []).map((a) => ({
+    id: a.id as string,
+    name: a.name as string,
+    type: a.type as string,
+    institution: (a.institution as string | null) ?? null,
+    payment_account_id: (a.payment_account_id as string | null) ?? null,
+  }));
+  // Filtro (?account=): só conta de dinheiro — cartão entra pela conta que paga.
+  const cashAccounts = accounts.filter((a) => a.type !== "credit_card");
+  const filtered = cashAccounts.find((a) => a.id === accountParam) ?? null;
+  const scope = filtered ? scopeForAccount(fullScope, filtered.id, accounts) : fullScope;
 
   const {
     points,
@@ -49,14 +78,14 @@ export default async function FluxoDeCaixaPage({
     netResult,
     upcomingEvents,
     highlightedEventIds,
-  } = await getCashFlowProjection(
-    supabase,
-    householdId,
-    horizonDays,
-    await accountScope(supabase, householdId, memberId, "balance"),
-    today,
-    { includeOverdue },
-  );
+  } = await getCashFlowProjection(supabase, householdId, horizonDays, scope, today, { includeOverdue });
+
+  // Sem filtro: avisa se alguma conta fica negativa sozinha no período,
+  // mesmo com o total positivo.
+  const negativeAccounts =
+    !filtered && cashAccounts.length > 1
+      ? await findNegativeAccounts(supabase, householdId, horizonDays, fullScope, accounts, today)
+      : [];
 
   const fmt = (cents: number) => formatCents(cents, currency);
   const note = buildCashFlowNote({
@@ -66,11 +95,13 @@ export default async function FluxoDeCaixaPage({
     value: withOverdue ? (p) => p.with_overdue_cents ?? p.balance_cents : undefined,
   });
 
-  const href = (next: { period?: number; atrasados?: boolean }) => {
+  const href = (next: { period?: number; atrasados?: boolean; account?: string | null }) => {
     const q = new URLSearchParams();
     const days = next.period ?? horizonDays;
     if (days !== DEFAULT_DAYS) q.set("period", String(days));
     if (next.atrasados ?? includeOverdue) q.set("atrasados", "1");
+    const acc = next.account === undefined ? filtered?.id : next.account;
+    if (acc) q.set("account", acc);
     const qs = q.toString();
     return `/fluxo-de-caixa${qs ? `?${qs}` : ""}`;
   };
@@ -87,6 +118,10 @@ export default async function FluxoDeCaixaPage({
     lowDate === today
       ? "hoje"
       : new Date(`${lowDate}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }).replace(".", "");
+  const shortDay = (iso: string) =>
+    iso === today
+      ? "hoje"
+      : new Date(`${iso}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }).replace(".", "");
   const signed = (cents: number) => (
     <>
       {cents < 0 ? "−" : ""}
@@ -96,15 +131,45 @@ export default async function FluxoDeCaixaPage({
 
   return (
     <div className="flex flex-col gap-5 md:gap-6">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-page-title">Fluxo de caixa</h1>
-          <ScreenHelp screen="fluxo-de-caixa" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-page-title">Fluxo de caixa</h1>
+            <ScreenHelp screen="fluxo-de-caixa" />
+          </div>
+          <p className="text-page-subtitle max-sm:hidden">
+            Quanto vai ter na conta nos próximos dias, com o que já está previsto.
+          </p>
         </div>
-        <p className="text-page-subtitle max-sm:hidden">
-          Quanto vai ter na conta nos próximos dias, com o que já está previsto.
-        </p>
+        {cashAccounts.length > 1 ? (
+          <AccountFilter value={filtered?.id ?? null} accounts={cashAccounts} />
+        ) : null}
       </div>
+
+      {negativeAccounts.length > 0 ? (
+        <div className="flex flex-col gap-2.5 rounded-[16px] bg-(--warning-soft) px-4 py-3.5 md:px-5">
+          {negativeAccounts.map((n) => (
+            <div key={n.id} className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-(--warning-dark)" />
+                <p className="text-sm leading-relaxed text-(--warning-ink)">
+                  <b>{n.name}</b>{" "}
+                  {n.firstNegativeDate === today ? "já está no vermelho" : `fica no vermelho em ${shortDay(n.firstNegativeDate)}`}
+                  {" "}e chega a <b>{signed(n.lowestCents)}</b>
+                  {n.lowestDate !== n.firstNegativeDate ? ` em ${shortDay(n.lowestDate)}` : ""}
+                  {lowestPoint.balance_cents >= 0 ? ", mesmo com o total das contas positivo." : "."}
+                </p>
+              </div>
+              <Link
+                href={href({ account: n.id })}
+                className="flex h-9 shrink-0 items-center self-start rounded-[11px] bg-(--bg-surface) px-3.5 text-[13px] font-semibold whitespace-nowrap text-(--warning-dark) max-md:ml-8 md:self-auto"
+              >
+                Ver só ela →
+              </Link>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {overdue.count > 0 ? (
         <div className="flex flex-col gap-3 rounded-[16px] bg-(--danger-soft) px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
@@ -149,12 +214,14 @@ export default async function FluxoDeCaixaPage({
         />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
           <div>
-            <div className="text-sm text-white/80">Saldo hoje</div>
+            <div className="text-sm text-white/80">{filtered ? `Saldo hoje · ${filtered.name}` : "Saldo hoje"}</div>
             <div className="mt-1 text-[34px] leading-tight font-extrabold tracking-[-0.03em] tabular-nums md:text-[44px]">
               {signed(currentTotal)}
             </div>
             <div className="mt-1 text-[13px] text-white/75 max-md:hidden">
-              Contas correntes e investimentos. Cartão entra pela fatura.
+              {filtered
+                ? "Só esta conta. A fatura dos cartões pagos por ela sai no vencimento."
+                : "Contas correntes e investimentos. Cartão entra pela fatura."}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 md:gap-3 lg:min-w-[540px]">
