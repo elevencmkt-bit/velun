@@ -15,6 +15,7 @@ import { RecurrencesList, type RecurrenceRow } from "./recurrences-list";
 import { UpcomingGroups, type Group, type PendingRow } from "./upcoming-groups";
 import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
 import { ScreenHelp } from "@/components/screen-help";
+import { AccountFilter } from "@/components/account-filter";
 
 const HORIZON_DAYS = 30;
 
@@ -59,20 +60,23 @@ const PER_MONTH: Record<string, number> = {
 export default async function AVencerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ver?: string }>;
+  searchParams: Promise<{ ver?: string; account?: string }>;
 }) {
   const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
-  const { ver } = await searchParams;
+  const { ver, account: accountParam } = await searchParams;
   const view: View = TABS.some((t) => t.key === ver) ? (ver as View) : "tudo";
 
   // A vencer é extrato futuro: mesmo nível do extrato. De conta pessoal
   // do outro, só entra a marcada como "aberta". O saldo segue o nível de
   // saldo, como no Dashboard.
-  const [scope, balanceScope] = await Promise.all([
+  const [scope, fullBalanceScope] = await Promise.all([
     accountScope(supabase, householdId, memberId, "transactions"),
     accountScope(supabase, householdId, memberId, "balance"),
   ]);
+  // Filtro de conta (?account=), como no Dashboard: só estreita. Conta
+  // que a pessoa não vê por inteiro é ignorada.
+  const accountFilter = accountParam && scope.ids.includes(accountParam) ? accountParam : null;
   const visibleIds =
     scope.ids.length > 0 ? scope.ids : ["00000000-0000-0000-0000-000000000000"];
   const visibleSet = new Set(scope.ids);
@@ -85,12 +89,11 @@ export default async function AVencerPage({
     { data: categories },
     { data: pendingRaw },
     { data: recurrencesRaw },
-    cashFlow,
     cards,
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, owner_id, is_archived")
+      .select("id, name, owner_id, is_archived, type, institution")
       .eq("household_id", householdId)
       .in("id", visibleIds)
       .order("name"),
@@ -120,20 +123,34 @@ export default async function AVencerPage({
       .eq("household_id", householdId)
       .eq("is_active", true)
       .order("created_at", { ascending: true }),
-    getCashFlowProjection(
-      supabase,
-      householdId,
-      HORIZON_DAYS,
-      balanceScope,
-      today,
-    ),
     loadCards(supabase, householdId, memberId, today),
   ]);
 
   // Faturas que esta pessoa paga ou pode ver por inteiro (do cartão
   // pessoal do outro, só se ele estiver aberto).
-  const myCards = cards.filter((c) => c.canEdit || c.canSeeTransactions);
+  // Com filtro: o cartão escolhido, ou os cartões cuja fatura sai da
+  // conta escolhida.
+  const myCards = cards.filter(
+    (c) =>
+      (c.canEdit || c.canSeeTransactions) &&
+      (!accountFilter || c.id === accountFilter || c.paymentAccountId === accountFilter),
+  );
   const cardIds = new Set(cards.map((c) => c.id));
+
+  // Saldo projetado: sem filtro, o de sempre. Com filtro, a conta
+  // escolhida (ou a que paga o cartão escolhido) mais os cartões que ela
+  // paga — a fatura sai dela no vencimento.
+  const filteredCard = accountFilter ? cards.find((c) => c.id === accountFilter) : undefined;
+  const cashAccount = filteredCard ? filteredCard.paymentAccountId : accountFilter;
+  const balanceScope = accountFilter
+    ? {
+        ids: fullBalanceScope.ids.filter(
+          (id) => id === cashAccount || myCards.some((c) => c.id === id),
+        ),
+        excludedCount: 0,
+      }
+    : fullBalanceScope;
+  const cashFlow = await getCashFlowProjection(supabase, householdId, HORIZON_DAYS, balanceScope, today);
   const bills = cardBills(myCards);
   // Cartão da lateral: o da próxima fatura a vencer.
   const nextBill = bills.find((b) => b.amountCents > 0) ?? null;
@@ -162,16 +179,26 @@ export default async function AVencerPage({
   // Transferência programada (ex.: guardar pra uma meta) entra como uma
   // linha só, a da saída, com "de → pra". Confirmar confirma os dois lados.
   const transferTo = new Map<string, string>();
+  const transferToId = new Map<string, string>();
   for (const row of pendingRaw ?? []) {
     if (row.transfer_group_id && row.direction === "in") {
       transferTo.set(row.transfer_group_id as string, single<{ name: string }>(row.account)?.name ?? "—");
+      transferToId.set(row.transfer_group_id as string, row.account_id as string);
     }
   }
+  // Com filtro: o que sai ou entra na conta escolhida (a transferência
+  // conta pros dois lados).
+  const touchesFilter = (row: { account_id: unknown; transfer_group_id: unknown }) =>
+    !accountFilter ||
+    row.account_id === accountFilter ||
+    (row.transfer_group_id !== null && transferToId.get(row.transfer_group_id as string) === accountFilter);
   const allPending: PendingRow[] = [
     ...(pendingRaw ?? [])
       .filter(
         (row) =>
-          (!row.transfer_group_id || row.direction === "out") && !cardIds.has(row.account_id as string),
+          (!row.transfer_group_id || row.direction === "out") &&
+          !cardIds.has(row.account_id as string) &&
+          touchesFilter(row),
       )
       .map((row) => ({
         id: row.id as string,
@@ -264,9 +291,10 @@ export default async function AVencerPage({
   // Recorrências: a conta mora no `template` (jsonb), então o filtro de
   // visibilidade é feito aqui e não na consulta.
   const recurrenceRows: RecurrenceRow[] = (recurrencesRaw ?? [])
-    .filter((row) =>
-      visibleSet.has((row.template as { account_id: string }).account_id),
-    )
+    .filter((row) => {
+      const id = (row.template as { account_id: string }).account_id;
+      return visibleSet.has(id) && (!accountFilter || id === accountFilter);
+    })
     .map((row) => {
       const template = row.template as {
         account_id: string;
@@ -297,6 +325,14 @@ export default async function AVencerPage({
     );
 
   const lowest = cashFlow.lowestPoint;
+  const filterAccounts = (accounts ?? [])
+    .filter((a) => !a.is_archived)
+    .map((a) => ({
+      id: a.id as string,
+      name: a.name as string,
+      type: a.type as string,
+      institution: (a.institution as string | null) ?? null,
+    }));
 
   return (
     <div className="flex flex-col gap-6 md:gap-7">
@@ -310,30 +346,36 @@ export default async function AVencerPage({
             O que sai e o que entra nos próximos {HORIZON_DAYS} dias.
           </p>
         </div>
-        <nav
-          aria-label="Filtro"
-          className="flex max-w-full gap-0.5 overflow-x-auto rounded-[14px] bg-(--bg-surface) p-1 [scrollbar-width:none] max-lg:self-start sm:gap-1"
-        >
-          {TABS.map((tab) => {
-            const active = tab.key === view;
-            return (
-              <Link
-                key={tab.key}
-                href={
-                  tab.key === "tudo" ? "/a-pagar" : `/a-pagar?ver=${tab.key}`
-                }
-                aria-current={active ? "page" : undefined}
-                className={`flex h-9 shrink-0 items-center rounded-[11px] px-3 text-[13px] font-semibold transition-colors sm:px-4 sm:text-[14px] ${
-                  active
-                    ? "bg-(--bg-inverse) text-white"
-                    : "text-(--text-muted) hover:text-(--text-primary)"
-                }`}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="flex flex-wrap items-center gap-2 max-lg:self-start sm:gap-3">
+          {filterAccounts.length > 1 ? (
+            <AccountFilter value={accountFilter} accounts={filterAccounts} />
+          ) : null}
+          <nav
+            aria-label="Filtro"
+            className="flex max-w-full gap-0.5 overflow-x-auto rounded-[14px] bg-(--bg-surface) p-1 [scrollbar-width:none] max-lg:self-start sm:gap-1"
+          >
+            {TABS.map((tab) => {
+              const active = tab.key === view;
+              const qs = new URLSearchParams();
+              if (tab.key !== "tudo") qs.set("ver", tab.key);
+              if (accountFilter) qs.set("account", accountFilter);
+              return (
+                <Link
+                  key={tab.key}
+                  href={qs.size ? `/a-pagar?${qs}` : "/a-pagar"}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex h-9 shrink-0 items-center rounded-[11px] px-3 text-[13px] font-semibold transition-colors sm:px-4 sm:text-[14px] ${
+                    active
+                      ? "bg-(--bg-inverse) text-white"
+                      : "text-(--text-muted) hover:text-(--text-primary)"
+                  }`}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
       </div>
 
       {view === "recorrencias" ? (
