@@ -1,5 +1,6 @@
 "use client";
 
+import { currencySymbol, type CurrencyCode } from "@/lib/money";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDownLeft, ArrowUpRight, Pencil, Plus, X } from "lucide-react";
@@ -65,6 +66,7 @@ export function EditTransactionDialog({
   open: controlledOpen,
   onOpenChange,
   showTrigger = true,
+  currency = "USD",
 }: {
   transaction: EditableTransaction;
   accounts: Account[];
@@ -72,6 +74,7 @@ export function EditTransactionDialog({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   showTrigger?: boolean;
+  currency?: CurrencyCode;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
@@ -217,7 +220,7 @@ export function EditTransactionDialog({
             </label>
             <div className="flex items-baseline gap-1.5">
               <span className="shrink-0 text-[28px] font-bold whitespace-nowrap" style={{ color: tone.strong }}>
-                {tone.sign}$
+                {tone.sign}{currencySymbol(currency)}
               </span>
               <input
                 id="edit-amount"

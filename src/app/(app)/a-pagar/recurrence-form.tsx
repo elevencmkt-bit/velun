@@ -4,6 +4,7 @@ import { localToday } from "@/lib/today";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createRecurrence } from "@/lib/actions/recurrences";
+import { currencySymbol, type CurrencyCode } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,9 +44,11 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
 export function RecurrenceForm({
   accounts,
   categories,
+  currency = "USD",
 }: {
   accounts: Account[];
   categories: Category[];
+  currency?: CurrencyCode;
 }) {
   const [open, setOpen] = useState(false);
   const [direction, setDirection] = useState<"in" | "out">("out");
@@ -111,7 +114,7 @@ export function RecurrenceForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">Valor (USD)</Label>
+              <Label htmlFor="amount">Valor ({currencySymbol(currency)})</Label>
               <Input
                 id="amount"
                 name="amount"

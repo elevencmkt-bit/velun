@@ -11,6 +11,17 @@ export const CURRENCY_LABELS: Record<CurrencyCode, string> = {
   EUR: "Euro (€)",
 };
 
+/** Só o símbolo, pro prefixo dos campos de valor: R$, $, €. */
+const SYMBOL_BY_CURRENCY: Record<CurrencyCode, string> = {
+  BRL: "R$",
+  USD: "$",
+  EUR: "€",
+};
+
+export function currencySymbol(currency: CurrencyCode = "USD"): string {
+  return SYMBOL_BY_CURRENCY[currency] ?? "$";
+}
+
 const LOCALE_BY_CURRENCY: Record<CurrencyCode, string> = {
   BRL: "pt-BR",
   USD: "en-US",

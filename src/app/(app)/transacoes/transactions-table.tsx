@@ -572,6 +572,7 @@ export function TransactionsTable({
             if (!next) setEditingRow(null);
           }}
           showTrigger={false}
+          currency={currency}
           transaction={{
             id: editingRow.id,
             date: editingRow.date,

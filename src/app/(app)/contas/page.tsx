@@ -100,7 +100,7 @@ export default async function ContasPage() {
     if (id === memberId) continue;
     const items = nonCards.filter((a) => a.owner_id === id);
     if (items.length > 0) {
-      groups.push({ title: `De ${String(name).trim().split(/\s+/)[0]}`, note: "Só o que ela escolheu mostrar", items });
+      groups.push({ title: `De ${String(name).trim().split(/\s+/)[0]}`, note: "Só o que foi escolhido pra mostrar", items });
     }
   }
 

@@ -216,3 +216,6 @@ export const STATUS_LABELS: Record<StatementStatus, string> = {
   paid: "Paga",
   overdue: "Vencida",
 };
+
+/** Até quantas vezes dá pra parcelar uma compra no cartão (tela e servidor). */
+export const MAX_INSTALLMENTS = 24;

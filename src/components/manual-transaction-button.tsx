@@ -17,7 +17,8 @@ import { AccountAvatar } from "@/components/account-avatar";
 import { buildCategoryColorMap } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
-import { formatCents, type CurrencyCode } from "@/lib/money";
+import { currencySymbol, formatCents, type CurrencyCode } from "@/lib/money";
+import { MAX_INSTALLMENTS } from "@/lib/credit-card";
 import { fitsDirection } from "@/lib/category-kind";
 import { topOf } from "@/lib/subcategories";
 import { SubcategoryChips } from "@/components/subcategory-chips";
@@ -366,7 +367,7 @@ export function ManualTransactionButton({
             </label>
             <div className="flex items-baseline gap-1.5">
               <span className="shrink-0 text-[28px] font-bold whitespace-nowrap" style={{ color: tone.strong }}>
-                {tone.sign}$
+                {tone.sign}{currencySymbol(currency)}
               </span>
               <input
                 id="amount"
@@ -521,7 +522,7 @@ export function ManualTransactionButton({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">À vista</SelectItem>
-                  {Array.from({ length: 23 }, (_, i) => String(i + 2)).map((n) => (
+                  {Array.from({ length: MAX_INSTALLMENTS - 1 }, (_, i) => String(i + 2)).map((n) => (
                     <SelectItem key={n} value={n}>
                       {n} vezes
                     </SelectItem>
