@@ -7,12 +7,13 @@ export type ThemeChoice = "system" | "light" | "dark";
 export const THEME_KEY = "velun:theme";
 
 // Roda no <head>, antes de pintar: põe ou tira a classe `dark` do <html>.
-// No "sistema", também acompanha a troca do sistema com a página aberta.
+// No "sistema", também acompanha a troca do sistema com a página aberta;
+// e trocar o tema numa aba vale na hora pras outras abas abertas.
 export const THEME_SCRIPT = `(function(){try{
 var d=document.documentElement,m=window.matchMedia("(prefers-color-scheme: dark)");
 function pref(){try{return localStorage.getItem("${THEME_KEY}")||"system"}catch(e){return "system"}}
 function apply(){var p=pref();d.dataset.theme=p;d.classList.toggle("dark",p==="dark"||(p==="system"&&m.matches))}
-apply();m.addEventListener("change",apply);window.__velunApplyTheme=apply;
+apply();m.addEventListener("change",apply);window.addEventListener("storage",function(e){if(e.key==="${THEME_KEY}"||e.key===null)apply()});window.__velunApplyTheme=apply;
 }catch(e){}})()`;
 
 export function readThemeChoice(): ThemeChoice {
