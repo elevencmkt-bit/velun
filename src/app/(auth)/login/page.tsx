@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { login } from "./actions";
 import {
   AuthField,
@@ -48,6 +49,12 @@ export default async function LoginPage({
             autoComplete="current-password"
           />
         </AuthField>
+        <Link
+          href="/esqueci-senha"
+          className="-mt-2 self-end text-[13px] font-semibold text-(--primary) hover:underline"
+        >
+          Esqueci minha senha
+        </Link>
         {error ? (
           <p
             className="rounded-[14px] bg-(--expense-soft) px-4 py-3 text-sm text-(--expense-dark)"
