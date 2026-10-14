@@ -540,6 +540,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { list: [
         "Compras no cartão não tiram dinheiro da conta na hora: o que sai é o pagamento da fatura, no vencimento.",
         "Lançamentos atrasados ficam de fora da projeção. O aviso no topo deixa incluir com **Incluir na projeção**.",
+        "O filtro de conta mostra a projeção de uma conta só, com as faturas dos cartões que ela paga.",
+        "Se alguma conta fica no vermelho no período, mesmo com o total positivo, um aviso no topo diz qual e quando. O banco cobra o cheque especial conta por conta.",
       ] },
     ],
     related: ["a-vencer/o-que-aparece-em-a-vencer"],
