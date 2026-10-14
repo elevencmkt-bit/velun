@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateInput } from "@/components/date-input";
-import { AccountPicker, TONE, ToggleRow } from "@/components/manual-transaction-button";
+import { TONE, ToggleRow } from "@/components/manual-transaction-button";
+import { AccountSelect } from "@/components/account-select";
 import { GoalLinkField } from "@/components/goal-link-field";
 import { buildCategoryColorMap } from "@/lib/category-colors";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
@@ -270,8 +271,10 @@ export function EditTransactionDialog({
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <span className={fieldLabel}>Conta</span>
-            <AccountPicker label="Conta" accounts={accountChoices} value={accountId} onChange={setAccountId} />
+            <Label htmlFor="edit-account" className={fieldLabel}>
+              Conta
+            </Label>
+            <AccountSelect id="edit-account" label="Conta" accounts={accountChoices} value={accountId} onChange={setAccountId} />
           </div>
 
           <div className="flex flex-col gap-2">

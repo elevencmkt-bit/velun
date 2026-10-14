@@ -273,6 +273,33 @@ export const HELP_ARTICLES: HelpArticle[] = [
     related: ["a-vencer/o-que-aparece-em-a-vencer", "importar/repetidos-e-previsoes"],
   },
   {
+    slug: "ler-recibo-ou-print",
+    topic: "lancamentos",
+    title: "Ler recibo ou print",
+    summary: "Escolha a foto do recibo ou o print do app e o Velun preenche valor, data e loja pra você conferir.",
+    body: [
+      { steps: [
+        "Em **+ Lançamento**, toque em **Ler recibo ou print**.",
+        "Escolha a imagem. No celular, dá pra tirar a foto na hora.",
+        "Espere alguns segundos. Na primeira vez demora um pouco mais.",
+        "Confira os campos marcados com **✦ do recibo**, ajuste o que precisar e lance.",
+      ] },
+      { list: [
+        "O Velun procura o **total** (\"Total\", \"Amount\", \"Valor\"), a **data** e o **nome da loja** ou de quem recebeu.",
+        "A categoria vem da que você já usou pra essa loja, quando houver.",
+        "**Desfazer** volta o formulário como estava antes da leitura.",
+      ] },
+      { h2: "Pra ler melhor", id: "dicas" },
+      { list: [
+        "Print de app (Zelle, banco, e-mail de compra) funciona melhor que foto.",
+        "Foto: recibo reto, inteiro, bem iluminado e sem reflexo.",
+        "Recibo apagado, amassado ou torto pode sair com erro. Nada é lançado sem você conferir.",
+      ] },
+      { tip: "A imagem é lida no seu próprio aparelho e não fica guardada em lugar nenhum. Só o nome da loja vai pro Velun, pra sugerir a categoria." },
+    ],
+    related: ["primeiros-passos/primeiro-lancamento", "lancamentos/categorizar-varios"],
+  },
+  {
     slug: "compra-parcelada",
     topic: "lancamentos",
     title: "Compra parcelada no cartão",
