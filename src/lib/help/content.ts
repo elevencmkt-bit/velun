@@ -371,6 +371,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { list: [
         "Tire o print da lista de lançamentos, com as datas aparecendo. Pode rolar e tirar vários: o trecho repetido entre um print e outro entra uma vez só.",
         "Comece o primeiro print com uma data à vista; uma linha sem data acima dela fica de fora.",
+        "Os lançamentos **Pending** do app ficam de fora: o banco ainda pode mudar valor e data. Eles entram no próximo print ou extrato, já lançados.",
+        "Se algum valor não der pra conferir pelo saldo (por exemplo, a linha mais antiga do print quando falta histórico no Velun), o aviso da revisão diz qual é: confira no app antes de confirmar.",
         "O que já está no Velun (inclusive o que veio do extrato em PDF) vem marcado como **Já existe**, pelo dia, valor e tipo.",
         "Os prints são lidos no seu aparelho; só as palavras reconhecidas vão pro Velun, e as imagens não ficam guardadas.",
       ] },
