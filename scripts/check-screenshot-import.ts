@@ -97,4 +97,62 @@ const lost = screensToStatement([screen([{ name: "Algo", amount: "-$1.00", balan
 assert.equal(lost.undated, 1);
 assert.equal(lost.statement.transactions.length, 0);
 
+// Topo do app com "Projected available balance" (não é lançamento), a seção
+// "Pending" (confere a corrente mas fica de fora), "-$" lido como 5 mesmo
+// com o "$" e a linha mais antiga com o sinal perdido.
+const top = screen([
+  { name: "Projected available balance", amount: "-$40.00" },
+  { date: "Pending" },
+  { name: "Cloud Box", amount: "$15.00", balance: "-$40.00", conf: 20 },
+  { name: "Streaming", amount: "-$80.00", balance: "-$25.00" },
+]);
+const posted = screen([
+  { date: "10/13/2026" },
+  { name: "Service Fee", amount: "50.50", balance: "$55.00" },
+  { name: "Tools Co", amount: "-$24.50", balance: "$55.50" },
+  { name: "Music Store", amount: "$519.00", balance: "$80.00", conf: 70 },
+  { name: "Host Plan", amount: "$20.00", balance: "$99.00", conf: 20 },
+]);
+// Rolou: repete a última linha com o fim do nome cortado e traz a mais antiga.
+const older = screen([
+  { date: "10/13/2026" },
+  { name: "Host Pla", amount: "-$20.00", balance: "$99.00" },
+  { name: "Course Hub", amount: "$81.00", balance: "$119.00", conf: 12 },
+]);
+const pend = screensToStatement([posted, older, top]);
+assert.equal(pend.hasBalances, true, "o rótulo de saldo não desliga a conferência");
+assert.equal(pend.pending, 2, "os pendentes ficam de fora");
+assert.equal(pend.undated, 0);
+assert.deepEqual(
+  pend.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`),
+  ["in 8100 Course Hub", "out 2000 Host Plan", "out 1900 Music Store", "out 2450 Tools Co", "out 50 Service Fee"],
+  "sem rótulo, sem pendentes, sem repetir o Host; $519.00 virou -19.00",
+);
+assert.deepEqual(pend.unchecked.map((u) => u.description), ["Course Hub"], "a mais antiga fica marcada como não conferida");
+// Com o saldo que o Velun tem antes dela, a mais antiga também confere.
+const withOpening = screensToStatement([posted, older, top], 20000);
+assert.equal(withOpening.statement.transactions[0].direction, "out");
+assert.equal(withOpening.statement.transactions[0].amountCents, 8100);
+assert.deepEqual(withOpening.unchecked, []);
+assert.equal(withOpening.statement.beginningBalanceCents, 20000);
+assert.equal(withOpening.statement.endingBalanceCents, 5500, "saldo do último lançado, sem os pendentes");
+assert.equal(verifyStatement(withOpening.statement).matches, true);
+
+// Uma linha sem saldo no meio não desliga a conferência das outras.
+const gap = screensToStatement([
+  screen([
+    { date: "10/2/2026" },
+    { name: "Mercado", amount: "54.00", balance: "$10.00", conf: 40 },
+    { name: "Padaria", amount: "-$6.00", balance: "$14.00" },
+    { name: "Sem Saldo", amount: "-$1.00" },
+    { name: "Farmacia", amount: "-$3.00", balance: "$30.00" },
+  ]),
+]);
+assert.equal(gap.hasBalances, false, "\"Sem Saldo\" é nome de loja, não rótulo");
+assert.deepEqual(
+  gap.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`).reverse(),
+  ["out 400 Mercado", "out 600 Padaria", "out 100 Sem Saldo", "out 300 Farmacia"],
+);
+assert.deepEqual(gap.unchecked.map((u) => u.description), ["Padaria", "Sem Saldo", "Farmacia"]);
+
 console.log("check-screenshot-import: ok");

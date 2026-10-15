@@ -257,13 +257,23 @@ async function runImportStatement(input: {
           error: "Print funciona pra conta. Pra fatura de cartão, use o PDF da fatura do Nubank.",
         };
       }
-      const read = screensToStatement(screens);
+      let read = screensToStatement(screens);
       if (read.statement.transactions.length === 0) {
         return {
           ok: false,
           error:
-            "Não achei lançamentos nesses prints. Use prints da lista de lançamentos do app, com a data e os valores aparecendo.",
+            read.pending > 0
+              ? "Esses prints só mostram lançamentos pendentes. Eles entram quando o banco lançar: importe de novo daqui a uns dias."
+              : "Não achei lançamentos nesses prints. Use prints da lista de lançamentos do app, com a data e os valores aparecendo.",
         };
+      }
+      // O print mostra o saldo antes do lançamento mais antigo. Com o saldo
+      // que o Velun já tem nesse ponto dá pra conferir o mais antigo também;
+      // se não bate, faltam (ou sobram) lançamentos ANTES do print.
+      let before: number | null = null;
+      if (read.hasBalances) {
+        before = await balanceBefore(supabase, householdId, accountId, read.statement.periodStart);
+        read = screensToStatement(screens, before);
       }
       statement = read.statement;
       verification = read.hasBalances
@@ -275,6 +285,8 @@ async function runImportStatement(input: {
               0,
             ),
           };
+      const fmt = (c: number) => `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+      const signed = (c: number) => `${c < 0 ? "−" : "+"}${fmt(Math.abs(c))}`;
       const parts: string[] = [];
       parts.push(
         `Lido de ${screens.length} ${screens.length === 1 ? "print" : "prints"}: ${statement.transactions.length} lançamentos.`,
@@ -286,20 +298,28 @@ async function runImportStatement(input: {
             : `${read.corrected} valores mal lidos foram corrigidos pelo saldo que o app mostra.`,
         );
       }
-      if (!read.hasBalances) parts.push("Os prints não mostram o saldo de cada linha, então não deu pra conferir: revise os valores.");
+      if (!read.hasBalances) {
+        parts.push("Atenção: nem todas as linhas mostram o saldo, então não deu pra conferir tudo. Compare cada valor com o app antes de confirmar.");
+      }
+      if (read.unchecked.length > 0 && read.unchecked.length <= 5) {
+        const list = read.unchecked.map((u) => `${u.description} ${signed(u.amountCents)}`).join(", ");
+        parts.push(`Confira no app: ${list}. ${read.unchecked.length === 1 ? "Esse valor não deu" : "Esses valores não deram"} pra conferir pelo saldo.`);
+      } else if (read.unchecked.length > 5) {
+        parts.push(`${read.unchecked.length} valores não deram pra conferir pelo saldo: compare com o app antes de confirmar.`);
+      }
+      if (read.pending > 0) {
+        parts.push(
+          `${read.pending} ${read.pending === 1 ? "lançamento pendente ficou" : "lançamentos pendentes ficaram"} de fora: ${read.pending === 1 ? "entra" : "entram"} quando o banco lançar, no próximo print ou extrato.`,
+        );
+      }
       if (read.undated > 0) {
         parts.push(
           `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,
         );
       }
-      // O print mostra o saldo antes do lançamento mais antigo. Se o
-      // Velun tem outro saldo nesse ponto, faltam (ou sobram) lançamentos
-      // ANTES do período do print — melhor avisar já.
-      if (read.hasBalances) {
-        const before = await balanceBefore(supabase, householdId, accountId, statement.periodStart);
+      if (before !== null) {
         const diff = statement.beginningBalanceCents - before;
         if (Math.abs(diff) >= 1) {
-          const fmt = (c: number) => `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
           const [y, m, d] = statement.periodStart.split("-");
           parts.push(
             `Atenção: antes de ${d}/${m}/${y} o app mostra saldo de ${fmt(statement.beginningBalanceCents)} e o Velun tem ${fmt(before)} (diferença de ${fmt(diff)}). Faltam ou sobram lançamentos antes dessa data: importe um print ou extrato dos dias anteriores.`,
