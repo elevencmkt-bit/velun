@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateInput } from "@/components/date-input";
+import { startNavProgress } from "@/components/nav-progress";
 
 const MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -61,6 +62,10 @@ export function ReportPeriodSelector({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
   const thisMonth = today.slice(0, 7);
   const thisYear = Number(today.slice(0, 4));
   const firstYear = Math.min(thisYear, firstDate ? Number(firstDate.slice(0, 4)) : thisYear, year ?? thisYear);
@@ -89,7 +94,7 @@ export function ReportPeriodSelector({
 
   function go(next: Target) {
     setOpen(false);
-    router.push(hrefFor(next));
+    navigate(hrefFor(next));
   }
 
   function applyRange() {
