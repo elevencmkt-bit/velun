@@ -161,6 +161,9 @@ export default async function ImportarPage() {
         name: c.name as string,
         kind: c.kind as string,
         is_transfer: (c.is_transfer as boolean | null) ?? false,
+        // Sem isto a sub "Trabalho · Assinaturas" aparecia solta, igual à
+        // principal "Assinaturas".
+        parent_id: (c.parent_id as string | null) ?? null,
       }))}
       openImport={
         openImport

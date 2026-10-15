@@ -241,6 +241,8 @@ async function runImportStatement(input: {
 
   let statement: ParsedStatement;
   let screensNote: string | null = null;
+  /** Saldo do Velun antes do print (só prints com saldo). */
+  let screensBefore: number | null = null;
   let cardDaysNote: string | null = null;
   let nomadNote: string | null = null;
   // `matches` null: o documento não traz como conferir (Nomad).
@@ -317,15 +319,9 @@ async function runImportStatement(input: {
           `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,
         );
       }
-      if (before !== null) {
-        const diff = statement.beginningBalanceCents - before;
-        if (Math.abs(diff) >= 1) {
-          const [y, m, d] = statement.periodStart.split("-");
-          parts.push(
-            `Atenção: antes de ${d}/${m}/${y} o app mostra saldo de ${fmt(statement.beginningBalanceCents)} e o Velun tem ${fmt(before)} (diferença de ${fmt(diff)}). Faltam ou sobram lançamentos antes dessa data: importe um print ou extrato dos dias anteriores.`,
-          );
-        }
-      }
+      // A comparação com o saldo do Velun é feita mais abaixo, depois de
+      // saber quais lançamentos seus esta importação vai substituir.
+      screensBefore = before;
       screensNote = parts.join(" ");
     } else if (isCard) {
       if (!looksLikeNubank(text)) {
@@ -737,6 +733,34 @@ async function runImportStatement(input: {
         r.is_included = false;
       }
     });
+  }
+
+  // Prints: o app mostra o saldo antes do lançamento mais antigo. Se o
+  // Velun tem outro saldo nesse ponto, faltam (ou sobram) lançamentos
+  // ANTES do print. Lançamentos seus que esta importação substitui (ex.:
+  // "Fxreplay" lançado à mão no dia 10, que no banco caiu no 13) saem da
+  // conta: depois de confirmar eles passam pra data do banco.
+  if (screensBefore !== null) {
+    const replacedIds = rows.filter((r) => r.match_transaction_id && r.merge_accepted).map((r) => r.match_transaction_id as string);
+    let before = screensBefore;
+    if (replacedIds.length > 0) {
+      const { data: replaced } = await supabase
+        // limite: só os lançamentos casados nesta importação
+        .from("transactions")
+        .select("date, amount_cents, direction, status")
+        .in("id", replacedIds);
+      for (const t of replaced ?? []) {
+        if (t.status !== "cleared" || (t.date as string) >= statement.periodStart) continue;
+        before -= t.direction === "in" ? (t.amount_cents as number) : -(t.amount_cents as number);
+      }
+    }
+    const diff = statement.beginningBalanceCents - before;
+    if (Math.abs(diff) >= 1) {
+      const fmt = (c: number) => `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+      const [y, m, d] = statement.periodStart.split("-");
+      const note = `Atenção: antes de ${d}/${m}/${y} o app mostra saldo de ${fmt(statement.beginningBalanceCents)} e o Velun tem ${fmt(before)} (diferença de ${fmt(diff)}). Faltam ou sobram lançamentos antes dessa data: importe um print ou extrato dos dias anteriores.`;
+      screensNote = screensNote ? `${screensNote} ${note}` : note;
+    }
   }
 
   const stagedRows = rows.map((r, i) => ({
