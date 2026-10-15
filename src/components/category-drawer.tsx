@@ -16,6 +16,7 @@ import type { CurrencyCode } from "@/lib/money";
 import { fitsDirection } from "@/lib/category-kind";
 import { themedFg } from "@/lib/theme-color";
 import { orderWithChildren } from "@/lib/subcategories";
+import { SubcategoryItem } from "@/components/category-select-items";
 
 export type CategoryDrawerQuery = {
   /** "2026-09" */
@@ -313,16 +314,20 @@ export function CategoryDrawer({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={NONE}>Sem categoria</SelectItem>
-                            {orderWithChildren(options).map((c) => (
-                              <SelectItem key={c.id} value={c.id} className={c.depth ? "pl-8" : undefined}>
-                                {c.depth ? (
-                                  <span className="in-data-[slot=select-content]:hidden">
-                                    {options.find((p) => p.id === c.parent_id)?.name} ·{" "}
-                                  </span>
-                                ) : null}
-                                {c.name}
-                              </SelectItem>
-                            ))}
+                            {orderWithChildren(options).map((c) =>
+                              c.depth ? (
+                                <SubcategoryItem
+                                  key={c.id}
+                                  value={c.id}
+                                  name={c.name}
+                                  parentName={options.find((p) => p.id === c.parent_id)?.name}
+                                />
+                              ) : (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.name}
+                                </SelectItem>
+                              ),
+                            )}
                           </SelectContent>
                         </Select>
                       ) : null}
