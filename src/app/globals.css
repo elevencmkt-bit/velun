@@ -380,10 +380,16 @@
   user-select: none;
 }
 
-/* Barra de carregamento entre telas (components/nav-progress.tsx). */
-@keyframes nav-progress-run {
-  from { width: 8%; }
-  to { width: 85%; }
+/* "Carregando…" entre telas (components/nav-progress.tsx). */
+@keyframes nav-loading-in {
+  from { opacity: 0; transform: translateY(4px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+#app-root main > * {
+  transition: opacity 180ms ease;
+}
+html[data-nav-loading] #app-root main > * {
+  opacity: 0.45;
 }
 html[data-nav-pending],
 html[data-nav-pending] * {

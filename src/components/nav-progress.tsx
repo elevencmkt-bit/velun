@@ -1,6 +1,7 @@
 "use client";
 
-// Barra fina no topo enquanto a próxima tela carrega.
+// "Carregando…" no meio da tela enquanto a próxima tela chega (e o
+// conteúdo atual fica esmaecido).
 //
 // O esqueleto (loading.tsx) só aparece quando muda de página. Trocar o
 // mês, a conta, o filtro ou o período fica na MESMA página, só muda o
@@ -25,7 +26,7 @@ export function startNavProgress() {
 const SHOW_AFTER_MS = 120;
 const GIVE_UP_MS = 12_000;
 
-function Bar() {
+function Loader() {
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const [phase, setPhase] = useState<"idle" | "wait" | "run" | "done">("idle");
@@ -85,17 +86,35 @@ function Bar() {
     finishRef.current();
   }, [pathname, search]);
 
+  // Escurece o conteúdo enquanto carrega (CSS em globals.css).
+  useEffect(() => {
+    const el = document.documentElement;
+    if (phase === "run") el.dataset.navLoading = "";
+    else delete el.dataset.navLoading;
+  }, [phase]);
+
   if (phase === "idle" || phase === "wait") return null;
+  // No centro da área de conteúdo (fora o menu lateral), ou da tela.
+  const main = document.querySelector("#app-root main")?.getBoundingClientRect();
+  const top = main ? Math.max(main.top, 0) : 0;
+  const bottom = main ? Math.min(main.bottom, window.innerHeight) : window.innerHeight;
+  const box = main
+    ? { left: main.left, top, width: main.width, height: Math.max(bottom - top, 80) }
+    : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-[3px]">
+    <div
+      role="status"
+      aria-label="Carregando"
+      className="pointer-events-none fixed z-[200] flex items-center justify-center"
+      style={{ ...box, opacity: phase === "run" ? 1 : 0, transition: "opacity 180ms ease" }}
+    >
       <div
-        className="h-full rounded-r-full bg-(--primary) shadow-[0_0_8px_var(--primary)]"
-        style={
-          phase === "run"
-            ? { width: "85%", animation: "nav-progress-run 8s cubic-bezier(.08,.7,.2,1) both" }
-            : { width: "100%", opacity: 0, transition: "width 160ms ease-out, opacity 300ms ease 140ms" }
-        }
-      />
+        className="flex items-center gap-3 rounded-[16px] bg-(--bg-surface) px-5 py-3.5 text-[14px] font-semibold text-(--text-primary)"
+        style={{ boxShadow: "var(--shadow-card), 0 12px 32px rgba(16,24,40,.14)", animation: "nav-loading-in 200ms ease-out both" }}
+      >
+        <span className="h-5 w-5 animate-spin rounded-full border-[2.5px] border-(--primary-soft) border-t-(--primary)" />
+        Carregando…
+      </div>
     </div>
   );
 }
@@ -104,7 +123,7 @@ export function NavProgress() {
   // useSearchParams pede um Suspense em volta.
   return (
     <Suspense fallback={null}>
-      <Bar />
+      <Loader />
     </Suspense>
   );
 }
