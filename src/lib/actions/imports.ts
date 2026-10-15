@@ -737,11 +737,13 @@ async function runImportStatement(input: {
 
   // Prints: o app mostra o saldo antes do lançamento mais antigo. Se o
   // Velun tem outro saldo nesse ponto, faltam (ou sobram) lançamentos
-  // ANTES do print. Lançamentos seus que esta importação substitui (ex.:
-  // "Fxreplay" lançado à mão no dia 10, que no banco caiu no 13) saem da
-  // conta: depois de confirmar eles passam pra data do banco.
+  // ANTES do print. Lançamentos seus que esta importação substitui ou
+  // sugere juntar (ex.: "Fxreplay" lançado à mão no dia 10, que no banco
+  // caiu no 13) saem da conta: juntados, passam pra data do banco.
   if (screensBefore !== null) {
-    const replacedIds = rows.filter((r) => r.match_transaction_id && r.merge_accepted).map((r) => r.match_transaction_id as string);
+    // Inclui as sugestões ainda não aceitas ("Parece ser o mesmo… Juntar"):
+    // se não forem juntadas, ficam em dobro — o saldo certo é o de juntar.
+    const replacedIds = rows.filter((r) => r.match_transaction_id).map((r) => r.match_transaction_id as string);
     let before = screensBefore;
     if (replacedIds.length > 0) {
       const { data: replaced } = await supabase

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { foldText, searchHelp, type HelpSearchEntry } from "@/lib/help/content";
+import { startNavProgress } from "@/components/nav-progress";
 
 /** Marca no texto os trechos que batem com a busca, ignorando acento. */
 function Highlight({ text, words }: { text: string; words: string[] }) {
@@ -46,6 +47,10 @@ function Highlight({ text, words }: { text: string; words: string[] }) {
 export function HelpSearch({ index, variant }: { index: HelpSearchEntry[]; variant: "hero" | "compact" }) {
   const pathname = usePathname();
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -106,7 +111,7 @@ export function HelpSearch({ index, variant }: { index: HelpSearchEntry[]; varia
             } else if (e.key === "Enter" && results[active]) {
               e.preventDefault();
               setOpen(false);
-              router.push(results[active].href);
+              navigate(results[active].href);
             } else if (e.key === "Escape") {
               setOpen(false);
             }

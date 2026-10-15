@@ -2,18 +2,23 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { startNavProgress } from "@/components/nav-progress";
 
 export type ReportView = "realizado" | "a-vencer";
 
 export function ReportViewToggle({ view }: { view: ReportView }) {
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
   const searchParams = useSearchParams();
 
   function onChange(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (next === "realizado") params.delete("view");
     else params.set("view", next);
-    router.push(`/relatorios?${params.toString()}`);
+    navigate(`/relatorios?${params.toString()}`);
   }
 
   // Mesma altura e cara do seletor de mês ao lado: caixa branca com

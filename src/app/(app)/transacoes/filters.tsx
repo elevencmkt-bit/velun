@@ -21,6 +21,7 @@ import { AccountOptions } from "@/components/account-options";
 import type { AccountOption, CategoryOption, MemberOption } from "./types";
 import { CategoryOptions } from "./category-options";
 import { DateInput } from "@/components/date-input";
+import { startNavProgress } from "@/components/nav-progress";
 
 const ALL = "__all__";
 const ADVANCED_KEYS = ["member", "origin", "direction", "from", "to", "all"];
@@ -35,6 +36,10 @@ export function TransactionFilters({
   members: MemberOption[];
 }) {
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
   const searchParams = useSearchParams();
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,7 +49,7 @@ export function TransactionFilters({
     else params.set(key, value);
     // De/até é outro tipo de período: tira o "todo o período".
     if (key === "from" || key === "to") params.delete("all");
-    router.push(`/transacoes?${params.toString()}`);
+    navigate(`/transacoes?${params.toString()}`);
   }
 
   // "Todo o período" liga/desliga; ligado, tira mês e de/até.
@@ -56,7 +61,7 @@ export function TransactionFilters({
       for (const key of ["month", "from", "to"]) params.delete(key);
       params.set("all", "1");
     }
-    router.push(`/transacoes?${params.toString()}`);
+    navigate(`/transacoes?${params.toString()}`);
   }
   const allPeriod = searchParams.get("all") === "1";
 
@@ -68,7 +73,7 @@ export function TransactionFilters({
   function clearAdvanced() {
     const params = new URLSearchParams(searchParams.toString());
     for (const key of ADVANCED_KEYS) params.delete(key);
-    router.push(`/transacoes?${params.toString()}`);
+    navigate(`/transacoes?${params.toString()}`);
   }
 
   // Filtro de direção ligado: só as categorias daquele tipo.

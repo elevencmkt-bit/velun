@@ -2,9 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
+import { startNavProgress } from "@/components/nav-progress";
 
 export function GlobalSearch() {
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
 
   return (
     <form
@@ -12,7 +17,7 @@ export function GlobalSearch() {
       onSubmit={(e) => {
         e.preventDefault();
         const value = (new FormData(e.currentTarget).get("q") as string) ?? "";
-        router.push(`/transacoes?q=${encodeURIComponent(value)}`);
+        navigate(`/transacoes?q=${encodeURIComponent(value)}`);
       }}
     >
       <Search

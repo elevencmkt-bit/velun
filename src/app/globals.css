@@ -379,3 +379,13 @@
   filter: blur(7px);
   user-select: none;
 }
+
+/* Barra de carregamento entre telas (components/nav-progress.tsx). */
+@keyframes nav-progress-run {
+  from { width: 8%; }
+  to { width: 85%; }
+}
+html[data-nav-pending],
+html[data-nav-pending] * {
+  cursor: progress !important;
+}

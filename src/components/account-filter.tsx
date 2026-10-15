@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AccountOptions } from "@/components/account-options";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { startNavProgress } from "@/components/nav-progress";
 
 const ALL = "__all__";
 
@@ -17,6 +18,10 @@ export function AccountFilter({
   value: string | null;
 }) {
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -25,7 +30,7 @@ export function AccountFilter({
     if (next === ALL) params.delete("account");
     else params.set("account", next);
     const qs = params.toString();
-    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+    navigate(`${pathname}${qs ? `?${qs}` : ""}`);
   }
 
   return (

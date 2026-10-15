@@ -20,6 +20,7 @@ import type {
   TransactionsSummary,
 } from "./types";
 import { ScreenHelp } from "@/components/screen-help";
+import { startNavProgress } from "@/components/nav-progress";
 
 const TABS: { key: StatusKey | "all"; label: string; badge: string }[] = [
   { key: "all", label: "Todas", badge: "bg-(--bg-strong) text-(--text-secondary)" },
@@ -80,6 +81,10 @@ export function TransactionsWorkspace({
 }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const router = useRouter();
+  const navigate = (href: string) => {
+    startNavProgress();
+    router.push(href);
+  };
   const searchParams = useSearchParams();
   const net = summary.inCents - summary.outCents;
   const pendingNet = summary.pendingInCents - summary.pendingOutCents;
@@ -243,7 +248,7 @@ export function TransactionsWorkspace({
                     type="button"
                     role="tab"
                     aria-selected={on}
-                    onClick={() => router.push(tabHref(t.key))}
+                    onClick={() => navigate(tabHref(t.key))}
                     className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold transition-colors md:rounded-[11px] ${
                       on
                         ? "bg-(--bg-inverse) text-white md:bg-(--bg-surface) md:text-(--text-primary) md:shadow-[0_1px_3px_rgba(16,24,40,.08)]"
