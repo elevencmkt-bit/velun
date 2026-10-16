@@ -273,8 +273,25 @@ async function runImportStatement(input: {
       // que o Velun já tem nesse ponto dá pra conferir o mais antigo também;
       // se não bate, faltam (ou sobram) lançamentos ANTES do print.
       let before: number | null = null;
-      if (read.hasBalances) {
-        before = await balanceBefore(supabase, householdId, accountId, read.statement.periodStart);
+      if (read.hasBalances && read.oldest) {
+        const oldestDate = read.oldest.date;
+        before = await balanceBefore(supabase, householdId, accountId, oldestDate);
+        // Lançado à mão uns dias antes e lançado pelo banco depois (o
+        // "Fxreplay" do dia 10 que caiu no 13): conta no saldo do Velun
+        // antes do print, mas é o mesmo dinheiro de uma linha do print.
+        const nearby = await fetchConfirmedCandidates(supabase, householdId, accountId, {
+          periodStart: oldestDate,
+          periodEnd: read.statement.periodEnd,
+        });
+        const used = new Set<string>();
+        for (const t of read.statement.transactions) {
+          const twin = nearby.find(
+            (c) => !used.has(c.id) && c.date < oldestDate && c.amountCents === t.amountCents && c.direction === t.direction,
+          );
+          if (!twin) continue;
+          used.add(twin.id);
+          before -= twin.direction === "in" ? twin.amountCents : -twin.amountCents;
+        }
         read = screensToStatement(screens, before);
       }
       statement = read.statement;
@@ -319,9 +336,21 @@ async function runImportStatement(input: {
           `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,
         );
       }
-      // A comparação com o saldo do Velun é feita mais abaixo, depois de
-      // saber quais lançamentos seus esta importação vai substituir.
-      screensBefore = before;
+      if (read.oldest?.excluded) {
+        const [, m, d] = read.oldest.date.split("-");
+        parts.push(
+          `A linha mais antiga (${read.oldest.description}, ${d}/${m}) ficou de fora: o valor dela não dá pra conferir pelo saldo. Ela entra na próxima importação se o print mostrar também a linha de baixo dela.`,
+        );
+        if (before !== null) {
+          parts.push(
+            `Atenção: o saldo do Velun antes de ${d}/${m} (${fmt(before)}) não fecha com o do app: faltam ou sobram lançamentos antes dessa data. Importe um print ou extrato dos dias anteriores.`,
+          );
+        }
+      } else {
+        // A comparação com o saldo do Velun é feita mais abaixo, depois de
+        // saber quais lançamentos seus esta importação vai substituir.
+        screensBefore = before;
+      }
       screensNote = parts.join(" ");
     } else if (isCard) {
       if (!looksLikeNubank(text)) {
