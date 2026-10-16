@@ -49,8 +49,9 @@ const s2 = screen([
   { name: "Starbucks", amount: "-$13.67", balance: "-$56.75" },
 ]);
 
-// Ordem trocada de propósito: o Velun ordena pela data.
-const r = screensToStatement([s2, s1]);
+// Ordem trocada de propósito: o Velun ordena pela data. Com o saldo que o
+// Velun tem antes do mais antigo (-$43.08), até ele confere.
+const r = screensToStatement([s2, s1], -4308);
 assert.equal(r.undated, 0);
 assert.equal(r.hasBalances, true);
 const t = r.statement.transactions;
@@ -75,7 +76,7 @@ assert.equal(verifyStatement(r.statement).matches, true, "a conferência dia a d
 // outro, o "-$" virou 3) continua sendo a mesma: entra uma vez só.
 const a1 = screen([{ date: "10/6/2026" }, { name: "Uber", amount: "-$29.05", balance: "-$35.15" }, { date: "10/5/2026" }, { name: "Dash Pass", amount: "-$9.99", balance: "-$6.10" }]);
 const a2 = screen([{ date: "10/5/2026" }, { name: "Dash Pass", amount: "39.99", balance: "-$6.10", conf: 60 }, { name: "Prime", amount: "-$15.16", balance: "$3.89" }]);
-const misread = screensToStatement([a1, a2]);
+const misread = screensToStatement([a1, a2], 1905);
 assert.deepEqual(
   misread.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`),
   ["out 1516 Prime", "out 999 Dash Pass", "out 2905 Uber"],
@@ -91,6 +92,14 @@ assert.deepEqual(
   plain.statement.transactions.map((x) => `${x.direction} ${x.amountCents}`),
   ["in 250000", "out 1549"],
 );
+
+// Sem o saldo do Velun, a mais antiga (Starbucks) fica de fora e o saldo
+// dela vira o ponto de partida.
+const noOpening = screensToStatement([s2, s1]);
+assert.equal(noOpening.statement.transactions.length, 5);
+assert.equal(noOpening.oldest?.excluded, true);
+assert.equal(noOpening.statement.beginningBalanceCents, -5675);
+assert.equal(verifyStatement(noOpening.statement).matches, true);
 
 // Linha sem data nenhuma (nenhum cabeçalho acima, nenhuma tela antes): fica de fora e é contada.
 const lost = screensToStatement([screen([{ name: "Algo", amount: "-$1.00", balance: "$5.00" }])]);
@@ -125,10 +134,12 @@ assert.equal(pend.pending, 2, "os pendentes ficam de fora");
 assert.equal(pend.undated, 0);
 assert.deepEqual(
   pend.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`),
-  ["in 8100 Course Hub", "out 2000 Host Plan", "out 1900 Music Store", "out 2450 Tools Co", "out 50 Service Fee"],
+  ["out 2000 Host Plan", "out 1900 Music Store", "out 2450 Tools Co", "out 50 Service Fee"],
   "sem rótulo, sem pendentes, sem repetir o Host; $519.00 virou -19.00",
 );
-assert.deepEqual(pend.unchecked.map((u) => u.description), ["Course Hub"], "a mais antiga fica marcada como não conferida");
+assert.deepEqual(pend.oldest, { date: "2026-10-13", description: "Course Hub", balanceCents: 11900, excluded: true }, "a mais antiga, sem como conferir, fica de fora");
+assert.deepEqual(pend.unchecked, []);
+assert.equal(pend.statement.beginningBalanceCents, 11900, "o saldo dela vira o ponto de partida");
 // Com o saldo que o Velun tem antes dela, a mais antiga também confere.
 const withOpening = screensToStatement([posted, older, top], 20000);
 assert.equal(withOpening.statement.transactions[0].direction, "out");
@@ -153,6 +164,6 @@ assert.deepEqual(
   gap.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`).reverse(),
   ["out 400 Mercado", "out 600 Padaria", "out 100 Sem Saldo", "out 300 Farmacia"],
 );
-assert.deepEqual(gap.unchecked.map((u) => u.description), ["Padaria", "Sem Saldo", "Farmacia"]);
+assert.deepEqual(gap.unchecked.map((u) => u.description), ["Padaria", "Sem Saldo", "Farmacia"], "sem saldo na mais antiga: entra, marcada");
 
 console.log("check-screenshot-import: ok");

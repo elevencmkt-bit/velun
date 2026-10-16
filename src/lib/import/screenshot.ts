@@ -408,6 +408,8 @@ export function screensToStatement(
   undated: number;
   /** Na seção "Pending": ficam de fora até o banco lançar. */
   pending: number;
+  /** A linha mais antiga (não pendente). `excluded`: ficou de fora por não dar pra conferir. */
+  oldest: { date: string; description: string; balanceCents: number | null; excluded: boolean } | null;
   /** Linhas cujo valor não deu pra conferir pelo saldo (do mais novo pro mais antigo). */
   unchecked: { date: string; description: string; amountCents: number }[];
 } {
@@ -416,14 +418,33 @@ export function screensToStatement(
   // mas não na importação: o banco ainda pode mudar valor e data, e o
   // lançamento de verdade vem no próximo print ou extrato.
   const all = reconcile(rows, openingCents);
-  const reconciled = all.filter((r) => !r.pending);
+  let reconciled = all.filter((r) => !r.pending);
+  // A linha mais antiga só confere com a de baixo dela, que não está no
+  // print. Se nem o saldo do Velun fecha com ela, o valor é um chute do
+  // leitor ("-$10.58" lido como "$510.58"): fica de fora em vez de entrar
+  // errado. O saldo dela continua valendo como ponto de partida.
+  const last = reconciled[reconciled.length - 1];
+  // (Só quando todas as linhas têm saldo; numa lista sem saldo, nada
+  // confere e tudo entra marcado pra conferir.)
+  const allHaveBalance = reconciled.every((r) => r.balanceCents !== null);
+  const excludeOldest = Boolean(last && allHaveBalance && !last.checked && reconciled.length > 1);
+  const oldest = last
+    ? {
+        date: last.date,
+        description: last.description,
+        balanceCents: last.balanceCents,
+        excluded: excludeOldest,
+      }
+    : null;
+  if (excludeOldest) reconciled = reconciled.slice(0, -1);
   const { statement, hasBalances } = toStatement(reconciled);
   return {
     statement,
     hasBalances,
     corrected: reconciled.filter((r) => r.corrected).length,
     undated,
-    pending: all.length - reconciled.length,
+    pending: all.length - all.filter((r) => !r.pending).length,
+    oldest,
     unchecked: reconciled
       .filter((r) => !r.checked)
       .map((r) => ({ date: r.date, description: r.description, amountCents: r.amountCents })),
