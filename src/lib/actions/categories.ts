@@ -23,7 +23,12 @@ function revalidateCategoryPaths() {
   revalidatePath("/configuracoes");
 }
 
-export async function createCategory(formData: FormData) {
+// Erro lançado numa server action chega no navegador, em produção, só
+// como "Minified React error #441" — a mensagem some. Por isso estas
+// devolvem o erro em vez de lançar.
+export type CategoryResult = { ok: true; id: string } | { ok: false; error: string };
+
+export async function createCategory(formData: FormData): Promise<CategoryResult> {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 
@@ -41,14 +46,14 @@ export async function createCategory(formData: FormData) {
   const parentInput = formData.get("parent_id");
   const parentId = typeof parentInput === "string" && parentInput ? parentInput : null;
 
-  if (!name) throw new Error("Nome da categoria é obrigatório.");
-  if (kind !== "income" && kind !== "expense") throw new Error("Tipo de categoria inválido.");
+  if (!name) return { ok: false, error: "Nome da categoria é obrigatório." };
+  if (kind !== "income" && kind !== "expense") return { ok: false, error: "Tipo de categoria inválido." };
 
   if (color && !findPaletteColorByFg(color)) {
-    throw new Error("Cor inválida.");
+    return { ok: false, error: "Cor inválida." };
   }
   if (icon && !VALID_ICON_KEYS.has(icon)) {
-    throw new Error("Ícone inválido.");
+    return { ok: false, error: "Ícone inválido." };
   }
 
   const { data, error } = await supabase
@@ -65,11 +70,11 @@ export async function createCategory(formData: FormData) {
     .select("id")
     .single();
 
-  if (error) throw new Error(friendlyCategoryError(error.message));
+  if (error) return { ok: false, error: friendlyCategoryError(error.message) };
 
   revalidateCategoryPaths();
 
-  return data.id as string;
+  return { ok: true, id: data.id as string };
 }
 
 // As mensagens das regras de subcategoria (0030) já vêm em português.
@@ -82,7 +87,10 @@ function friendlyCategoryError(message: string) {
  * volta a ser principal). Os lançamentos continuam nela; nos relatórios
  * passam a somar na principal.
  */
-export async function setCategoryParent(categoryId: string, parentId: string | null) {
+export async function setCategoryParent(
+  categoryId: string,
+  parentId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const { householdId } = await getCurrentMember();
   const supabase = await createClient();
 
@@ -92,9 +100,10 @@ export async function setCategoryParent(categoryId: string, parentId: string | n
     .eq("id", categoryId)
     .eq("household_id", householdId);
 
-  if (error) throw new Error(friendlyCategoryError(error.message));
+  if (error) return { ok: false, error: friendlyCategoryError(error.message) };
 
   revalidateCategoryPaths();
+  return { ok: true };
 }
 
 export async function updateCategoryName(categoryId: string, name: string) {

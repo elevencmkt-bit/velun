@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { createCategory } from "@/lib/actions/categories";
 
-type Cat = { id: string; name: string; kind: "income" | "expense"; parent_id?: string | null };
+type Cat = { id: string; name: string; kind: "income" | "expense"; parent_id?: string | null; is_transfer?: boolean };
 
 /**
  * Segunda fileira do seletor de categoria: aparece quando a categoria
@@ -30,6 +30,8 @@ export function SubcategoryChips({
   color: { fg: string; bg: string };
 }) {
   const subs = categories.filter((c) => c.parent_id === parent.id);
+  // Movimentação entre contas (Transferência) não tem subcategoria: fica
+  // fora de receita e despesa, então não há relatório pra ela somar.
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,9 @@ export function SubcategoryChips({
     fd.set("parent_id", parent.id);
     startTransition(async () => {
       try {
-        const id = await createCategory(fd);
+        const res = await createCategory(fd);
+        if (!res.ok) throw new Error(res.error);
+        const id = res.id;
         onCreated({ id, name: trimmed, kind: parent.kind, parent_id: parent.id });
         onChange(id);
         setName("");
@@ -55,6 +59,8 @@ export function SubcategoryChips({
       }
     });
   }
+
+  if (parent.is_transfer) return null;
 
   if (subs.length === 0 && !adding) {
     return (

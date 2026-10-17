@@ -321,7 +321,9 @@ export function ManualTransactionButton({
         const formData = new FormData();
         formData.set("name", name);
         formData.set("kind", kind);
-        const id = await createCategory(formData);
+        const res = await createCategory(formData);
+        if (!res.ok) throw new Error(res.error);
+        const id = res.id;
         setCategories((prev) => [...prev, { id, name, kind }]);
         setCategoryId(id);
         setNewCategoryName("");
