@@ -2,7 +2,7 @@
 
 import { createElement, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import {
   createCategory,
   deleteCategory,
@@ -59,6 +59,7 @@ export function CategoryRow({
   parents = [],
   childCount = 0,
   compact = false,
+  expand,
 }: {
   category: CategoryRowData;
   effectiveColor?: string | null;
@@ -68,6 +69,8 @@ export function CategoryRow({
   childCount?: number;
   /** Sub: bloco menor, embaixo da principal. */
   compact?: boolean;
+  /** Tem subcategorias: tocar no nome abre/fecha a lista delas (editar fica no lápis). */
+  expand?: { open: boolean; onToggle: () => void };
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -135,9 +138,14 @@ export function CategoryRow({
     >
       <button
         type="button"
-        onClick={() => setEditOpen(true)}
+        onClick={() => (expand ? expand.onToggle() : setEditOpen(true))}
         className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none md:gap-2.5"
-        aria-label={`Editar ${category.name}`}
+        aria-label={
+          expand
+            ? `${expand.open ? "Esconder" : "Mostrar"} as subcategorias de ${category.name}`
+            : `Editar ${category.name}`
+        }
+        aria-expanded={expand ? expand.open : undefined}
       >
         {compact ? null : (
           <span
@@ -152,6 +160,15 @@ export function CategoryRow({
         >
           {category.name}
         </span>
+        {expand ? (
+          <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-(--text-muted)">
+            {childCount}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${expand.open ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </span>
+        ) : null}
       </button>
 
       <span className="flex shrink-0 items-center opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
@@ -163,7 +180,7 @@ export function CategoryRow({
           }}
         >
           <DialogTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Editar categoria" className="max-md:hidden">
+            <Button variant="ghost" size="icon-sm" aria-label="Editar categoria" className={expand ? undefined : "max-md:hidden"}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
           </DialogTrigger>

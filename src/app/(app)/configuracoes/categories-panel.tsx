@@ -19,6 +19,15 @@ export function CategoriesPanel({
   transfer?: Item[];
 }) {
   const [tab, setTab] = useState<"expense" | "income" | "transfer">("expense");
+  // Subcategorias ficam recolhidas; tocar na principal abre as dela.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const items = tab === "expense" ? expense : tab === "income" ? income : transfer;
   // Subcategorias aparecem embaixo da principal; uma sub cuja principal
   // não está nesta aba aparece como principal, pra não sumir.
@@ -41,7 +50,7 @@ export function CategoriesPanel({
         <div className="min-w-0 flex-1">
           <h2 className="text-card-title">Categorias</h2>
           <p className="mt-1 text-sm text-(--text-muted) max-md:hidden">
-            Passe o mouse numa categoria pra editar ou apagar. Pra criar uma subcategoria, edite a categoria.
+            Passe o mouse numa categoria pra editar ou apagar. Clique numa categoria com número pra ver as subcategorias; pra criar uma, edite a categoria.
           </p>
         </div>
         <div role="tablist" className="order-3 flex w-full gap-1 rounded-xl bg-(--bg-track) p-1 sm:order-2 sm:w-auto">
@@ -79,8 +88,9 @@ export function CategoriesPanel({
                   effectiveColor={color}
                   parents={eligibleParents}
                   childCount={subs.length}
+                  expand={subs.length > 0 ? { open: open.has(category.id), onToggle: () => toggle(category.id) } : undefined}
                 />
-                {subs.length > 0 ? (
+                {subs.length > 0 && open.has(category.id) ? (
                   <div className="flex flex-wrap gap-1.5 pl-3">
                     {subs.map((sub) => (
                       <CategoryRow
