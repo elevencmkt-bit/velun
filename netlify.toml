@@ -1,0 +1,10 @@
+# O resto da configuração de build fica no painel do Netlify.
+#
+# O Turbopack guarda no cache de build (.next/cache) uma cópia das
+# variáveis de ambiente que o servidor lê — inclusive as secretas
+# (RESEND_API_KEY, CRON_SECRET). Esse cache não é publicado, mas o
+# "secrets scanning" do Netlify olha ele e derruba o deploy. Aqui só
+# tiramos o cache da varredura; o código e o que vai pro ar continuam
+# sendo verificados.
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = ".netlify/.next/cache/**,.next/cache/**"
