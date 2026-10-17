@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { BarChart3, Bell, CalendarDays, Lock } from "lucide-react";
-import { sendTestEmail, setEmailPreference, type EmailSettings } from "@/lib/actions/email-preferences";
+import { setEmailPreference, type EmailSettings } from "@/lib/actions/email-preferences";
 import type { EmailKind } from "@/lib/email/context";
 
 const ROWS: {
@@ -59,16 +59,6 @@ export function EmailSettingsPanel({ initial, timezoneLabel }: { initial: EmailS
     });
   }
 
-  function test(kind: EmailKind) {
-    setBusy(`test:${kind}`);
-    setMessage(null);
-    startTransition(async () => {
-      const res = await sendTestEmail(kind);
-      setMessage({ kind, ok: res.ok, text: res.message });
-      setBusy(null);
-    });
-  }
-
   return (
     <div className="flex flex-col">
       <div>
@@ -93,16 +83,6 @@ export function EmailSettingsPanel({ initial, timezoneLabel }: { initial: EmailS
       <div className="mt-4 flex flex-col">
         {ROWS.map((row) => {
           const on = state[row.kind];
-          const testButton = (className: string) => (
-            <button
-              type="button"
-              onClick={() => test(row.kind)}
-              disabled={busy !== null || !initial.ready}
-              className={`h-9 rounded-[10px] bg-(--primary-light) px-3 text-[13px] font-semibold whitespace-nowrap text-(--primary) transition-opacity hover:opacity-85 disabled:opacity-50 ${className}`}
-            >
-              {busy === `test:${row.kind}` ? "Mandando…" : "Mandar um de teste"}
-            </button>
-          );
           return (
             <div key={row.kind} className="border-t border-(--border-primary) py-4">
               <div className="flex items-start gap-3.5">
@@ -115,10 +95,8 @@ export function EmailSettingsPanel({ initial, timezoneLabel }: { initial: EmailS
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-bold text-(--text-primary)">{row.title}</div>
                   <div className="mt-0.5 text-[13px] leading-relaxed text-(--text-muted)">{row.text}</div>
-                  {testButton("mt-2.5 sm:hidden")}
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  {testButton("max-sm:hidden")}
                   <button
                     type="button"
                     role="switch"

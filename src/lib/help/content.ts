@@ -741,11 +741,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
         "Cada pessoa recebe **só o que vê no Velun**. Conta pessoal que a outra pessoa escondeu fica de fora.",
         "Transferência entre as contas da casa não conta como entrada nem saída.",
       ] },
-      { h2: "Ligar, desligar e testar", id: "ligar-desligar" },
+      { h2: "Ligar e desligar", id: "ligar-desligar" },
       { steps: [
         "Abra **Configurações** e vá em **E-mails**.",
         "Use a chave ao lado de cada e-mail. Cada pessoa da casa escolhe os seus.",
-        "Toque em **Mandar um de teste** pra receber agora um exemplo com os seus números de hoje.",
       ] },
       { tip: "Todo e-mail tem no rodapé um link pra parar de receber aquele tipo, sem precisar entrar no Velun." },
     ],
