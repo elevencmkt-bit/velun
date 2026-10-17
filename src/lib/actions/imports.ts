@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { computeFingerprint, normalizeDescription } from "@/lib/fingerprint";
-import { cleanBankDescription } from "@/lib/import/clean-description";
+import { cleanBankDescription, isGenericBankText } from "@/lib/import/clean-description";
 import { rememberMerchantName } from "@/lib/merchant-names";
 import {
   learnedCategoryFor,
@@ -618,7 +618,7 @@ async function runImportStatement(input: {
     // (acima) continua sendo calculada sobre ele.
     const cleanName = cleanBankDescription(t.description);
     const displayName =
-      nameByKey.get(normalizeDescription(cleanName)) ?? cleanName;
+      (isGenericBankText(t.description) ? undefined : nameByKey.get(normalizeDescription(cleanName))) ?? cleanName;
 
     return {
       import_id: importId,

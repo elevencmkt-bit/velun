@@ -233,7 +233,7 @@ function RecurrenceForm({
             Valor
           </Label>
           <div className="flex h-12 items-center gap-1 rounded-[12px] border-[1.5px] border-(--border-primary) px-3.5" style={{ backgroundColor: tone.bg }}>
-            <span className="font-bold" style={{ color: tone.strong }}>
+            <span className="shrink-0 font-bold whitespace-nowrap" style={{ color: tone.strong }}>
               {tone.sign}
               {currencySymbol(currency)}
             </span>

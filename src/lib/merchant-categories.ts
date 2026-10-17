@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeDescription } from "@/lib/fingerprint";
-import { cleanBankDescription } from "@/lib/import/clean-description";
+import { cleanBankDescription, isGenericBankText } from "@/lib/import/clean-description";
 
 // Categoria lembrada por estabelecimento.
 //
@@ -19,6 +19,8 @@ type Direction = "in" | "out";
 
 /** Chave do estabelecimento a partir do texto do banco. */
 export function merchantKey(bankDescription: string): string {
+  // Genérico ("Zelle Credit"): sem chave, nada é lembrado nem espalhado.
+  if (isGenericBankText(bankDescription)) return "";
   return normalizeDescription(cleanBankDescription(bankDescription));
 }
 

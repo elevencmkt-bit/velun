@@ -153,42 +153,8 @@ export function RecurrencesList({
                   </Button>
                 </span>
               ) : null}
-              {feedback?.id === row.id ? (
-                <span
-                  className="mt-1 text-xs"
-                  style={{
-                    color: feedback.error
-                      ? "var(--expense)"
-                      : "var(--text-secondary)",
-                  }}
-                >
-                  {feedback.text}
-                </span>
-              ) : null}
-            </span>
-            <span className="text-table-body hidden sm:block">
-              {FREQUENCY_LABELS[row.frequency]}
-            </span>
-            <span className="text-table-body hidden sm:block">
-              {row.frequency === "monthly" && row.day_of_month
-                ? row.day_of_month
-                : "—"}
-            </span>
-            <span className="flex flex-col items-end gap-1">
-              <span
-                className="text-right font-semibold tabular-nums"
-                style={{
-                  color:
-                    row.direction === "out"
-                      ? "var(--table-amount-out)"
-                      : "var(--table-amount-in)",
-                }}
-              >
-                {row.direction === "out" ? "-" : "+"}
-                <Money cents={row.amount_cents} currency={currency} />
-              </span>
               {row.can_edit ? (
-                <span className="flex items-center gap-1">
+                <span className="-ml-2 mt-1 flex flex-wrap items-center gap-1">
                   <Button
                     size="xs"
                     variant="ghost"
@@ -230,12 +196,46 @@ export function RecurrencesList({
                 </span>
               ) : (
                 <span
-                  className="text-xs text-(--text-muted)"
+                  className="mt-1 text-xs text-(--text-muted)"
                   title="Conta pessoal de outra pessoa: só leitura"
                 >
                   Só leitura
                 </span>
               )}
+              {feedback?.id === row.id ? (
+                <span
+                  className="mt-1 text-xs"
+                  style={{
+                    color: feedback.error
+                      ? "var(--expense)"
+                      : "var(--text-secondary)",
+                  }}
+                >
+                  {feedback.text}
+                </span>
+              ) : null}
+            </span>
+            <span className="text-table-body hidden sm:block">
+              {FREQUENCY_LABELS[row.frequency]}
+            </span>
+            <span className="text-table-body hidden sm:block">
+              {row.frequency === "monthly" && row.day_of_month
+                ? row.day_of_month
+                : "—"}
+            </span>
+            <span className="flex flex-col items-end gap-1">
+              <span
+                className="text-right font-semibold tabular-nums"
+                style={{
+                  color:
+                    row.direction === "out"
+                      ? "var(--table-amount-out)"
+                      : "var(--table-amount-in)",
+                }}
+              >
+                {row.direction === "out" ? "-" : "+"}
+                <Money cents={row.amount_cents} currency={currency} />
+              </span>
             </span>
           </div>
         ))}
