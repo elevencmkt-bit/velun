@@ -314,6 +314,13 @@ export default async function AVencerPage({
         can_edit: writableIds.has(template.account_id),
       };
     });
+  const recurrenceCategories = (categories ?? []).map((c) => ({
+    id: c.id as string,
+    name: c.name as string,
+    kind: c.kind as "income" | "expense",
+    is_transfer: (c.is_transfer as boolean | null) ?? false,
+    parent_id: (c.parent_id as string | null) ?? null,
+  }));
   const recurrencesIn = recurrenceRows.filter((r) => r.direction === "in");
   const recurrencesOut = recurrenceRows.filter((r) => r.direction === "out");
   const monthlyOf = (rows: RecurrenceRow[]) =>
@@ -403,6 +410,7 @@ export default async function AVencerPage({
               <CardContent>
                 <RecurrencesList
                   accounts={moveTargets}
+                  categories={recurrenceCategories}
                   rows={recurrencesIn}
                   currency={currency}
                   emptyMessage="Nenhuma entrada recorrente cadastrada."
@@ -418,6 +426,7 @@ export default async function AVencerPage({
               <CardContent>
                 <RecurrencesList
                   accounts={moveTargets}
+                  categories={recurrenceCategories}
                   rows={recurrencesOut}
                   currency={currency}
                   emptyMessage="Nenhuma saída recorrente cadastrada."

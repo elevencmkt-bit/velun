@@ -30,9 +30,12 @@ export async function materializeOccurrences(params: {
   dayOfMonth: number | null;
   endsOn: string | null;
   from?: string;
+  /** Datas que já têm lançamento (o que está sendo editado agora). */
+  skipDates?: string[];
 }) {
   const supabase = await createClient();
 
+  const skip = new Set(params.skipDates ?? []);
   const dates = generateOccurrenceDates({
     frequency: params.frequency,
     startsOn: params.startsOn,
@@ -40,7 +43,7 @@ export async function materializeOccurrences(params: {
     endsOn: params.endsOn,
     count: OCCURRENCES_TO_MATERIALIZE,
     from: params.from,
-  });
+  }).filter((d) => !skip.has(d));
 
   if (dates.length === 0) return;
 
@@ -119,4 +122,58 @@ export async function createRecurrenceFromAnchor(params: {
   });
 
   return recurrence.id;
+}
+
+/**
+ * Troca as previsões de uma recorrência a partir de `from` (inclusive)
+ * pelas geradas com o modelo e o calendário ATUAIS. Só mexe no que é
+ * previsão (`pending`): o que já caiu fica como aconteceu.
+ */
+export async function replaceFutureOccurrences(params: {
+  recurrenceId: string;
+  householdId: string;
+  memberId: string;
+  from: string;
+  /** Lançamento que fica (o que está sendo editado), e a data dele. */
+  keep?: { id: string; date: string };
+}): Promise<number> {
+  const supabase = await createClient();
+  const { data: rec, error } = await supabase
+    .from("recurrences")
+    .select("template, frequency, starts_on, day_of_month, ends_on, is_active")
+    .eq("id", params.recurrenceId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!rec) throw new Error("Recorrência não encontrada.");
+
+  let del = supabase
+    .from("transactions")
+    .delete()
+    .eq("recurrence_id", params.recurrenceId)
+    .eq("status", "pending")
+    .gte("date", params.from);
+  if (params.keep) del = del.neq("id", params.keep.id);
+  const { error: delError } = await del;
+  if (delError) throw new Error(delError.message);
+
+  if (!rec.is_active) return 0;
+  await materializeOccurrences({
+    recurrenceId: params.recurrenceId,
+    householdId: params.householdId,
+    memberId: params.memberId,
+    template: rec.template as RecurrenceTemplate,
+    frequency: rec.frequency as RecurrenceFrequency,
+    startsOn: rec.starts_on as string,
+    dayOfMonth: (rec.day_of_month as number | null) ?? null,
+    endsOn: (rec.ends_on as string | null) ?? null,
+    from: params.from,
+    skipDates: params.keep ? [params.keep.date] : [],
+  });
+  const { count } = await supabase
+    .from("transactions")
+    .select("id", { count: "exact", head: true })
+    .eq("recurrence_id", params.recurrenceId)
+    .eq("status", "pending")
+    .gte("date", params.from);
+  return count ?? 0;
 }

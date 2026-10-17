@@ -529,14 +529,22 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     slug: "mudar-ou-parar-recorrencia",
     topic: "a-vencer",
-    title: "Mudar de conta ou parar uma recorrência",
-    summary: "Mover leva as próximas ocorrências pra outra conta; Desativar apaga as que ainda não aconteceram.",
+    title: "Editar, mover ou parar uma recorrência",
+    summary: "Mude valor, nome, dia ou conta das próximas; o que já caiu fica como aconteceu.",
     body: [
       { table: [
+        ["Editar", "Em A vencer › Recorrências: nome, valor, de quanto em quanto tempo, a próxima vez, quando termina, conta e categoria. As previsões de hoje em diante são refeitas; o que já caiu não muda."],
         ["Mover", "Leva a recorrência e as ocorrências previstas pra outra conta. O que já foi pago fica onde aconteceu."],
         ["Desativar", "Para a recorrência e apaga as ocorrências pendentes de hoje em diante. O histórico fica."],
       ] },
-      { p: "Pra mudar só uma ocorrência (um mês com valor diferente, por exemplo), edite aquele lançamento em Transações." },
+      { h2: "Editando um lançamento da recorrência", id: "um-ou-os-proximos" },
+      { p: "Ao mudar nome, valor ou categoria de um lançamento que faz parte de uma recorrência, o Velun pergunta em quais salvar:" },
+      { list: [
+        "**Só este lançamento**: pra exceção, como uma multa por atraso num mês.",
+        "**Este e os próximos**: a recorrência passa a ser assim, e as próximas previsões mudam junto.",
+        "**Todos, inclusive os que já passaram**: só pra nome e categoria. Valor de lançamento que já caiu não muda.",
+      ] },
+      { p: "Mudar só a data ou a nota vale só pra aquele lançamento, sem pergunta." },
     ],
   },
 

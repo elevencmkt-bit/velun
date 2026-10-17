@@ -1,9 +1,9 @@
 "use client";
 
 import { currencySymbol, type CurrencyCode } from "@/lib/money";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowUpRight, Pencil, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, Repeat, X } from "lucide-react";
 import { updateTransaction } from "@/lib/actions/transactions";
 import { createCategory } from "@/lib/actions/categories";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,11 @@ import { topOf } from "@/lib/subcategories";
 import { SubcategoryChips } from "@/components/subcategory-chips";
 import { CategoryQuickPicker } from "@/components/category-quick-picker";
 import { themedPair } from "@/lib/theme-color";
+import { getRecurrenceForEdit } from "@/lib/actions/recurrences";
+import { RecurrenceEditDialog } from "@/components/recurrence-edit-dialog";
+import { RecurrenceScopeDialog } from "@/components/recurrence-scope-dialog";
+import { describeSchedule, recurrenceScopes, type RecurrenceScope } from "@/lib/recurrence";
+import { formatCents } from "@/lib/money";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
 type Category = {
@@ -94,6 +99,24 @@ export function EditTransactionDialog({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  // Faz parte de uma recorrência: o aviso no topo e a pergunta ao salvar.
+  const [recurrence, setRecurrence] = useState<{ name: string; schedule: string } | null>(null);
+  const [recurrenceEditOpen, setRecurrenceEditOpen] = useState(false);
+  const [scopeAsk, setScopeAsk] = useState<{ changeText: string; allowAll: boolean } | null>(null);
+  const pendingForm = useRef<FormData | null>(null);
+
+  useEffect(() => {
+    if (!open || !transaction.recurrence_id) return;
+    let alive = true;
+    getRecurrenceForEdit(transaction.recurrence_id)
+      .then((r) => {
+        if (alive && r) setRecurrence({ name: r.description, schedule: describeSchedule({ frequency: r.frequency, startsOn: r.starts_on, dayOfMonth: r.day_of_month }) });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [open, transaction.recurrence_id]);
 
   const tone = TONE[direction];
   const colors = useMemo(
@@ -123,12 +146,43 @@ export function EditTransactionDialog({
     if (pending) formData.set("is_pending", "on");
     else formData.delete("is_pending");
     if (makeRecurring) formData.set("make_recurring", "on");
+
+    // Lançamento de recorrência e mudou nome, valor, tipo ou categoria:
+    // pergunta se vale só pra este ou pros próximos também.
+    if (transaction.recurrence_id && recurrence) {
+      const newCents = amountToCents(amount);
+      const newDescription = String(formData.get("description") ?? "").trim();
+      const changes = {
+        amount: newCents !== transaction.amount_cents,
+        direction: direction !== transaction.direction,
+        description: newDescription !== transaction.description,
+        category: (categoryId || null) !== (transaction.category_id ?? null),
+      };
+      const { ask, allowAll } = recurrenceScopes(changes);
+      if (ask) {
+        const parts: string[] = [];
+        if (changes.amount) parts.push(`valor: ${formatCents(transaction.amount_cents, currency)} → ${formatCents(newCents, currency)}`);
+        if (changes.direction) parts.push(direction === "in" ? "tipo: saída → entrada" : "tipo: entrada → saída");
+        if (changes.description) parts.push(`nome: ${transaction.description} → ${newDescription}`);
+        if (changes.category) parts.push("categoria");
+        pendingForm.current = formData;
+        setScopeAsk({ changeText: parts.join(", "), allowAll });
+        return;
+      }
+    }
+    save(formData, "one");
+  }
+
+  function save(formData: FormData, scope: RecurrenceScope) {
+    formData.set("apply_to", scope);
     startTransition(async () => {
       try {
         await updateTransaction(transaction.id, formData);
+        setScopeAsk(null);
         setOpen(false);
         router.refresh();
       } catch (err) {
+        setScopeAsk(null);
         setError(err instanceof Error ? err.message : "Erro ao salvar.");
       }
     });
@@ -186,6 +240,31 @@ export function EditTransactionDialog({
             <X className="h-[18px] w-[18px]" />
           </button>
         </div>
+
+        {transaction.recurrence_id ? (
+          <div className="flex items-center gap-3 rounded-[14px] bg-(--primary-soft) px-3.5 py-3">
+            <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-(--primary-light) text-(--primary)">
+              <Repeat className="h-[17px] w-[17px]" />
+            </span>
+            <span className="flex-1 text-sm leading-snug text-(--text-body)">
+              Faz parte de uma recorrência
+              {recurrence ? (
+                <>
+                  : <b className="text-(--text-primary)">{recurrence.name}, {recurrence.schedule}</b>
+                </>
+              ) : null}
+            </span>
+            {recurrence ? (
+              <button
+                type="button"
+                onClick={() => setRecurrenceEditOpen(true)}
+                className="shrink-0 text-[13px] font-semibold whitespace-nowrap text-(--primary) hover:underline"
+              >
+                Editar recorrência
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmit} className="flex flex-col gap-5">
           <div role="tablist" aria-label="Tipo" className="flex gap-1.5 rounded-[16px] bg-(--bg-hover) p-[5px]">
@@ -337,11 +416,7 @@ export function EditTransactionDialog({
 
           <div className="flex flex-col">
             <ToggleRow checked={pending} onChange={setPending} title="Ainda não caiu" hint="Fica como pendente até você confirmar" />
-            {transaction.recurrence_id ? (
-              <p className="border-t border-(--border-soft) py-3.5 text-sm text-(--text-muted)">
-                Esse lançamento já faz parte de uma recorrência.
-              </p>
-            ) : (
+            {transaction.recurrence_id ? null : (
               <>
                 <ToggleRow checked={makeRecurring} onChange={setMakeRecurring} title="Repetir esse lançamento" hint="Toda semana, mês ou ano" />
                 {makeRecurring ? (
@@ -397,6 +472,29 @@ export function EditTransactionDialog({
             </Button>
           </div>
         </form>
+        {transaction.recurrence_id && recurrence ? (
+          <>
+            <RecurrenceScopeDialog
+              open={scopeAsk !== null}
+              onOpenChange={(next) => !next && setScopeAsk(null)}
+              name={recurrence.name}
+              changeText={scopeAsk?.changeText ?? ""}
+              date={`${transaction.date.slice(8, 10)}/${transaction.date.slice(5, 7)}`}
+              allowAll={scopeAsk?.allowAll ?? false}
+              busy={isPending}
+              onConfirm={(scope) => pendingForm.current && save(pendingForm.current, scope)}
+            />
+            <RecurrenceEditDialog
+              recurrenceId={transaction.recurrence_id}
+              accounts={accounts}
+              categories={categories}
+              currency={currency}
+              open={recurrenceEditOpen}
+              onOpenChange={setRecurrenceEditOpen}
+              onSaved={() => setOpen(false)}
+            />
+          </>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
