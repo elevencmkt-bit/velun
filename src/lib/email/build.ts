@@ -16,7 +16,7 @@ export function closingMonth(today: string): string {
  * Monta um e-mail pra uma pessoa. Devolve null quando não há o que dizer
  * (aviso num dia sem nada vencendo; mês sem nenhum lançamento).
  */
-export async function buildEmail(kind: EmailKind, ctx: EmailContext, opts: { force?: boolean } = {}): Promise<BuiltEmail | null> {
+export async function buildEmail(kind: EmailKind, ctx: EmailContext): Promise<BuiltEmail | null> {
   const base: RenderBase = {
     firstName: ctx.firstName,
     householdName: ctx.householdName,
@@ -33,24 +33,12 @@ export async function buildEmail(kind: EmailKind, ctx: EmailContext, opts: { for
 
   if (kind === "alerts") {
     const { accounts, items } = await loadUpcoming(ctx, addDaysISO(ctx.today, -OVERDUE_WINDOW_DAYS), addDaysISO(ctx.today, 1));
-    let summary = buildAlerts({ today: ctx.today, accounts, items });
-    // Teste num dia sem nada novo: mostra as atrasadas e o que vence nos
-    // próximos dias, pra dar pra ver como fica.
-    if (!summary && opts.force) {
-      const later = await loadUpcoming(ctx, addDaysISO(ctx.today, -OVERDUE_WINDOW_DAYS), addDaysISO(ctx.today, 14));
-      const firstOut = later.items.find((i) => i.date > ctx.today && i.direction === "out" && !i.silent);
-      if (firstOut) {
-        const fakeToday = addDaysISO(firstOut.date, -1);
-        summary = buildAlerts({ today: fakeToday, accounts: later.accounts, items: later.items });
-        if (summary) return renderAlerts(summary, base, fakeToday);
-      }
-      return null;
-    }
+    const summary = buildAlerts({ today: ctx.today, accounts, items });
     return summary ? renderAlerts(summary, base, ctx.today) : null;
   }
 
   const month = closingMonth(ctx.today);
   const summary = await loadMonth(ctx, month);
-  if (summary.count === 0 && !opts.force) return null;
+  if (summary.count === 0) return null;
   return renderMonthly(summary, base);
 }
