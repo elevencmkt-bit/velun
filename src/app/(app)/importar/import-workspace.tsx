@@ -11,6 +11,7 @@ import {
   Link2,
   Lock,
   Link2Off,
+  ListChecks,
   Pencil,
   SlidersHorizontal,
   Sparkles,
@@ -18,6 +19,8 @@ import {
   Upload,
 } from "lucide-react";
 import {
+  bulkSetStagedCategory,
+  bulkSetStagedIncluded,
   confirmImport,
   discardImport,
   dismissForecast,
@@ -596,6 +599,42 @@ export function ImportWorkspace({
     });
   }
 
+  // Seleção pra editar várias linhas de uma vez. Fica num modo à parte
+  // porque a caixinha da linha, fora dele, é "entra ou não".
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [lastPicked, setLastPicked] = useState<number | null>(null);
+  const [bulkKey, setBulkKey] = useState(0);
+  const selectedRows = rows.filter((r) => selected.has(r.id));
+  const selectedIds = selectedRows.map((r) => r.id);
+
+  function pickRow(index: number, shift: boolean) {
+    const id = rows[index].id;
+    const next = new Set(selected);
+    const turnOn = !next.has(id);
+    if (shift && lastPicked !== null) {
+      // Shift: marca (ou desmarca) o trecho entre a última e esta.
+      const [a, b] = lastPicked < index ? [lastPicked, index] : [index, lastPicked];
+      for (let i = a; i <= b; i++) {
+        if (turnOn) next.add(rows[i].id);
+        else next.delete(rows[i].id);
+      }
+    } else if (turnOn) next.add(id);
+    else next.delete(id);
+    setSelected(next);
+    setLastPicked(index);
+  }
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+    setLastPicked(null);
+  }
+
+  const bulkCategories = categories.filter((c) =>
+    [...new Set(selectedRows.map((r) => r.direction))].some((d) => fitsDirection(c, d)),
+  );
+
   const included = rows.filter((r) => r.isIncluded);
   const includedTotal = included.reduce(
     (sum, r) => sum + (r.direction === "in" ? r.amountCents : -r.amountCents),
@@ -1061,12 +1100,144 @@ export function ImportWorkspace({
         </p>
       ) : null}
 
+      {selecting ? (
+        <div
+          className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-[16px] border border-(--primary-border) bg-(--bg-surface) p-2.5 pl-4 shadow-(--shadow-card)"
+          role="toolbar"
+          aria-label="Editar selecionados"
+        >
+          <span className="mr-1 text-sm font-semibold text-(--text-primary)">
+            {selected.size === 0
+              ? "Nenhuma selecionada"
+              : selected.size === 1
+                ? "1 selecionada"
+                : `${selected.size} selecionadas`}
+          </span>
+          <div className="flex items-center gap-1 text-[13px]">
+            <button
+              type="button"
+              className="rounded-lg px-2 py-1 font-semibold text-(--primary) hover:bg-(--primary-soft)"
+              onClick={() => setSelected(new Set(rows.map((r) => r.id)))}
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              className="rounded-lg px-2 py-1 font-semibold text-(--primary) hover:bg-(--primary-soft)"
+              onClick={() =>
+                setSelected(
+                  new Set(
+                    rows
+                      .filter(
+                        (r) =>
+                          r.isIncluded &&
+                          !r.cardPayment?.accepted &&
+                          !categories.some((c) => c.id === r.categoryId && fitsDirection(c, r.direction)),
+                      )
+                      .map((r) => r.id),
+                  ),
+                )
+              }
+            >
+              Sem categoria
+            </button>
+            {selected.size > 0 ? (
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 font-semibold text-(--text-muted) hover:bg-(--bg-hover)"
+                onClick={() => setSelected(new Set())}
+              >
+                Limpar
+              </button>
+            ) : null}
+          </div>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Select
+              key={bulkKey}
+              disabled={isPending || selected.size === 0}
+              onValueChange={(value) => {
+                const categoryId = value === NO_CATEGORY ? null : value;
+                const name = categoryId ? categories.find((c) => c.id === categoryId)?.name : null;
+                setBulkKey((k) => k + 1);
+                run(
+                  () => bulkSetStagedCategory(openImport.id, selectedIds, categoryId),
+                  (result) => {
+                    if (!result.ok) return;
+                    const n = result.changed ?? 0;
+                    const k = result.skipped ?? 0;
+                    const what = name ? `${name} em` : "Categoria tirada de";
+                    let text = `${what} ${n} ${n === 1 ? "lançamento" : "lançamentos"}.`;
+                    if (k > 0) {
+                      text += ` ${k} ${k === 1 ? "ficou como estava" : "ficaram como estavam"}: ${
+                        name ? "a categoria não serve pro sentido (entrada × saída) ou é" : "é"
+                      } pagamento de fatura.`;
+                    }
+                    setToast(text);
+                  },
+                );
+              }}
+            >
+              <SelectTrigger className="h-9! w-[190px] rounded-[10px] text-[13px]" aria-label="Pôr categoria nos selecionados">
+                <SelectValue placeholder="Pôr categoria…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CATEGORY}>Sem categoria</SelectItem>
+                <CategorySelectItems categories={bulkCategories} />
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={isPending || selected.size === 0}
+              onClick={() => run(() => bulkSetStagedIncluded(openImport.id, selectedIds, true))}
+            >
+              Incluir
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={isPending || selected.size === 0}
+              onClick={() => run(() => bulkSetStagedIncluded(openImport.id, selectedIds, false))}
+            >
+              Não importar
+            </Button>
+            <Button size="sm" className="h-9" onClick={stopSelecting}>
+              Pronto
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="-mb-3 flex items-center justify-between gap-3">
+          <span className="text-sm text-(--text-muted)">
+            {rows.length} {rows.length === 1 ? "linha" : "linhas"} · {included.length} {included.length === 1 ? "entra" : "entram"}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setSelecting(true)}>
+            <ListChecks className="mr-1.5 h-4 w-4" />
+            Selecionar várias
+          </Button>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-(--text-muted)">
-                <th className="w-12 px-4 py-3" />
+                <th className="w-12 px-4 py-3">
+                  {selecting ? (
+                    <Checkbox
+                      checked={
+                        selected.size === 0 ? false : selected.size === rows.length ? true : "indeterminate"
+                      }
+                      onCheckedChange={(checked) =>
+                        setSelected(checked === true ? new Set(rows.map((r) => r.id)) : new Set())
+                      }
+                      aria-label="Selecionar todas"
+                    />
+                  ) : null}
+                </th>
                 <th className="w-20 px-2 py-3">Data</th>
                 <th className="px-2 py-3">Descrição</th>
                 <th className="w-52 px-2 py-3">Categoria</th>
@@ -1074,24 +1245,40 @@ export function ImportWorkspace({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {rows.map((row, index) => (
                 <tr
                   key={row.id}
-                  className="border-b last:border-0"
-                  style={{ opacity: row.isIncluded ? 1 : 0.45 }}
+                  className={`border-b last:border-0 ${
+                    selecting && selected.has(row.id) ? "bg-(--primary-soft)" : ""
+                  }`}
+                  style={{ opacity: row.isIncluded || selecting ? 1 : 0.45 }}
                 >
                   <td className="px-4 py-2">
-                    <Checkbox
-                      checked={row.isIncluded}
-                      disabled={isPending}
-                      onCheckedChange={(checked) =>
-                        run(() => toggleStagedRow(row.id, checked === true))
-                      }
-                      aria-label={`Incluir ${row.description}`}
-                    />
+                    {selecting ? (
+                      <Checkbox
+                        checked={selected.has(row.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          pickRow(index, e.shiftKey);
+                        }}
+                        aria-label={`Selecionar ${row.description}`}
+                      />
+                    ) : (
+                      <Checkbox
+                        checked={row.isIncluded}
+                        disabled={isPending}
+                        onCheckedChange={(checked) =>
+                          run(() => toggleStagedRow(row.id, checked === true))
+                        }
+                        aria-label={`Incluir ${row.description}`}
+                      />
+                    )}
                   </td>
                   <td className="px-2 py-2 text-(--text-muted)">
                     {shortDate(row.date)}
+                    {selecting && !row.isIncluded ? (
+                      <span className="mt-0.5 block text-[11px] font-semibold text-(--text-light)">não entra</span>
+                    ) : null}
                   </td>
                   <td className="px-2 py-2">
                     <div className="flex flex-col gap-1">
