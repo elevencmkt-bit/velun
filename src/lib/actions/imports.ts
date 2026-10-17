@@ -1308,6 +1308,128 @@ async function runSetStagedCategory(
   return updated;
 }
 
+/** Ids de linhas da revisão vindos do navegador: confere o formato. */
+function validIds(ids: unknown): string[] | null {
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 5000) return null;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return ids.every((id) => typeof id === "string" && uuid.test(id)) ? [...new Set(ids as string[])] : null;
+}
+
+/** Em pedaços: lista longa de ids estoura o tamanho do endereço da consulta. */
+function chunks<T>(list: T[], size = 200): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+/** Marca ou desmarca várias linhas da revisão de uma vez. */
+export async function bulkSetStagedIncluded(
+  importId: string,
+  ids: string[],
+  isIncluded: boolean,
+): Promise<ActionResult> {
+  return attempt(isIncluded ? "Não consegui marcar essas linhas." : "Não consegui desmarcar essas linhas.", async () => {
+    const clean = validIds(ids);
+    if (!clean || typeof importId !== "string") throw new Error("Seleção inválida.");
+    const supabase = await createClient();
+    for (const part of chunks(clean)) {
+      const { error } = await supabase
+        .from("staged_transactions")
+        .update({ is_included: isIncluded })
+        .eq("import_id", importId)
+        .in("id", part);
+      if (error) throw new Error(error.message);
+    }
+    revalidatePath("/importar");
+  });
+}
+
+/**
+ * Põe a mesma categoria em várias linhas da revisão. Linha em que a
+ * categoria não serve (receita numa saída) ou que é pagamento de fatura
+ * (vira transferência) fica como estava — e volta contada em `skipped`.
+ * A escolha vale como feita na mão: fica lembrada por estabelecimento.
+ */
+export async function bulkSetStagedCategory(
+  importId: string,
+  ids: string[],
+  categoryId: string | null,
+): Promise<ActionResult & { changed?: number; skipped?: number }> {
+  let changed = 0;
+  let skipped = 0;
+  const result = await attempt("Não consegui trocar a categoria dessas linhas.", async () => {
+    const clean = validIds(ids);
+    if (!clean || typeof importId !== "string") throw new Error("Seleção inválida.");
+    const { householdId, memberId } = await getCurrentMember();
+    const supabase = await createClient();
+
+    let category: { kind: string; is_transfer: boolean | null } | null = null;
+    if (categoryId) {
+      const { data } = await supabase
+        .from("categories")
+        .select("kind, is_transfer")
+        .eq("id", categoryId)
+        .eq("household_id", householdId)
+        .maybeSingle();
+      if (!data) throw new Error("Categoria não encontrada.");
+      category = data as { kind: string; is_transfer: boolean | null };
+    }
+
+    const rows: {
+      id: string;
+      description: string;
+      bank_description: string | null;
+      direction: "in" | "out";
+      card_payment_account_id: string | null;
+      card_payment_accepted: boolean | null;
+    }[] = [];
+    for (const part of chunks(clean)) {
+      const { data, error } = await supabase
+        .from("staged_transactions")
+        .select("id, description, bank_description, direction, card_payment_account_id, card_payment_accepted")
+        .eq("import_id", importId)
+        .in("id", part);
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as typeof rows));
+    }
+
+    const target = rows.filter(
+      (r) =>
+        !(r.card_payment_account_id != null && r.card_payment_accepted === true) &&
+        (!category || fitsDirection(category, r.direction)),
+    );
+    skipped = rows.length - target.length;
+
+    for (const part of chunks(target.map((r) => r.id))) {
+      const { error } = await supabase
+        .from("staged_transactions")
+        .update({ suggested_category_id: categoryId, category_source: "manual" })
+        .eq("import_id", importId)
+        .in("id", part);
+      if (error) throw new Error(error.message);
+    }
+    changed = target.length;
+
+    // Lembra (ou esquece) por estabelecimento, uma vez cada.
+    const seen = new Set<string>();
+    for (const r of target) {
+      const bank = r.bank_description ?? r.description;
+      const key = `${merchantKey(bank)}|${r.direction}`;
+      if (!merchantKey(bank) || seen.has(key)) continue;
+      seen.add(key);
+      await rememberMerchantCategory(supabase, {
+        householdId,
+        memberId,
+        bankDescription: bank,
+        direction: r.direction,
+        categoryId,
+      });
+    }
+    revalidatePath("/importar");
+  });
+  return result.ok ? { ...result, changed, skipped } : result;
+}
+
 /**
  * Renomeia uma linha da revisão. As outras linhas do mesmo
  * estabelecimento nesta importação ganham o mesmo nome, e o nome fica

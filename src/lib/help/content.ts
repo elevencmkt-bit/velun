@@ -413,6 +413,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
         "Mande o arquivo (OFX, CSV, Excel, PDF ou prints) e toque em **Ler e revisar**.",
         "Na revisão, confira o aviso de saldo: \"O saldo bate com o extrato\" ou \"não bate\".",
         "Desmarque o que não deve entrar, ajuste nomes e categorias. As sugestões automáticas vêm com ✦.",
+        "Pra mexer em várias de uma vez, toque em **Selecionar várias**: marque as linhas (Shift + clique pega um trecho, **Sem categoria** pega as que faltam) e escolha **Pôr categoria…**, **Incluir** ou **Não importar**.",
         "Toque em **Confirmar** pra lançar tudo de uma vez, ou **Descartar** pra desistir.",
       ] },
       { tip: "Cada conta pode ter uma revisão aberta por vez. Termine ou descarte antes de importar outro extrato da mesma conta." },
