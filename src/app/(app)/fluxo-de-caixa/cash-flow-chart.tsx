@@ -20,6 +20,27 @@ function EndDot(props: { cx?: number; cy?: number; index?: number; totalPoints: 
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke="white" strokeWidth={2} />;
 }
 
+// Rótulo do eixo X. No gráfico pequeno só aparecem o primeiro e o último
+// dia, bem nas pontas: centralizados, metade do texto saía do quadro
+// ("/10", "16/1"). Aqui o primeiro alinha pela esquerda e o último pela
+// direita.
+function EdgeTick(props: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+  first: string | undefined;
+  last: string | undefined;
+}) {
+  const { x = 0, y = 0, payload, first, last } = props;
+  const value = payload?.value ?? "";
+  const anchor = value === first ? "start" : value === last ? "end" : "middle";
+  return (
+    <text x={x} y={y} dy={12} textAnchor={anchor} fontSize={11} fill="var(--text-muted)">
+      {value}
+    </text>
+  );
+}
+
 function colorFor(balanceCents: number) {
   return balanceCents >= 0 ? "var(--income)" : "var(--expense)";
 }
@@ -73,7 +94,13 @@ export function CashFlowChart({
           <XAxis
             dataKey="label"
             interval={compact ? points.length - 2 : 6}
-            tick={{ fontSize: compact ? 11 : 11, fill: "var(--text-muted)" }}
+            tick={
+              compact ? (
+                <EdgeTick first={points[0]?.label} last={points[points.length - 1]?.label} />
+              ) : (
+                { fontSize: 11, fill: "var(--text-muted)" }
+              )
+            }
             axisLine={{ stroke: "var(--border-primary)" }}
             tickLine={false}
           />
@@ -88,6 +115,7 @@ export function CashFlowChart({
           )}
           <Tooltip
             formatter={(value) => [formatCents(Number(value), currency), "Saldo projetado"]}
+            separator=": "
             labelFormatter={compact ? (label) => label : undefined}
             contentStyle={{
               background: "var(--bg-surface)",
