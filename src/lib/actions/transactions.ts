@@ -10,8 +10,12 @@ import { rememberMerchantName } from "@/lib/merchant-names";
 import { merchantKey, rememberMerchantCategory } from "@/lib/merchant-categories";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { createRecurrenceFromAnchor } from "@/lib/materialize-occurrences";
-import type { RecurrenceFrequency } from "@/lib/recurrence";
+import {
+  createRecurrenceFromAnchor,
+  replaceFutureOccurrences,
+  type RecurrenceTemplate,
+} from "@/lib/materialize-occurrences";
+import { recurrenceScopes, type RecurrenceFrequency, type RecurrenceScope } from "@/lib/recurrence";
 
 // Se o box de lançamento/edição marcou "repetir esse lançamento",
 // devolve a frequência escolhida; senão null (fluxo sem recorrência).
@@ -181,7 +185,7 @@ export async function updateTransaction(
   transactionId: string,
   formData: FormData,
 ) {
-  const { memberId, householdId } = await getCurrentMember();
+  const { memberId, householdId, today } = await getCurrentMember();
   const supabase = await createClient();
 
   const accountId = String(formData.get("account_id") ?? "");
@@ -213,9 +217,20 @@ export async function updateTransaction(
 
   const { data: current } = await supabase
     .from("transactions")
-    .select("recurrence_id, description, bank_description, category_id")
+    .select("recurrence_id, description, bank_description, category_id, amount_cents, direction, date")
     .eq("id", transactionId)
     .maybeSingle();
+  const applyTo = (String(formData.get("apply_to") ?? "one") || "one") as RecurrenceScope;
+  if (!["one", "future", "all"].includes(applyTo)) throw new Error("Escolha em quais lançamentos salvar.");
+  const scopes = recurrenceScopes({
+    amount: amountCents !== current?.amount_cents,
+    direction: direction !== current?.direction,
+    description: description !== current?.description,
+    category: categoryId !== (current?.category_id ?? null),
+  });
+  if (applyTo === "all" && !scopes.allowAll) {
+    throw new Error("Valor de lançamento que já caiu não muda: escolha \"este e os próximos\".");
+  }
 
   // Lançamento que veio do banco: a impressão digital sai do texto do
   // banco, não do nome. Assim renomear não faz o mesmo extrato, importado
@@ -266,6 +281,22 @@ export async function updateTransaction(
       memberId,
       sourceIds: [transactionId],
       categoryId,
+    });
+  }
+
+  // Faz parte de uma recorrência e a pessoa escolheu levar a mudança
+  // pros próximos (ou, só nome e categoria, pra todos).
+  if (current?.recurrence_id && applyTo !== "one" && scopes.ask) {
+    await applyToRecurrence(supabase, {
+      recurrenceId: current.recurrence_id as string,
+      transactionId,
+      scope: applyTo,
+      fromDate: current.date as string,
+      newDate: date,
+      householdId,
+      memberId,
+      today,
+      changes: { description, categoryId, amountCents, direction: direction as "in" | "out" },
     });
   }
 
@@ -587,4 +618,124 @@ export async function createTransfer(formData: FormData) {
   revalidatePath("/transacoes");
   revalidatePath("/contas");
   revalidatePath("/mes");
+}
+
+/**
+ * Leva a edição de um lançamento pra recorrência dele.
+ * - "future": o modelo passa a ter o novo nome, valor, tipo e categoria, e
+ *   as previsões depois deste são refeitas com ele.
+ * - "all": só nome e categoria, em todos os lançamentos da recorrência
+ *   (inclusive os que já caíram) e no modelo.
+ * O que já caiu nunca muda de valor.
+ */
+async function applyToRecurrence(
+  supabase: SupabaseClient,
+  p: {
+    recurrenceId: string;
+    transactionId: string;
+    scope: "future" | "all";
+    fromDate: string;
+    newDate: string;
+    householdId: string;
+    memberId: string;
+    today: string;
+    changes: { description: string; categoryId: string | null; amountCents: number; direction: "in" | "out" };
+  },
+) {
+  const { data: rec } = await supabase.from("recurrences").select("template").eq("id", p.recurrenceId).maybeSingle();
+  if (!rec) throw new Error("Recorrência não encontrada.");
+  const current = rec.template as RecurrenceTemplate;
+  const template: RecurrenceTemplate =
+    p.scope === "future"
+      ? {
+          ...current,
+          description: p.changes.description,
+          category_id: p.changes.categoryId,
+          amount_cents: p.changes.amountCents,
+          direction: p.changes.direction,
+        }
+      : { ...current, description: p.changes.description, category_id: p.changes.categoryId };
+  const { data: updated, error } = await supabase
+    .from("recurrences")
+    .update({ template })
+    .eq("id", p.recurrenceId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!updated || updated.length === 0) throw new Error("Você não pode editar essa recorrência.");
+
+  if (p.scope === "all") {
+    // Nome e categoria em todos os que já existem (os do banco guardam o
+    // texto original em bank_description, então a impressão digital não muda).
+    const { error: allError } = await supabase
+      .from("transactions")
+      .update({ description: p.changes.description, category_id: p.changes.categoryId })
+      .eq("recurrence_id", p.recurrenceId)
+      .neq("id", p.transactionId);
+    if (allError) throw new Error(allError.message);
+    // As previsões de hoje em diante são refeitas com o modelo novo; os já
+    // confirmados à mão têm a impressão digital pelo nome: refaz um a um
+    // (são poucos: o que veio do banco usa o texto do banco).
+    await replaceFutureOccurrences({
+      recurrenceId: p.recurrenceId,
+      householdId: p.householdId,
+      memberId: p.memberId,
+      from: p.today,
+      keep: { id: p.transactionId, date: p.newDate },
+    });
+    const manual = await fetchAll<{ id: string; account_id: string; date: string; amount_cents: number }>((from, to) =>
+      supabase
+        .from("transactions")
+        .select("id, account_id, date, amount_cents")
+        .eq("recurrence_id", p.recurrenceId)
+        .eq("status", "cleared")
+        .is("bank_description", null)
+        .neq("id", p.transactionId)
+        .order("id")
+        .range(from, to),
+    );
+    for (const t of manual) {
+      await supabase
+        .from("transactions")
+        .update({
+          fingerprint: computeFingerprint({
+            accountId: t.account_id,
+            date: t.date,
+            amountCents: t.amount_cents,
+            description: p.changes.description,
+          }),
+        })
+        .eq("id", t.id);
+    }
+    return;
+  }
+
+  // "future": previsões atrasadas entre este e hoje mudam ali mesmo (não
+  // dá pra refazer o passado pelo calendário: algumas já caíram); de hoje
+  // em diante, as previsões são refeitas com o modelo novo.
+  const next = new Date(`${p.fromDate}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const after = next.toISOString().slice(0, 10);
+  if (after < p.today) {
+    const { error: lateError } = await supabase
+      .from("transactions")
+      .update({
+        description: p.changes.description,
+        category_id: p.changes.categoryId,
+        amount_cents: p.changes.amountCents,
+        direction: p.changes.direction,
+      })
+      .eq("recurrence_id", p.recurrenceId)
+      .eq("status", "pending")
+      .gte("date", after)
+      .lt("date", p.today)
+      .neq("id", p.transactionId);
+    if (lateError) throw new Error(lateError.message);
+  }
+  await replaceFutureOccurrences({
+    recurrenceId: p.recurrenceId,
+    householdId: p.householdId,
+    memberId: p.memberId,
+    from: after > p.today ? after : p.today,
+    keep: { id: p.transactionId, date: p.newDate },
+  });
 }

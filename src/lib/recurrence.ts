@@ -85,3 +85,41 @@ export function generateOccurrenceDates(params: {
 
   return dates.map(toISODate);
 }
+
+const WEEKDAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+/** "toda sexta", "todo dia 21", "todo ano em 05/03". */
+export function describeSchedule(params: {
+  frequency: RecurrenceFrequency;
+  startsOn: string;
+  dayOfMonth: number | null;
+}): string {
+  const d = parseISODate(params.startsOn);
+  if (params.frequency === "weekly") {
+    const w = d.getDay();
+    // "todo sábado/domingo", "toda segunda…sexta"
+    return `${w === 0 || w === 6 ? "todo" : "toda"} ${WEEKDAYS[w]}`;
+  }
+  if (params.frequency === "yearly") {
+    return `todo ano em ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return `todo dia ${params.dayOfMonth ?? d.getDate()}`;
+}
+
+/**
+ * Ao salvar um lançamento que faz parte de uma recorrência, em quais
+ * aplicar. "Todos, inclusive os que já passaram" só vale pra nome e
+ * categoria: valor (ou entrada/saída) de lançamento que já caiu não muda,
+ * é o que aconteceu.
+ */
+export type RecurrenceScope = "one" | "future" | "all";
+
+export function recurrenceScopes(changes: {
+  amount: boolean;
+  direction: boolean;
+  description: boolean;
+  category: boolean;
+}): { ask: boolean; allowAll: boolean } {
+  const ask = changes.amount || changes.direction || changes.description || changes.category;
+  return { ask, allowAll: ask && !changes.amount && !changes.direction };
+}

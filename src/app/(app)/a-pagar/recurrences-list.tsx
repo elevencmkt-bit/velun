@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/recurrences";
 import { Button } from "@/components/ui/button";
 import { Money } from "@/components/money";
+import { RecurrenceEditDialog } from "@/components/recurrence-edit-dialog";
 
 export type RecurrenceRow = {
   id: string;
@@ -24,6 +25,7 @@ export type RecurrenceRow = {
 };
 
 type AccountOption = { id: string; name: string };
+type CategoryOption = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean; parent_id?: string | null };
 
 const FREQUENCY_LABELS: Record<RecurrenceRow["frequency"], string> = {
   monthly: "Mensal",
@@ -34,12 +36,14 @@ const FREQUENCY_LABELS: Record<RecurrenceRow["frequency"], string> = {
 export function RecurrencesList({
   rows,
   accounts,
+  categories,
   currency = "USD",
   emptyMessage = "Nenhuma recorrência cadastrada.",
 }: {
   rows: RecurrenceRow[];
   /** Contas pra onde dá pra mover: a do casal e as próprias. */
   accounts: AccountOption[];
+  categories: CategoryOption[];
   currency?: CurrencyCode;
   emptyMessage?: string;
 }) {
@@ -49,6 +53,7 @@ export function RecurrencesList({
   // própria linha — a pergunta fica ao lado do que vai mudar.
   const [movingId, setMovingId] = useState<string | null>(null);
   const [target, setTarget] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     id: string;
     text: string;
@@ -184,6 +189,17 @@ export function RecurrencesList({
               </span>
               {row.can_edit ? (
                 <span className="flex items-center gap-1">
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    disabled={isPending}
+                    onClick={() => {
+                      setFeedback(null);
+                      setEditingId(row.id);
+                    }}
+                  >
+                    Editar
+                  </Button>
                   {accounts.some((a) => a.id !== row.account_id) ? (
                     <Button
                       size="xs"
@@ -224,6 +240,17 @@ export function RecurrencesList({
           </div>
         ))}
       </div>
+      {editingId ? (
+        <RecurrenceEditDialog
+          recurrenceId={editingId}
+          accounts={accounts}
+          categories={categories}
+          currency={currency}
+          open
+          onOpenChange={(next) => !next && setEditingId(null)}
+          onSaved={(text) => setFeedback({ id: editingId, text, error: false })}
+        />
+      ) : null}
     </div>
   );
 }
