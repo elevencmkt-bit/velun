@@ -123,7 +123,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { h2: "Opções", id: "opcoes" },
       { table: [
         ["Ainda não caiu", "Salva como pendente: aparece em A vencer, mas ainda não mexe no saldo."],
-        ["Repetir esse lançamento", "Vira uma recorrência semanal, mensal ou anual, com data pra terminar se quiser."],
+        ["Repetir esse lançamento", "Vira uma recorrência semanal, mensal, trimestral, semestral ou anual, com data pra terminar se quiser."],
         ["Parcelas", "Só em saída no cartão: divide o total em até 24 vezes, uma em cada fatura."],
         ["+ Adicionar nota", "Um comentário seu sobre o lançamento."],
       ] },
@@ -519,7 +519,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { h2: "Como criar", id: "criar" },
       { steps: [
         "Em **A vencer**, abra a aba **Recorrências** e toque em **Nova recorrência**.",
-        "Preencha descrição, valor, conta, categoria e a **Frequência** (semanal, mensal ou anual).",
+        "Preencha descrição, valor, conta, categoria e a **Frequência** (semanal, mensal, trimestral, semestral ou anual).",
         "Na mensal, escolha o **Dia do mês**. Dia 31 cai no último dia dos meses mais curtos.",
         "Se tiver fim, preencha **Termina em**.",
       ] },
@@ -536,6 +536,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     body: [
       { table: [
         ["Editar", "Em A vencer › Recorrências: nome, valor, de quanto em quanto tempo, a próxima vez, quando termina, conta e categoria. As previsões de hoje em diante são refeitas; o que já caiu não muda."],
+        ["Filtrar por período", "Em A vencer › Recorrências, os botões Semanais, Mensais, Trimestrais, Semestrais e Anuais mostram só aquele tipo, com o total do período. Em \"Todas\", o total vem convertido por mês."],
         ["Mover", "Leva a recorrência e as ocorrências previstas pra outra conta. O que já foi pago fica onde aconteceu."],
         ["Desativar", "Para a recorrência e apaga as ocorrências pendentes de hoje em diante. O histórico fica."],
       ] },

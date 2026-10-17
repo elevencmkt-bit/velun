@@ -16,6 +16,7 @@ import { UpcomingGroups, type Group, type PendingRow } from "./upcoming-groups";
 import { CATEGORY_JOIN, resolveJoinedCategory } from "@/lib/subcategories";
 import { ScreenHelp } from "@/components/screen-help";
 import { AccountFilter } from "@/components/account-filter";
+import { PER_MONTH, type RecurrenceFrequency } from "@/lib/recurrence";
 
 const HORIZON_DAYS = 30;
 
@@ -49,22 +50,23 @@ function Signed({
   );
 }
 
-// Quanto uma recorrência pesa por mês, pra somar semanal, mensal e anual
-// numa conta só.
-const PER_MONTH: Record<string, number> = {
-  weekly: 52 / 12,
-  monthly: 1,
-  yearly: 1 / 12,
-};
+// Filtro de recorrências por período (?periodo=).
+const PERIOD_FILTERS: { key: RecurrenceFrequency; label: string; per: string }[] = [
+  { key: "weekly", label: "Semanais", per: "por semana" },
+  { key: "monthly", label: "Mensais", per: "por mês" },
+  { key: "quarterly", label: "Trimestrais", per: "a cada 3 meses" },
+  { key: "semiannual", label: "Semestrais", per: "a cada 6 meses" },
+  { key: "yearly", label: "Anuais", per: "por ano" },
+];
 
 export default async function AVencerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ver?: string; account?: string }>;
+  searchParams: Promise<{ ver?: string; account?: string; periodo?: string }>;
 }) {
   const { householdId, memberId, currency, today } = await getCurrentMember();
   const supabase = await createClient();
-  const { ver, account: accountParam } = await searchParams;
+  const { ver, account: accountParam, periodo } = await searchParams;
   const view: View = TABS.some((t) => t.key === ver) ? (ver as View) : "tudo";
 
   // A vencer é extrato futuro: mesmo nível do extrato. De conta pessoal
@@ -326,10 +328,26 @@ export default async function AVencerPage({
   const monthlyOf = (rows: RecurrenceRow[]) =>
     Math.round(
       rows.reduce(
-        (s, r) => s + r.amount_cents * (PER_MONTH[r.frequency] ?? 1),
+        (s, r) => s + r.amount_cents * (PER_MONTH[r.frequency as RecurrenceFrequency] ?? 1),
         0,
       ),
     );
+
+  // Filtro por período: só aparece o que existe; "Todas" soma por mês.
+  const periodCounts = PERIOD_FILTERS.map((f) => ({
+    ...f,
+    count: recurrenceRows.filter((r) => r.frequency === f.key).length,
+  })).filter((f) => f.count > 0);
+  const period = periodCounts.find((f) => f.key === periodo) ?? null;
+  const shownIn = period ? recurrencesIn.filter((r) => r.frequency === period.key) : recurrencesIn;
+  const shownOut = period ? recurrencesOut.filter((r) => r.frequency === period.key) : recurrencesOut;
+  const periodHref = (key: string | null) => {
+    const qs = new URLSearchParams({ ver: "recorrencias" });
+    if (accountFilter) qs.set("account", accountFilter);
+    if (key) qs.set("periodo", key);
+    return `/a-pagar?${qs}`;
+  };
+  const sumOf = (rows: RecurrenceRow[]) => rows.reduce((s, r) => s + r.amount_cents, 0);
 
   const lowest = cashFlow.lowestPoint;
   const filterAccounts = (accounts ?? [])
@@ -400,36 +418,113 @@ export default async function AVencerPage({
               currency={currency}
             />
           </div>
+          {periodCounts.length > 1 ? (
+            <nav
+              aria-label="Período"
+              className="-mt-1 flex max-w-full gap-2 overflow-x-auto [scrollbar-width:none]"
+            >
+              {[{ key: null as string | null, label: "Todas", count: recurrenceRows.length }, ...periodCounts].map((f) => {
+                const active = (period?.key ?? null) === f.key;
+                return (
+                  <Link
+                    key={f.key ?? "todas"}
+                    href={periodHref(f.key)}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${
+                      active
+                        ? "border-(--bg-inverse) bg-(--bg-inverse) text-white"
+                        : "border-(--border-primary) bg-(--bg-surface) text-(--text-secondary) hover:text-(--text-primary)"
+                    }`}
+                  >
+                    {f.label}
+                    <span className={active ? "text-white/70" : "text-(--text-light)"}>{f.count}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : null}
           <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <CardTitle className="text-card-title">
                   Entradas recorrentes
                 </CardTitle>
+                {shownIn.length > 0 ? (
+                  <span className="text-[13px] text-(--text-muted)">
+                    {period ? (
+                      <>
+                        <b className="font-semibold text-(--text-secondary) tabular-nums">
+                          <Money cents={sumOf(shownIn)} currency={currency} />
+                        </b>{" "}
+                        {period.per}
+                        {period.key !== "monthly" ? (
+                          <>
+                            {" · ≈ "}
+                            <Money cents={monthlyOf(shownIn)} currency={currency} />/mês
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        ≈{" "}
+                        <b className="font-semibold text-(--text-secondary) tabular-nums">
+                          <Money cents={monthlyOf(shownIn)} currency={currency} />
+                        </b>{" "}
+                        por mês
+                      </>
+                    )}
+                  </span>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <RecurrencesList
                   accounts={moveTargets}
                   categories={recurrenceCategories}
-                  rows={recurrencesIn}
+                  rows={shownIn}
                   currency={currency}
-                  emptyMessage="Nenhuma entrada recorrente cadastrada."
+                  emptyMessage={period ? `Nenhuma entrada ${period.label.toLowerCase().replace(/is$/, "l")}.` : "Nenhuma entrada recorrente cadastrada."}
                 />
               </CardContent>
             </Card>
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <CardTitle className="text-card-title">
                   Saídas recorrentes
                 </CardTitle>
+                {shownOut.length > 0 ? (
+                  <span className="text-[13px] text-(--text-muted)">
+                    {period ? (
+                      <>
+                        <b className="font-semibold text-(--text-secondary) tabular-nums">
+                          <Money cents={sumOf(shownOut)} currency={currency} />
+                        </b>{" "}
+                        {period.per}
+                        {period.key !== "monthly" ? (
+                          <>
+                            {" · ≈ "}
+                            <Money cents={monthlyOf(shownOut)} currency={currency} />/mês
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        ≈{" "}
+                        <b className="font-semibold text-(--text-secondary) tabular-nums">
+                          <Money cents={monthlyOf(shownOut)} currency={currency} />
+                        </b>{" "}
+                        por mês
+                      </>
+                    )}
+                  </span>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <RecurrencesList
                   accounts={moveTargets}
                   categories={recurrenceCategories}
-                  rows={recurrencesOut}
+                  rows={shownOut}
                   currency={currency}
-                  emptyMessage="Nenhuma saída recorrente cadastrada."
+                  emptyMessage={period ? `Nenhuma saída ${period.label.toLowerCase().replace(/is$/, "l")}.` : "Nenhuma saída recorrente cadastrada."}
                 />
               </CardContent>
             </Card>
