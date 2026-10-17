@@ -141,3 +141,22 @@ export function cleanBankDescription(raw: string): string {
   const trimmed = text.replace(/(\s+\d{5,})+$/, "").trim();
   return trimmed || text;
 }
+
+const GENERIC =
+  /^(zelle( credit| debit| payment)?|deposit|mobile deposit|atm( withdrawal)?|withdrawal|transfer|online transfer( (to|from))?|internal transfer|ach( credit| debit)?|check|cheque|payment|pix( enviado| recebido)?|ted|doc|pagamento|transferencia( enviada| recebida)?)$/;
+
+/**
+ * Texto do banco que não diz QUEM ("Zelle Credit", "Deposit", "Transfer"):
+ * acontece muito em print do app, que corta o nome. Esses não ensinam
+ * nome nem categoria — senão renomear um Zelle pra "Salário" faria todo
+ * Zelle virar salário.
+ */
+export function isGenericBankText(raw: string): boolean {
+  const key = cleanBankDescription(raw)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return key === "" || GENERIC.test(key);
+}

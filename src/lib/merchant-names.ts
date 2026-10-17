@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeDescription } from "@/lib/fingerprint";
-import { cleanBankDescription } from "@/lib/import/clean-description";
+import { cleanBankDescription, isGenericBankText } from "@/lib/import/clean-description";
 
 /**
  * Lembra o nome que a pessoa deu a um estabelecimento, pra próxima
@@ -21,7 +21,7 @@ export async function rememberMerchantName(
   const automatic = cleanBankDescription(params.bankDescription);
   const key = normalizeDescription(automatic);
   const name = params.name.trim();
-  if (!key) return;
+  if (!key || isGenericBankText(params.bankDescription)) return;
 
   if (!name || normalizeDescription(name) === key) {
     await supabase.from("merchant_names").delete().eq("member_id", params.memberId).eq("bank_key", key);
