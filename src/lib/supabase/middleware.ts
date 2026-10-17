@@ -4,6 +4,9 @@ import { classifyClaims } from "@/lib/auth-check";
 
 const AUTH_ROUTES = ["/login", "/convite", "/esqueci-senha"];
 const OPEN_ROUTES = ["/auth/confirm", "/nova-senha", "/ajuda"];
+// Só estes endereços, exatos: a rotina dos e-mails (confere o próprio
+// segredo) e o "parar de receber" do rodapé (confere o token), sem login.
+const OPEN_EXACT = ["/emails/sair", "/api/emails/sair", "/api/cron/emails"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -43,7 +46,7 @@ export async function updateSession(request: NextRequest) {
   // Abertas com ou sem sessão: a volta do link do email (que cria a
   // sessão), a tela de senha nova (que confere a sessão ela mesma) e a
   // central de ajuda (pública).
-  if (OPEN_ROUTES.some((p) => path === p || path.startsWith(`${p}/`))) {
+  if (OPEN_EXACT.includes(path) || OPEN_ROUTES.some((p) => path === p || path.startsWith(`${p}/`))) {
     return supabaseResponse;
   }
 

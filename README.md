@@ -46,6 +46,19 @@ Next.js (App Router) + TypeScript + Tailwind + shadcn/ui, Supabase (Postgres + A
    ```
    e trocar `createBrowserClient` / `createServerClient` para a versão tipada (`createBrowserClient<Database>` etc.) em `src/lib/supabase/client.ts` e `server.ts`.
 
+## E-mails (Resend)
+
+Resumo da semana (segunda), fechamento do mês (dia 1), avisos de vencimento e convite saem pelo [Resend](https://resend.com), do remetente `ola@velunapp.com`. Código em `src/lib/email/`.
+
+1. **Resend**: verificar o domínio `velunapp.com` (3 registros de DNS) e criar uma chave com permissão *Sending access*.
+2. **Netlify** → Site configuration → Environment variables:
+   - `RESEND_API_KEY`: a chave do Resend;
+   - `CRON_SECRET`: um texto aleatório longo (ex.: `openssl rand -hex 32`);
+   - `EMAIL_FROM` (opcional): padrão `Velun <ola@velunapp.com>`.
+3. **Supabase**: rodar `supabase/migrations/0032_emails.sql`.
+4. A função agendada `netlify/functions/emails.mts` roda de hora em hora e chama `/api/cron/emails`; cada casa recebe a partir das 8h do seu fuso, sem repetir (tabela `email_log`). Pra simular sem mandar: `GET /api/cron/emails?dry=1` com `Authorization: Bearer <CRON_SECRET>`.
+5. **E-mails de login do Supabase** (trocar senha etc.) também pelo Resend: Authentication → Emails → SMTP Settings → host `smtp.resend.com`, porta `465`, usuário `resend`, senha = a chave do Resend, remetente `ola@velunapp.com`, nome `Velun`. Em Authentication → Emails → Templates, colar os modelos de `supabase/templates/` (Reset password → `trocar-senha.html`, Confirm signup → `confirmar-conta.html`, Change email address → `trocar-email.html`).
+
 ## Estrutura
 
 ```
@@ -56,6 +69,7 @@ src/lib/money.ts          conversão centavos <-> texto exibido (única fronteir
 src/lib/fingerprint.ts    fingerprint de transação (dedup import + lançamento manual)
 src/lib/balances.ts       saldo por conta, derivado das transações cleared
 src/lib/actions/          server actions (contas, categorias, transações)
+src/lib/email/            e-mails: dados, HTML, envio (Resend) e a rotina de hora em hora
 supabase/migrations/      schema SQL com RLS por household_id
 supabase/seed/            dados de exemplo
 ```

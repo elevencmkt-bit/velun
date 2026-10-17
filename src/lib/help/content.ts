@@ -153,13 +153,13 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "convidar",
     topic: "casal-e-privacidade",
     title: "Convidar quem divide a casa",
-    summary: "Gere um link de convite em Configurações e mande você mesmo.",
+    summary: "Mande o convite por e-mail em Configurações, ou copie o link e mande você mesmo.",
     body: [
       { steps: [
         "Abra **Configurações** e vá em **Pessoas da casa**.",
-        "Toque em **Convidar alguém**. Se quiser, informe o email da pessoa: aí só esse email consegue usar o link.",
-        "Toque em **Gerar convite** e depois em **Copiar link**.",
-        "Mande o link pelo WhatsApp, email ou como preferir. O Velun não envia o convite sozinho.",
+        "Digite o e-mail da pessoa e toque em **Mandar convite**. O Velun manda o convite pra ela, e só esse e-mail consegue usar o link.",
+        "O link também fica copiado, se quiser mandar pelo WhatsApp.",
+        "Prefere não informar e-mail? Use **Copiar link** e mande como preferir: aí qualquer pessoa com o link consegue entrar.",
       ] },
       { p: "A pessoa abre o link, coloca o nome, o email e cria uma senha (mínimo de 6 caracteres). Ela já entra na casa na hora." },
       { h2: "Validade", id: "validade" },
@@ -721,6 +721,34 @@ export const HELP_ARTICLES: HelpArticle[] = [
     related: ["lancamentos/categorizar-varios", "relatorios/por-categoria"],
   },
   {
+    slug: "emails",
+    topic: "configuracoes",
+    title: "E-mails: resumo da semana, fechamento do mês e avisos",
+    summary: "O que chega por e-mail, quando chega e como ligar ou desligar cada um.",
+    body: [
+      { table: [
+        ["Resumo da semana", "Toda segunda, às 8h: o que vence e o que entra nos próximos 7 dias, conta por conta, as atrasadas e o saldo previsto pro domingo. Se alguma conta vai ficar negativa, o e-mail avisa o dia e quanto falta."],
+        ["Fechamento do mês", "Dia 1, às 8h: quanto entrou e saiu em cada conta e o saldo no fim do mês, onde foi o dinheiro, como foram as metas e o que já está previsto pro mês novo."],
+        ["Avisos de vencimento", "Às 8h, só nos dias em que alguma conta vence no dia seguinte ou ficou atrasada. Vem separado por conta, com o saldo de hoje e se dá pra pagar."],
+        ["Acesso e convites", "Trocar a senha e convite pra casa. Esses sempre chegam."],
+      ] },
+      { list: [
+        "O horário segue o **fuso da casa** (Configurações › Sua casa).",
+        "Na segunda, quem recebe o resumo da semana não recebe o aviso do dia: o resumo já mostra o que vence e o que está atrasado.",
+        "Cada pessoa recebe **só o que vê no Velun**. Conta pessoal que a outra pessoa escondeu fica de fora.",
+        "Transferência entre as contas da casa não conta como entrada nem saída.",
+      ] },
+      { h2: "Ligar, desligar e testar", id: "ligar-desligar" },
+      { steps: [
+        "Abra **Configurações** e vá em **E-mails**.",
+        "Use a chave ao lado de cada e-mail. Cada pessoa da casa escolhe os seus.",
+        "Toque em **Mandar um de teste** pra receber agora um exemplo com os seus números de hoje.",
+      ] },
+      { tip: "Todo e-mail tem no rodapé um link pra parar de receber aquele tipo, sem precisar entrar no Velun." },
+    ],
+    related: ["a-vencer/o-que-aparece-em-a-vencer", "casal-e-privacidade/quem-ve-o-que"],
+  },
+  {
     slug: "moeda-fuso-e-aparencia",
     topic: "configuracoes",
     title: "Moeda, fuso e aparência",
@@ -899,6 +927,7 @@ export const SCREEN_HELP: Record<ScreenHelpKey, { title: string; points: string[
     points: [
       "Moeda e fuso valem pra casa toda; o tema é de cada aparelho.",
       "Subcategorias têm um nível só.",
+      "Os e-mails (resumo da semana, fechamento do mês, avisos) ligam e desligam aqui.",
       "A zona de risco apaga de vez. Leia antes.",
     ],
     article: "configuracoes/categorias-e-subcategorias",
