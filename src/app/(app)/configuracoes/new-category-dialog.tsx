@@ -38,7 +38,8 @@ export function NewCategoryDialog() {
     if (icon) formData.set("icon", icon);
     startTransition(async () => {
       try {
-        await createCategory(formData);
+        const res = await createCategory(formData);
+        if (!res.ok) throw new Error(res.error);
         setName("");
         setColor(null);
         setIcon(null);

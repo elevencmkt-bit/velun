@@ -47,6 +47,8 @@ export type CategoryRowData = {
   icon: string | null;
   /** Preenchido quando é subcategoria. */
   parent_id?: string | null;
+  /** Movimentação entre contas: não tem nem é subcategoria. */
+  is_transfer?: boolean | null;
 };
 
 const NO_PARENT = "__principal__";
@@ -91,13 +93,17 @@ export function CategoryRow({
         await updateCategoryColor(category.id, color);
         await updateCategoryIcon(category.id, icon);
         const nextParent = parentId === NO_PARENT ? null : parentId;
-        if (nextParent !== (category.parent_id ?? null)) await setCategoryParent(category.id, nextParent);
+        if (nextParent !== (category.parent_id ?? null)) {
+          const moved = await setCategoryParent(category.id, nextParent);
+          if (!moved.ok) throw new Error(moved.error);
+        }
         if (newSub.trim()) {
           const fd = new FormData();
           fd.set("name", newSub.trim());
           fd.set("kind", category.kind);
           fd.set("parent_id", category.id);
-          await createCategory(fd);
+          const created = await createCategory(fd);
+          if (!created.ok) throw new Error(created.error);
           setNewSub("");
         }
         setEditOpen(false);
@@ -176,6 +182,7 @@ export function CategoryRow({
                   autoFocus
                 />
               </div>
+              {category.is_transfer ? null : (
               <div className="flex flex-col gap-2">
                 <Label>Dentro de</Label>
                 <Select value={parentId} onValueChange={setParentId} disabled={childCount > 0}>
@@ -199,8 +206,10 @@ export function CategoryRow({
                     : "Virando sub, os lançamentos vão junto e passam a somar na principal nos relatórios."}
                 </p>
               </div>
+              )}
               {parentId === NO_PARENT ? (
                 <>
+                  {category.is_transfer ? null : (
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="new-sub">Nova subcategoria (opcional)</Label>
                     <Input
@@ -210,6 +219,7 @@ export function CategoryRow({
                       placeholder={`Ex.: dentro de ${name || "Transporte"}`}
                     />
                   </div>
+                  )}
                   <div className="flex flex-col gap-2">
                     <Label>Cor</Label>
                     <ColorSwatchGrid value={color} onChange={setColor} />
