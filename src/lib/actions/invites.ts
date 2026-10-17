@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentMember } from "@/lib/current-member";
 import { renderInvite } from "@/lib/email/render";
 import { siteUrl } from "@/lib/email/context";
@@ -71,8 +72,12 @@ export async function ensureInvite(email?: string): Promise<string> {
  * pela pessoa. Sem o envio ligado no servidor, devolve só o link pra
  * copiar, como antes.
  */
-export async function inviteByEmail(email: string): Promise<{ token: string; emailed: boolean }> {
-  const trimmed = email.trim();
+export async function inviteByEmail(email: string): Promise<{ token: string; emailed: boolean; note?: string }> {
+  const trimmed = email.trim().toLowerCase();
+  // Um endereço só, sem espaço nem vírgula.
+  if (trimmed && !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(trimmed)) {
+    throw new Error("Esse e-mail não parece certo. Confira e tente de novo.");
+  }
   const token = await ensureInvite(trimmed);
   if (!trimmed || !emailConfigured()) return { token, emailed: false };
 
@@ -80,20 +85,42 @@ export async function inviteByEmail(email: string): Promise<{ token: string; ema
   const supabase = await createClient();
   const [{ data: household }, { data: invite }] = await Promise.all([
     supabase.from("households").select("name").eq("id", householdId).maybeSingle(),
-    supabase.from("household_invites").select("expires_at").eq("token", token).maybeSingle(),
+    supabase
+      .from("household_invites")
+      .select("id, expires_at, emailed_at")
+      .eq("token", token)
+      .eq("household_id", householdId)
+      .maybeSingle(),
   ]);
+  // No máximo um e-mail de convite a cada 2 minutos por casa.
+  const last = invite?.emailed_at ? new Date(invite.emailed_at as string).getTime() : 0;
+  if (Date.now() - last < 2 * 60 * 1000) {
+    return { token, emailed: false, note: "O convite acabou de ser mandado. Espere uns minutos pra mandar de novo." };
+  }
   const site = siteUrl();
+  const oneLine = (t: string) => t.replace(/[\r\n]+/g, " ").trim();
   const built = renderInvite({
-    inviterName: displayName,
-    householdName: (household?.name as string | undefined) ?? "sua casa",
+    inviterName: oneLine(displayName),
+    householdName: oneLine((household?.name as string | undefined) ?? "sua casa"),
     link: `${site}/convite/${token}`,
     email: trimmed,
     expiresOn: String(invite?.expires_at ?? new Date(Date.now() + INVITE_TTL_DAYS * 864e5).toISOString()).slice(0, 10),
     siteUrl: site,
   });
   const result = await sendEmail({ to: trimmed, subject: built.subject, html: built.html, text: built.text, tag: "convite" });
-  if (!result.ok) console.error("[convite] e-mail não saiu:", result.error);
-  return { token, emailed: result.ok };
+  if (!result.ok) {
+    console.error("[convite] e-mail não saiu:", result.error);
+    return { token, emailed: false };
+  }
+  if (invite?.id) {
+    // Pela service role: a coluna é só desta rotina, o app não escreve nela.
+    await createAdminClient()
+      .from("household_invites")
+      .update({ emailed_at: new Date().toISOString() })
+      .eq("id", invite.id)
+      .eq("household_id", householdId);
+  }
+  return { token, emailed: true };
 }
 
 export async function revokeInvite(inviteId: string) {

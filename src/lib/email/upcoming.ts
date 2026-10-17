@@ -39,10 +39,10 @@ export async function loadUpcoming(
   ctx: EmailContext,
   from: string,
   to: string,
-): Promise<{ accounts: CashAccount[]; items: UpcomingItem[] }> {
+): Promise<{ accounts: CashAccount[]; items: UpcomingItem[]; excludedCount: number }> {
   const { supabase, householdId, memberId, today } = ctx;
   const scope = await accountScope(supabase, householdId, memberId, "transactions");
-  if (scope.ids.length === 0) return { accounts: [], items: [] };
+  if (scope.ids.length === 0) return { accounts: [], items: [], excludedCount: scope.excludedCount };
 
   const [{ data: accountRows, error: accountsError }, balances, { data: pending, error: pendingError }, cards] =
     await Promise.all([
@@ -132,5 +132,7 @@ export async function loadUpcoming(
   }
 
   items.sort((a, b) => a.date.localeCompare(b.date) || a.description.localeCompare(b.description));
-  return { accounts, items };
+  // Contas pessoais do outro que a pessoa sabe que existem, mas não vê
+  // lançamento por lançamento: o total avisa que ficaram de fora.
+  return { accounts, items, excludedCount: scope.excludedCount };
 }

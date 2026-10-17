@@ -88,6 +88,10 @@ assert.match(weekly.text, /Conta por conta/);
 assert.doesNotMatch(weekly.html, /undefined|NaN/);
 save("semana.html", weekly.html);
 
+// Conta pessoal da outra pessoa fora da soma: o e-mail avisa.
+assert.match(renderWeekly(buildWeek({ today, accounts, items, excludedCount: 1 }), base).html, /1 conta pessoal da outra pessoa fica fora/);
+assert.doesNotMatch(weekly.html, /fica fora destas somas/);
+
 // Semana vazia não quebra.
 const empty = buildWeek({ today, accounts, items: [] });
 assert.equal(weekSubject(empty, "USD", moneyShort), "Sua semana: nada previsto");
@@ -169,6 +173,8 @@ const month = buildMonth({
   next: { outCents: 428619, inCents: 905000, count: 24 },
 });
 assert.equal(month.inCents, 850000, "transferência fora");
+assert.equal(month.count, 5, "contagem sem as transferências");
+assert.equal(buildMonth({ month: "2026-09", rows: rows.filter((r) => r.transfer_group_id), prevRows: [], accounts: [], goals: [], next: { outCents: 0, inCents: 0, count: 0 } }).count, 0, "mês só com transferência: nada a resumir");
 assert.equal(month.outCents, 238500 + 280000 + 64018);
 const bizRow = month.accounts.find((a) => a.id === "biz")!;
 assert.equal(bizRow.outCents, 238500 + 64018);

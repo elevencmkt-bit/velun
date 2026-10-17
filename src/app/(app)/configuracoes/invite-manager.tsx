@@ -13,7 +13,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
   const [isPending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [copied, setCopied] = useState(false);
-  const [invited, setInvited] = useState<{ email: string; emailed: boolean } | null>(null);
+  const [invited, setInvited] = useState<{ email: string; emailed: boolean; note?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -33,9 +33,9 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
         // Manda o e-mail de convite (quando o envio está ligado) e copia o
         // link também, pra quem convidou mandar por mensagem se quiser.
         const sentTo = email.trim();
-        const { token, emailed } = await inviteByEmail(sentTo);
+        const { token, emailed, note } = await inviteByEmail(sentTo);
         copyToken(token);
-        setInvited({ email: sentTo, emailed });
+        setInvited({ email: sentTo, emailed, note });
         setEmail("");
         router.refresh();
       } catch (err) {
@@ -103,7 +103,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
         <p className="text-xs text-(--text-secondary)">
           {invited.emailed
             ? `Convite mandado pra ${invited.email}. O link também foi copiado, se quiser mandar por mensagem. Vale por 7 dias e só uma vez.`
-            : "Link copiado. Cole numa mensagem pra ela (WhatsApp, por exemplo). Vale por 7 dias e só uma vez."}
+            : `${invited.note ? `${invited.note} ` : ""}Link copiado. Cole numa mensagem pra ela (WhatsApp, por exemplo). Vale por 7 dias e só uma vez.`}
         </p>
       ) : null}
 

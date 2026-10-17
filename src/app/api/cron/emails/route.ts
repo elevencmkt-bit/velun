@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runScheduledEmails } from "@/lib/email/run";
@@ -17,7 +18,9 @@ export const dynamic = "force-dynamic";
 function authorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return request.headers.get("authorization") === `Bearer ${secret}`;
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const given = Buffer.from(request.headers.get("authorization") ?? "");
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 export async function POST(request: NextRequest) {

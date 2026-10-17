@@ -84,6 +84,12 @@ function textFooter(kind: EmailKind, base: RenderBase): string {
     .join("\n");
 }
 
+/** "1 conta pessoal fora deste total" (null quando a soma é completa). */
+function excludedNote(count: number): string | null {
+  if (count <= 0) return null;
+  return count === 1 ? "1 conta pessoal da outra pessoa fica fora destas somas." : `${count} contas pessoais da outra pessoa ficam fora destas somas.`;
+}
+
 function itemMeta(i: UpcomingItem): string {
   return [i.accountName, i.categoryName].filter(Boolean).join(" · ");
 }
@@ -156,6 +162,9 @@ export function renderWeekly(w: WeekSummary, base: RenderBase): BuiltEmail {
               ],
             })),
           }) +
+          (excludedNote(w.excludedCount)
+            ? paragraph(esc(excludedNote(w.excludedCount)!), { size: 12, color: C.faint, top: 8 })
+            : "") +
           negatives
             .map((a) => {
               const n = a.negative!;
@@ -516,11 +525,14 @@ export function renderMonthly(m: MonthSummary, base: RenderBase): BuiltEmail {
                 )}`,
             )
             .join("") +
-          paragraph("Transferência entre as contas da casa não conta como entrada nem saída.", {
-            size: 12,
-            color: C.faint,
-            top: 8,
-          }),
+          paragraph(
+            esc(
+              [excludedNote(m.excludedCount), "Transferência entre as contas da casa não conta como entrada nem saída."]
+                .filter(Boolean)
+                .join(" "),
+            ),
+            { size: 12, color: C.faint, top: 8 },
+          ),
         26,
       ),
     );

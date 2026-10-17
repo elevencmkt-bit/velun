@@ -32,8 +32,14 @@ create policy email_preferences_own on email_preferences
   using (member_id = auth.uid())
   with check (member_id = auth.uid());
 
-revoke update on email_preferences from anon, authenticated;
+-- O app cria a própria linha e liga/desliga os tipos; o token não muda
+-- pelo app (só nasce com o default).
+revoke insert, update on email_preferences from anon, authenticated;
+grant insert (member_id, weekly, monthly, alerts) on email_preferences to authenticated;
 grant update (weekly, monthly, alerts, updated_at) on email_preferences to authenticated;
+
+-- Convite por e-mail: quando foi mandado pela última vez (limita reenvio).
+alter table household_invites add column if not exists emailed_at timestamptz;
 
 create table email_log (
   id bigint generated always as identity primary key,
@@ -41,8 +47,10 @@ create table email_log (
   kind text not null check (kind in ('weekly', 'monthly', 'alerts')),
   -- Semana/dia: a data local (AAAA-MM-DD). Mês: o mês resumido (AAAA-MM).
   period text not null,
-  -- 'sent' ou 'skipped' (aviso num dia sem nada vencendo).
-  status text not null default 'sent' check (status in ('sent', 'skipped')),
+  -- 'pending': reservado, enviando agora (se ficar assim por muito tempo,
+  -- a rodada seguinte tenta de novo); 'sent'; 'skipped' (aviso num dia
+  -- sem nada vencendo).
+  status text not null default 'pending' check (status in ('pending', 'sent', 'skipped')),
   provider_id text,
   created_at timestamptz not null default now(),
   unique (member_id, kind, period)

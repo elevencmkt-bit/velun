@@ -14,6 +14,8 @@ export type OutgoingEmail = {
   unsubscribeUrl?: string | null;
   /** Agrupa no painel do Resend (ex.: "weekly"). */
   tag?: string;
+  /** Mesmo valor em 24h = o Resend não manda de novo. */
+  idempotencyKey?: string;
 };
 
 export type SendResult = { ok: true; id: string | null } | { ok: false; error: string };
@@ -44,6 +46,7 @@ export async function sendEmail(email: OutgoingEmail): Promise<SendResult> {
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
+        ...(email.idempotencyKey ? { "Idempotency-Key": email.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from: emailFrom(),

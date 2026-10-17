@@ -27,8 +27,8 @@ export async function buildEmail(kind: EmailKind, ctx: EmailContext, opts: { for
   };
 
   if (kind === "weekly") {
-    const { accounts, items } = await loadUpcoming(ctx, addDaysISO(ctx.today, -OVERDUE_WINDOW_DAYS), addDaysISO(ctx.today, 6));
-    return renderWeekly(buildWeek({ today: ctx.today, accounts, items }), base);
+    const { accounts, items, excludedCount } = await loadUpcoming(ctx, addDaysISO(ctx.today, -OVERDUE_WINDOW_DAYS), addDaysISO(ctx.today, 6));
+    return renderWeekly(buildWeek({ today: ctx.today, accounts, items, excludedCount }), base);
   }
 
   if (kind === "alerts") {

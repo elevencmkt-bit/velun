@@ -52,8 +52,10 @@ export type MonthSummary = {
   otherCategories: { count: number; cents: number };
   goals: MonthGoal[];
   next: { outCents: number; inCents: number; count: number };
-  /** Lançamentos confirmados no mês (0 = nada pra resumir). */
+  /** Lançamentos confirmados no mês, fora transferências (0 = nada pra resumir). */
   count: number;
+  /** Contas pessoais do outro que ficaram fora das somas. */
+  excludedCount: number;
 };
 
 const TOP_CATEGORIES = 5;
@@ -66,6 +68,7 @@ export function buildMonth(input: {
   accounts: Omit<MonthAccount, "inCents" | "outCents">[];
   goals: MonthGoal[];
   next: MonthSummary["next"];
+  excludedCount?: number;
 }): MonthSummary {
   const current = excludeTransfers(input.rows);
   const previous = excludeTransfers(input.prevRows);
@@ -101,7 +104,8 @@ export function buildMonth(input: {
     otherCategories: { count: rest.length, cents: rest.reduce((s, r) => s + r.amount_cents, 0) },
     goals: input.goals.slice(0, MAX_GOALS),
     next: input.next,
-    count: input.rows.length,
+    count: current.length,
+    excludedCount: input.excludedCount ?? 0,
   };
 }
 
@@ -267,6 +271,7 @@ export async function loadMonth(ctx: EmailContext, month: string): Promise<Month
     accounts: balances,
     goals: goalLines(goals, memberId, month),
     next,
+    excludedCount: scope.excludedCount,
   });
   for (const c of summary.categories) c.color = colors.get(c.name)?.fg;
   return summary;

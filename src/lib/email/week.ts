@@ -29,9 +29,11 @@ export type WeekSummary = {
   inCents: number;
   accounts: AccountWeek[];
   endTotalCents: number;
+  /** Contas pessoais do outro que ficaram fora das somas. */
+  excludedCount: number;
 };
 
-export function buildWeek(input: { today: string; accounts: CashAccount[]; items: UpcomingItem[] }): WeekSummary {
+export function buildWeek(input: { today: string; accounts: CashAccount[]; items: UpcomingItem[]; excludedCount?: number }): WeekSummary {
   const { today, accounts, items } = input;
   const end = addDaysISO(today, 6);
   const oldest = addDaysISO(today, -OVERDUE_WINDOW_DAYS);
@@ -92,6 +94,7 @@ export function buildWeek(input: { today: string; accounts: CashAccount[]; items
     inCents,
     accounts: shown,
     endTotalCents: accountWeeks.reduce((s, a) => s + a.endCents, 0),
+    excludedCount: input.excludedCount ?? 0,
   };
 }
 

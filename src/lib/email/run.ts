@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CurrencyCode } from "@/lib/money";
-import { todayIn } from "@/lib/today";
 import { buildEmail, closingMonth } from "./build";
 import { firstNameOf, siteUrl, type EmailContext, type EmailKind } from "./context";
 import { sendEmail } from "./send";
@@ -74,9 +73,40 @@ export type RunReport = {
   errors: { member: string; kind?: EmailKind; error: string }[];
 };
 
+/** Data local (AAAA-MM-DD) num fuso, num instante dado. */
+function localDate(timeZone: string, now: Date): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  } catch {
+    return now.toISOString().slice(0, 10);
+  }
+}
+
+/** Reserva que ficou "enviando" por mais que isso (rodada morreu no meio): tenta de novo. */
+const STALE_CLAIM_MS = 30 * 60 * 1000;
+
+/**
+ * Reserva o envio (pessoa, tipo, período). Devolve false se outra rodada
+ * já mandou, pulou ou está mandando agora.
+ */
+async function claim(admin: SupabaseClient, memberId: string, kind: EmailKind, period: string): Promise<boolean | string> {
+  const { error } = await admin.from("email_log").insert({ member_id: memberId, kind, period, status: "pending" });
+  if (!error) return true;
+  if (error.code !== "23505") return error.message;
+  // Já existe: só retoma se for uma reserva velha que nunca terminou.
+  const cutoff = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  const { data } = await admin
+    .from("email_log")
+    .update({ created_at: new Date().toISOString() })
+    .match({ member_id: memberId, kind, period, status: "pending" })
+    .lt("created_at", cutoff)
+    .select("id");
+  return (data?.length ?? 0) > 0;
+}
+
 export async function runScheduledEmails(
   admin: SupabaseClient,
-  opts: { now?: Date; dryRun?: boolean; onlyMember?: string } = {},
+  opts: { now?: Date; dryRun?: boolean } = {},
 ): Promise<RunReport> {
   const now = opts.now ?? new Date();
   const report: RunReport = { households: 0, sent: [], skipped: [], errors: [] };
@@ -86,24 +116,47 @@ export async function runScheduledEmails(
 
   for (const h of households ?? []) {
     const timezone = (h.timezone as string | null) ?? "America/New_York";
-    if (localHour(timezone, now) < SEND_HOUR && !opts.onlyMember) continue;
-    const today = todayIn(timezone);
+    if (localHour(timezone, now) < SEND_HOUR) continue;
+    const today = localDate(timezone, now);
     report.households += 1;
 
     const { data: members } = await admin
       .from("members")
       .select("id, display_name")
       .eq("household_id", h.id);
-    const people = (members ?? []).filter((m) => !opts.onlyMember || m.id === opts.onlyMember);
+    const people = members ?? [];
+    if (people.length === 0) continue;
+
+    // O que já foi resolvido hoje (mandado, pulado ou mandando): sem isso,
+    // cada rodada depois das 8h refaria as consultas de todo mundo.
+    const ids = people.map((m) => m.id as string);
+    const [{ data: prefRows }, { data: logRows }] = await Promise.all([
+      admin.from("email_preferences").select("member_id, weekly, monthly, alerts, unsubscribe_token").in("member_id", ids),
+      admin
+        .from("email_log")
+        .select("member_id, kind, period, status, created_at")
+        .in("member_id", ids)
+        .in("period", [today, closingMonth(today)]),
+    ]);
+    const prefsBy = new Map((prefRows ?? []).map((p) => [p.member_id as string, p as Preferences]));
+    const staleBefore = now.getTime() - STALE_CLAIM_MS;
+    const done = new Set(
+      (logRows ?? [])
+        .filter((l) => l.status !== "pending" || new Date(l.created_at as string).getTime() > staleBefore)
+        .map((l) => `${l.member_id}:${l.kind}:${l.period}`),
+    );
 
     for (const m of people) {
       const memberId = m.id as string;
       const label = (m.display_name as string) ?? memberId;
       try {
-        const prefs = await ensurePreferences(admin, memberId);
-        const kinds = dueKinds(today, prefs);
+        const known = prefsBy.get(memberId);
+        const flags = known ?? { weekly: true, monthly: true, alerts: true };
+        const kinds = dueKinds(today, flags).filter((k) => !done.has(`${memberId}:${k.kind}:${k.period}`));
         if (kinds.length === 0) continue;
 
+        // Simulação não grava nada (nem a linha de preferências).
+        const prefs = known ?? (opts.dryRun ? null : await ensurePreferences(admin, memberId));
         const { data: userData } = await admin.auth.admin.getUserById(memberId);
         const to = userData?.user?.email;
         if (!to) {
@@ -117,22 +170,20 @@ export async function runScheduledEmails(
           householdName: h.name as string,
           memberId,
           firstName: firstNameOf(label),
-          shared: (members ?? []).length > 1,
+          shared: people.length > 1,
           currency: ((h.currency as CurrencyCode | null) ?? "USD") as CurrencyCode,
           timezone,
           today,
           siteUrl: siteUrl(),
-          unsubscribeUrl: (kind) => unsubscribeLink(prefs.unsubscribe_token, kind),
+          unsubscribeUrl: (kind) => (prefs ? unsubscribeLink(prefs.unsubscribe_token, kind) : null),
         };
 
         for (const { kind, period } of kinds) {
+          const key = { member_id: memberId, kind, period };
           if (!opts.dryRun) {
-            // Reserva: se a linha já existe, outra rodada já cuidou disso.
-            const { error: claimError } = await admin
-              .from("email_log")
-              .insert({ member_id: memberId, kind, period, status: "sent" });
-            if (claimError) {
-              if (claimError.code !== "23505") report.errors.push({ member: label, kind, error: claimError.message });
+            const claimed = await claim(admin, memberId, kind, period);
+            if (claimed !== true) {
+              if (typeof claimed === "string") report.errors.push({ member: label, kind, error: claimed });
               continue;
             }
           }
@@ -141,15 +192,13 @@ export async function runScheduledEmails(
           try {
             email = await buildEmail(kind, ctx);
           } catch (e) {
-            if (!opts.dryRun) await admin.from("email_log").delete().match({ member_id: memberId, kind, period });
+            if (!opts.dryRun) await admin.from("email_log").delete().match(key);
             report.errors.push({ member: label, kind, error: e instanceof Error ? e.message : String(e) });
             continue;
           }
 
           if (!email) {
-            if (!opts.dryRun) {
-              await admin.from("email_log").update({ status: "skipped" }).match({ member_id: memberId, kind, period });
-            }
+            if (!opts.dryRun) await admin.from("email_log").update({ status: "skipped" }).match(key);
             report.skipped.push({ member: label, kind, reason: "nada a dizer" });
             continue;
           }
@@ -166,13 +215,16 @@ export async function runScheduledEmails(
             text: email.text,
             unsubscribeUrl: ctx.unsubscribeUrl(kind),
             tag: kind,
+            // Se a resposta do Resend se perder e a rodada tentar de novo, o
+            // Resend reconhece e não manda duas vezes.
+            idempotencyKey: `${memberId}:${kind}:${period}`,
           });
           if (result.ok) {
-            await admin.from("email_log").update({ provider_id: result.id }).match({ member_id: memberId, kind, period });
+            await admin.from("email_log").update({ status: "sent", provider_id: result.id }).match(key);
             report.sent.push({ member: label, kind, subject: email.subject });
           } else {
             // Libera a reserva: a próxima rodada tenta de novo.
-            await admin.from("email_log").delete().match({ member_id: memberId, kind, period });
+            await admin.from("email_log").delete().match(key);
             report.errors.push({ member: label, kind, error: result.error });
           }
         }

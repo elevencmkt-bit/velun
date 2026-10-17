@@ -102,6 +102,9 @@ export async function loadGoals(params: {
     )
     .eq("household_id", householdId)
     .eq("is_archived", false)
+    // Igual ao RLS (goals_rw): meta oculta de outra pessoa não vem. Repetido
+    // aqui porque os e-mails agendados leem sem RLS (service role).
+    .or(`owner_id.is.null,owner_id.eq.${memberId},visibility.eq.shared`)
     .order("created_at");
   if (error) throw new Error(error.message);
   const goals = (goalRows ?? []) as GoalRow[];
@@ -126,12 +129,12 @@ export async function loadGoals(params: {
     transaction_id: string | null;
     tx: RawTx | RawTx[] | null;
   };
-  type RawTx = { amount_cents: number; date: string; description: string; account: { name: string } | { name: string }[] | null };
+  type RawTx = { amount_cents: number; date: string; description: string; account_id: string; account: { name: string } | { name: string }[] | null };
   const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
   const rawDeposits = await fetchAll<RawDeposit>((from, to) =>
     supabase
       .from("goal_deposits")
-      .select("id, goal_id, amount_cents, date, note, transaction_id, tx:transactions(amount_cents, date, description, account:accounts(name))")
+      .select("id, goal_id, amount_cents, date, note, transaction_id, tx:transactions(amount_cents, date, description, account_id, account:accounts(name))")
       .in("goal_id", goalIds)
       .order("date", { ascending: false })
       .order("id")
@@ -139,9 +142,13 @@ export async function loadGoals(params: {
   );
   // Vinculado: o lançamento manda (se ele for editado, a meta acompanha).
   // Se quem vê não enxerga o lançamento, fica o valor guardado na hora.
+  // Lançamento numa conta que quem vê não enxerga conta como "não vejo"
+  // (o RLS já faz isso no app; os e-mails leem sem RLS).
+  const visibleAccounts = new Set(balanceScope.ids);
   const deposits: GoalDeposit[] = rawDeposits
     .map((d) => {
-      const tx = one(d.tx);
+      const raw = one(d.tx);
+      const tx = raw && visibleAccounts.has(raw.account_id) ? raw : null;
       return {
         id: d.id,
         goal_id: d.goal_id,
