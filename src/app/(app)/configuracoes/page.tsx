@@ -11,6 +11,9 @@ import { HouseholdSettingsForm } from "./household-settings-form";
 import { themedBg, themedFg } from "@/lib/theme-color";
 import { AppearancePicker } from "./appearance-picker";
 import { ScreenHelp } from "@/components/screen-help";
+import { EmailSettingsPanel } from "./email-settings";
+import { getEmailSettings } from "@/lib/actions/email-preferences";
+import { TIMEZONES } from "@/lib/household-settings";
 
 const BENEFITS = [
   { icon: ChartNoAxesColumnIncreasing, label: "Acompanhar saldo e gastos", bg: "#E9FBF2", fg: "#19B86A" },
@@ -59,7 +62,7 @@ export default async function ConfiguracoesPage() {
   const { memberId, householdId, currency, country, timezone } = await getCurrentMember();
   const supabase = await createClient();
 
-  const [withAvatar, categoriesResult, colorMap, membersResult, inviteResult] = await Promise.all([
+  const [withAvatar, categoriesResult, colorMap, membersResult, inviteResult, emailSettings] = await Promise.all([
     supabase.from("members").select("display_name, avatar_url").eq("id", memberId).maybeSingle(),
     supabase
       .from("categories")
@@ -81,7 +84,9 @@ export default async function ConfiguracoesPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    getEmailSettings(),
   ]);
+  const timezoneLabel = (TIMEZONES.find((t) => t.value === timezone)?.label ?? timezone).split(" (")[0];
 
   // avatar_url pode ainda não existir se a migração 0003 não rodou —
   // refaz sem a coluna em vez de perder o nome também.
@@ -227,6 +232,12 @@ export default async function ConfiguracoesPage() {
           ))}
         </div>
       </section>
+
+      <Card id="emails" className="scroll-mt-24">
+        <CardContent>
+          <EmailSettingsPanel initial={emailSettings} timezoneLabel={timezoneLabel} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent>

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Link2, Mail } from "lucide-react";
-import { ensureInvite, revokeInvite } from "@/lib/actions/invites";
+import { ensureInvite, inviteByEmail, revokeInvite } from "@/lib/actions/invites";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -13,7 +13,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
   const [isPending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
   const [copied, setCopied] = useState(false);
-  const [invited, setInvited] = useState(false);
+  const [invited, setInvited] = useState<{ email: string; emailed: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -30,11 +30,12 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
     setError(null);
     startTransition(async () => {
       try {
-        // O Velun não manda email: gerar o convite já copia o link, pra
-        // quem convidou mandar por onde quiser.
-        const token = await ensureInvite(email);
+        // Manda o e-mail de convite (quando o envio está ligado) e copia o
+        // link também, pra quem convidou mandar por mensagem se quiser.
+        const sentTo = email.trim();
+        const { token, emailed } = await inviteByEmail(sentTo);
         copyToken(token);
-        setInvited(true);
+        setInvited({ email: sentTo, emailed });
         setEmail("");
         router.refresh();
       } catch (err) {
@@ -92,7 +93,7 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
             />
           </div>
           <Button type="submit" disabled={isPending} className="h-11 shrink-0">
-            {isPending ? "Gerando..." : "Gerar convite"}
+            {isPending ? "Mandando..." : "Mandar convite"}
           </Button>
         </div>
         <span className="text-xs text-(--text-light)">Só esse email vai poder usar o link.</span>
@@ -100,8 +101,9 @@ export function InviteManager({ pendingInvite }: { pendingInvite: PendingInvite 
 
       {invited ? (
         <p className="text-xs text-(--text-secondary)">
-          Link copiado. O Velun não manda email — cole o link numa mensagem pra ela (WhatsApp,
-          por exemplo). Vale por 7 dias e só uma vez.
+          {invited.emailed
+            ? `Convite mandado pra ${invited.email}. O link também foi copiado, se quiser mandar por mensagem. Vale por 7 dias e só uma vez.`
+            : "Link copiado. Cole numa mensagem pra ela (WhatsApp, por exemplo). Vale por 7 dias e só uma vez."}
         </p>
       ) : null}
 

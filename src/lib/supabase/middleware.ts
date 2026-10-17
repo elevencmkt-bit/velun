@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { classifyClaims } from "@/lib/auth-check";
 
 const AUTH_ROUTES = ["/login", "/convite", "/esqueci-senha"];
-const OPEN_ROUTES = ["/auth/confirm", "/nova-senha", "/ajuda"];
+// /api/cron e /api/emails conferem o próprio segredo/token; /emails/sair é
+// o "parar de receber" do rodapé dos e-mails, que abre sem login.
+const OPEN_ROUTES = ["/auth/confirm", "/nova-senha", "/ajuda", "/emails", "/api/cron", "/api/emails"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

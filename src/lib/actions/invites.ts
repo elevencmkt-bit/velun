@@ -4,6 +4,9 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
+import { renderInvite } from "@/lib/email/render";
+import { siteUrl } from "@/lib/email/context";
+import { emailConfigured, sendEmail } from "@/lib/email/send";
 
 const INVITE_TTL_DAYS = 7;
 
@@ -61,6 +64,36 @@ export async function ensureInvite(email?: string): Promise<string> {
 
   revalidatePath("/configuracoes");
   return token;
+}
+
+/**
+ * Convite com e-mail: gera (ou reaproveita) o convite e manda o e-mail
+ * pela pessoa. Sem o envio ligado no servidor, devolve só o link pra
+ * copiar, como antes.
+ */
+export async function inviteByEmail(email: string): Promise<{ token: string; emailed: boolean }> {
+  const trimmed = email.trim();
+  const token = await ensureInvite(trimmed);
+  if (!trimmed || !emailConfigured()) return { token, emailed: false };
+
+  const { householdId, displayName } = await getCurrentMember();
+  const supabase = await createClient();
+  const [{ data: household }, { data: invite }] = await Promise.all([
+    supabase.from("households").select("name").eq("id", householdId).maybeSingle(),
+    supabase.from("household_invites").select("expires_at").eq("token", token).maybeSingle(),
+  ]);
+  const site = siteUrl();
+  const built = renderInvite({
+    inviterName: displayName,
+    householdName: (household?.name as string | undefined) ?? "sua casa",
+    link: `${site}/convite/${token}`,
+    email: trimmed,
+    expiresOn: String(invite?.expires_at ?? new Date(Date.now() + INVITE_TTL_DAYS * 864e5).toISOString()).slice(0, 10),
+    siteUrl: site,
+  });
+  const result = await sendEmail({ to: trimmed, subject: built.subject, html: built.html, text: built.text, tag: "convite" });
+  if (!result.ok) console.error("[convite] e-mail não saiu:", result.error);
+  return { token, emailed: result.ok };
 }
 
 export async function revokeInvite(inviteId: string) {
