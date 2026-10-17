@@ -31,6 +31,8 @@ import { verifyStatement } from "@/lib/import/verify";
 import { looksLikeNomad, parseNomadStatementText } from "@/lib/import/nomad-pdf";
 import { suggestCategoryId } from "@/lib/import/mcc";
 import { screensToStatement, type OcrScreen } from "@/lib/import/screenshot";
+import { isIsoDate, type FileStatement } from "@/lib/import/file-statement";
+import type { ColumnMapping } from "@/lib/import/table";
 import { duplicateCounter } from "@/lib/import/duplicates";
 import { fitsDirection } from "@/lib/category-kind";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -116,6 +118,10 @@ export async function importStatement(input: {
   text?: string;
   /** Ou: palavras reconhecidas em prints da lista do app (no navegador). */
   screens?: OcrScreen[];
+  /** Ou: lançamentos lidos de OFX/QFX, CSV ou planilha (no navegador). */
+  file?: FileStatement;
+  /** Colunas usadas na planilha, pra lembrar na próxima (CSV/XLSX). */
+  mapping?: { signature: string; columns: ColumnMapping };
 }): Promise<ImportResult> {
   try {
     return await runImportStatement(input);
@@ -176,11 +182,94 @@ function validScreens(screens: unknown): OcrScreen[] | null {
   return out;
 }
 
+const MAX_FILE_ROWS = 5000;
+
+/**
+ * Lançamentos de arquivo vêm do navegador: confere cada campo antes de
+ * confiar. Devolve a frase do problema, ou o extrato limpo.
+ */
+function validFileStatement(file: unknown): FileStatement | string {
+  if (!file || typeof file !== "object") return "Não consegui ler esse arquivo.";
+  const f = file as FileStatement;
+  if (f.format !== "ofx" && f.format !== "csv" && f.format !== "xlsx") return "Formato de arquivo desconhecido.";
+  if (!Array.isArray(f.transactions) || f.transactions.length === 0) {
+    return "Não achei lançamentos nesse arquivo. Confira as colunas e o período baixado.";
+  }
+  if (f.transactions.length > MAX_FILE_ROWS) {
+    return `Esse arquivo tem mais de ${MAX_FILE_ROWS} lançamentos. Baixe um período menor (alguns meses por vez).`;
+  }
+  const transactions: FileStatement["transactions"] = [];
+  for (const t of f.transactions) {
+    if (!t || typeof t !== "object") return "Não consegui ler esse arquivo.";
+    if (typeof t.date !== "string" || !isIsoDate(t.date)) return "Tem lançamento com data inválida no arquivo.";
+    if (!Number.isInteger(t.amountCents) || t.amountCents <= 0 || t.amountCents > 100_000_000_00) {
+      return "Tem lançamento com valor inválido no arquivo.";
+    }
+    if (t.direction !== "in" && t.direction !== "out") return "Não consegui ler esse arquivo.";
+    const description = typeof t.description === "string" ? t.description.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+    const mcc = typeof t.mcc === "string" && /^\d{4}$/.test(t.mcc) ? t.mcc : null;
+    transactions.push({ date: t.date, description: description || "Lançamento", amountCents: t.amountCents, direction: t.direction, mcc });
+  }
+  const dates = transactions.map((t) => t.date).sort();
+  let periodStart = dates[0];
+  let periodEnd = dates[dates.length - 1];
+  // O período informado só pode alargar até 45 dias além das datas.
+  if (typeof f.periodStart === "string" && isIsoDate(f.periodStart) && f.periodStart < periodStart && f.periodStart >= shiftDays(periodStart, -45)) periodStart = f.periodStart;
+  if (typeof f.periodEnd === "string" && isIsoDate(f.periodEnd) && f.periodEnd > periodEnd && f.periodEnd <= shiftDays(periodEnd, 45)) periodEnd = f.periodEnd;
+  const balance =
+    f.balance && typeof f.balance === "object" && Number.isInteger(f.balance.cents) && Math.abs(f.balance.cents) < 1e13 && typeof f.balance.date === "string" && isIsoDate(f.balance.date)
+      ? { cents: f.balance.cents, date: f.balance.date }
+      : null;
+  return {
+    format: f.format,
+    periodStart,
+    periodEnd,
+    kind: f.kind === "bank" || f.kind === "card" ? f.kind : null,
+    balance,
+    transactions,
+    skipped: Number.isInteger(f.skipped) && f.skipped >= 0 ? f.skipped : 0,
+  };
+}
+
+function validMapping(m: unknown): { signature: string; columns: ColumnMapping } | null {
+  if (!m || typeof m !== "object") return null;
+  const { signature, columns: c } = m as { signature: unknown; columns: ColumnMapping };
+  if (typeof signature !== "string" || signature.length === 0 || signature.length > 400 || !c) return null;
+  const col = (x: unknown) => x === null || (Number.isInteger(x) && (x as number) >= 0 && (x as number) < 200);
+  if (!Number.isInteger(c.headerRow) || c.headerRow < -1 || c.headerRow > 100) return null;
+  if (!col(c.date) || c.date === null || !col(c.description) || c.description === null) return null;
+  if (!col(c.amount) || !col(c.debit) || !col(c.credit)) return null;
+  if (!["ymd", "dmy", "mdy"].includes(c.dateFormat) || (c.decimal !== "." && c.decimal !== ",")) return null;
+  if (typeof c.outIsNegative !== "boolean") return null;
+  return {
+    signature,
+    columns: {
+      headerRow: c.headerRow,
+      date: c.date,
+      description: c.description,
+      amount: c.amount,
+      debit: c.debit,
+      credit: c.credit,
+      dateFormat: c.dateFormat,
+      decimal: c.decimal,
+      outIsNegative: c.outIsNegative,
+    },
+  };
+}
+
+const FILE_LABEL: Record<FileStatement["format"], string> = {
+  ofx: "do arquivo OFX",
+  csv: "do CSV",
+  xlsx: "da planilha",
+};
+
 async function runImportStatement(input: {
   accountId: string;
   fileName: string;
   text?: string;
   screens?: OcrScreen[];
+  file?: FileStatement;
+  mapping?: { signature: string; columns: ColumnMapping };
 }): Promise<ImportResult> {
   const { householdId, memberId, timezone } = await getCurrentMember();
   const supabase = await createClient();
@@ -189,12 +278,15 @@ async function runImportStatement(input: {
   const text = input.text ?? "";
   const screens = input.screens ? validScreens(input.screens) : null;
   if (input.screens && !screens) return { ok: false, error: "Não consegui ler esses prints. Tente de novo." };
+  const fileChecked = input.file ? validFileStatement(input.file) : null;
+  if (typeof fileChecked === "string") return { ok: false, error: fileChecked };
+  const fileInput = fileChecked;
 
   // Falhas previsíveis voltam como resultado, não como exceção: o Next
   // mascara erro de server action em produção, e o usuário acabaria
   // vendo um código do React no lugar da causa.
   if (!accountId) return { ok: false, error: "Escolha a conta do extrato." };
-  if (!screens && !text.trim()) {
+  if (!screens && !fileInput && !text.trim()) {
     return {
       ok: false,
       error:
@@ -245,6 +337,7 @@ async function runImportStatement(input: {
   let screensBefore: number | null = null;
   let cardDaysNote: string | null = null;
   let nomadNote: string | null = null;
+  let fileNote: string | null = null;
   // `matches` null: o documento não traz como conferir (Nomad).
   let verification: {
     matches: boolean | null;
@@ -252,11 +345,62 @@ async function runImportStatement(input: {
     firstDivergence?: { date: string } | null;
   };
   try {
-    if (screens) {
+    if (fileInput) {
+      // O arquivo diz de que tipo é a conta (OFX): recusa o do outro lado,
+      // como no PDF.
+      if (isCard && fileInput.kind === "bank") {
+        return { ok: false, error: "Esse arquivo é de conta corrente. Escolha a conta, não o cartão." };
+      }
+      if (!isCard && fileInput.kind === "card") {
+        return { ok: false, error: "Esse arquivo é de cartão de crédito. Escolha o cartão como conta pra importar." };
+      }
+      const sum = fileInput.transactions.reduce((n, t) => n + (t.direction === "in" ? t.amountCents : -t.amountCents), 0);
+      statement = {
+        periodStart: fileInput.periodStart,
+        periodEnd: fileInput.periodEnd,
+        beginningBalanceCents: 0,
+        endingBalanceCents: fileInput.balance?.cents ?? 0,
+        transactions: fileInput.transactions,
+        dailyBalances: [],
+      };
+      verification = { matches: null, extractedSumCents: sum };
+      const fmt = (c: number) => `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+      const br = (iso: string) => iso.split("-").reverse().join("/");
+      const n = fileInput.transactions.length;
+      const parts = [`Lido ${FILE_LABEL[fileInput.format]}: ${n} ${n === 1 ? "lançamento" : "lançamentos"}.`];
+      if (fileInput.skipped > 0) {
+        parts.push(
+          fileInput.skipped === 1
+            ? "1 linha sem data ou valor (saldo, total) ficou de fora."
+            : `${fileInput.skipped} linhas sem data ou valor (saldos, totais) ficaram de fora.`,
+        );
+      }
+      // Conta com saldo informado no arquivo: o saldo do Velun antes do
+      // período mais os lançamentos do arquivo tem que dar o do banco.
+      if (fileInput.balance && !isCard && fileInput.balance.date >= statement.periodEnd) {
+        const before = await balanceBefore(supabase, householdId, accountId, statement.periodStart);
+        const after = before + sum;
+        statement.beginningBalanceCents = fileInput.balance.cents - sum;
+        const diff = fileInput.balance.cents - after;
+        verification.matches = diff === 0;
+        if (diff !== 0) {
+          parts.push(
+            `O banco informa saldo de ${fmt(fileInput.balance.cents)} em ${br(fileInput.balance.date)}. O Velun tem ${fmt(before)} antes de ${br(statement.periodStart)} e, com estes lançamentos, fecharia em ${fmt(after)} (diferença de ${fmt(diff)}). Faltam ou sobram lançamentos antes de ${br(statement.periodStart)}, ou o arquivo não cobre o período inteiro.`,
+          );
+        }
+      } else if (fileInput.balance) {
+        parts.push(
+          isCard
+            ? `O arquivo informa saldo do cartão de ${fmt(fileInput.balance.cents)} em ${br(fileInput.balance.date)}.`
+            : `O banco informa saldo de ${fmt(fileInput.balance.cents)} em ${br(fileInput.balance.date)}. Depois de importar, compare com o saldo da conta no Velun.`,
+        );
+      }
+      fileNote = parts.join(" ");
+    } else if (screens) {
       if (isCard) {
         return {
           ok: false,
-          error: "Print funciona pra conta. Pra fatura de cartão, use o PDF da fatura do Nubank.",
+          error: "Print funciona pra conta. Pra cartão, use o OFX/CSV do cartão ou o PDF da fatura do Nubank.",
         };
       }
       let read = screensToStatement(screens);
@@ -357,7 +501,7 @@ async function runImportStatement(input: {
         return {
           ok: false,
           error:
-            "Não reconheci essa fatura. Por enquanto o Velun lê faturas do Nubank em PDF.",
+            "Não reconheci essa fatura. Em PDF o Velun lê a do Nubank; de outro cartão, baixe o OFX/QFX ou o CSV no site do banco.",
         };
       }
       const card = parseNubankStatementText(text);
@@ -448,11 +592,11 @@ async function runImportStatement(input: {
       household_id: householdId,
       account_id: accountId,
       file_path: fileName,
-      file_type: screens ? "image" : "pdf",
+      file_type: fileInput ? fileInput.format : screens ? "image" : "pdf",
       status: "review",
       statement_start: statement.periodStart,
       statement_end: statement.periodEnd,
-      closing_balance_cents: statement.endingBalanceCents,
+      closing_balance_cents: fileInput ? (fileInput.balance?.cents ?? null) : statement.endingBalanceCents,
       extracted_sum_cents: verification.extractedSumCents,
       balance_matches: verification.matches,
       created_by: memberId,
@@ -503,10 +647,11 @@ async function runImportStatement(input: {
     amount_cents: number;
     direction: string;
     status: string;
+    import_id: string | null;
   }>((from, to) =>
     supabase
       .from("transactions")
-      .select("fingerprint, date, amount_cents, direction, status")
+      .select("fingerprint, date, amount_cents, direction, status, import_id")
       .eq("household_id", householdId)
       .eq("account_id", accountId)
       .gte("date", statement.periodStart)
@@ -530,7 +675,42 @@ async function runImportStatement(input: {
         return (_fp: string, t: { date: string; direction: string; amountCents: number }) =>
           loose(looseKey(t.date, t.direction, t.amountCents));
       })()
-    : (() => {
+    : fileInput
+      ? (() => {
+          // Arquivo: o texto do banco no OFX/CSV não é o do PDF (o OFX corta
+          // o nome em 32 letras, o CSV às vezes traz outra descrição). O que
+          // já veio de outra importação vale por dia + valor + direção; o
+          // resto, pela impressão digital. Uma linha existente só é
+          // "gasta" uma vez: o que bate pela impressão digital sai também
+          // da contagem solta.
+          const strict = duplicateCounter(existing.map((t) => t.fingerprint));
+          const imported = existing.filter((t) => t.status === "cleared" && t.import_id);
+          const looseLeft = new Map<string, number>();
+          for (const t of imported) {
+            const k = looseKey(t.date, t.direction, t.amount_cents);
+            looseLeft.set(k, (looseLeft.get(k) ?? 0) + 1);
+          }
+          const importedFp = new Set(imported.map((t) => t.fingerprint));
+          // Primeiro todas as exatas, depois as soltas — senão uma linha
+          // solta poderia gastar a existente de uma exata mais abaixo.
+          const exact = new Map<number, boolean>();
+          statement.transactions.forEach((t, i) => {
+            const fp = computeFingerprint({ accountId, date: t.date, amountCents: t.amountCents, description: t.description });
+            if (!strict(fp)) return;
+            exact.set(i, true);
+            const k = looseKey(t.date, t.direction, t.amountCents);
+            if (importedFp.has(fp) && (looseLeft.get(k) ?? 0) > 0) looseLeft.set(k, (looseLeft.get(k) ?? 0) - 1);
+          });
+          return (_fp: string, t: { date: string; direction: string; amountCents: number }, index: number) => {
+            if (exact.has(index)) return true;
+            const k = looseKey(t.date, t.direction, t.amountCents);
+            const left = looseLeft.get(k) ?? 0;
+            if (left === 0) return false;
+            looseLeft.set(k, left - 1);
+            return true;
+          };
+        })()
+      : (() => {
         const strict = duplicateCounter(existing.map((t) => t.fingerprint));
         return (fp: string) => strict(fp);
       })();
@@ -595,14 +775,14 @@ async function runImportStatement(input: {
     return fitsDirection(category, direction) ? id : null;
   };
 
-  const rows = statement.transactions.map((t) => {
+  const rows = statement.transactions.map((t, index) => {
     const fingerprint = computeFingerprint({
       accountId,
       date: t.date,
       amountCents: t.amountCents,
       description: t.description,
     });
-    const isDuplicate = isExistingDuplicate(fingerprint, t);
+    const isDuplicate = isExistingDuplicate(fingerprint, t, index);
     const learnedId = learnedFor(t.description, t.direction);
     const suggested =
       learnedId ?? suggestCategoryId(t.mcc, categoriesByName, t.direction);
@@ -813,7 +993,7 @@ async function runImportStatement(input: {
   const duplicates = rows.filter((r) => r.dup_status === "duplicate").length;
 
   let message: string | null = null;
-  if (verification.matches === false) {
+  if (verification.matches === false && !fileInput) {
     message = isCard
       ? "A soma dos lançamentos não fecha com o total da fatura. Revise antes de confirmar."
       : verification.firstDivergence
@@ -824,7 +1004,15 @@ async function runImportStatement(input: {
   if (cardDaysNote)
     message = message ? `${message} ${cardDaysNote}` : cardDaysNote;
   if (nomadNote) message = message ? `${message} ${nomadNote}` : nomadNote;
+  if (fileNote) message = message ? `${fileNote} ${message}` : fileNote;
   if (screensNote) message = message ? `${screensNote} ${message}` : screensNote;
+
+  // Planilha: lembra as colunas pra esta conta. A próxima do mesmo banco
+  // (mesmo cabeçalho) entra sem perguntar. Falhar aqui não desfaz nada.
+  const mapping = fileInput && fileInput.format !== "ofx" ? validMapping(input.mapping) : null;
+  if (mapping && fileInput) {
+    await saveImportMapping(supabase, householdId, accountId, fileInput.format, mapping).catch(() => undefined);
+  }
 
   revalidatePath("/importar");
   revalidatePath("/cartoes");
@@ -837,6 +1025,66 @@ async function runImportStatement(input: {
     duplicates,
     message,
   };
+}
+
+/**
+ * As colunas de planilha moram em `import_profiles` (da 0001, que estava
+ * sem uso): `institution` guarda a assinatura do cabeçalho e
+ * `column_mapping`, a conta e as colunas.
+ */
+async function saveImportMapping(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  householdId: string,
+  accountId: string,
+  format: string,
+  mapping: { signature: string; columns: ColumnMapping },
+) {
+  const value = { accountId, columns: mapping.columns };
+  const { data: existing } = await supabase
+    .from("import_profiles")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("institution", mapping.signature)
+    .eq("column_mapping->>accountId", accountId)
+    .limit(1);
+  if (existing && existing.length > 0) {
+    await supabase
+      .from("import_profiles")
+      .update({ column_mapping: value, date_format: mapping.columns.dateFormat, file_type: format })
+      .eq("id", existing[0].id as string);
+    return;
+  }
+  await supabase.from("import_profiles").insert({
+    household_id: householdId,
+    institution: mapping.signature,
+    file_type: format,
+    column_mapping: value,
+    date_format: mapping.columns.dateFormat,
+  });
+}
+
+/**
+ * Colunas lembradas pra uma planilha com esse cabeçalho: as desta conta,
+ * ou, se ela nunca recebeu esse formato, as de outra conta da casa.
+ */
+export async function getImportMapping(accountId: string, signature: string): Promise<ColumnMapping | null> {
+  try {
+    if (typeof accountId !== "string" || typeof signature !== "string" || signature.length > 400) return null;
+    const { householdId } = await getCurrentMember();
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("import_profiles")
+      .select("column_mapping, created_at")
+      .eq("household_id", householdId)
+      .eq("institution", signature)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const rows = (data ?? []).map((r) => r.column_mapping as { accountId?: string; columns?: unknown });
+    const own = rows.find((r) => r.accountId === accountId) ?? rows[0];
+    return own ? (validMapping({ signature, columns: own.columns })?.columns ?? null) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Transforma o que está marcado na revisão em transações de verdade. */
