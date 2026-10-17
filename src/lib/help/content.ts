@@ -350,6 +350,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { h2: "O Velun aprende", id: "aprende" },
       { p: "Quando você categoriza um lançamento que veio do banco, os outros da mesma loja ainda sem categoria recebem a mesma, e as próximas importações já chegam categorizadas. Cada pessoa da casa tem a sua própria memória." },
       { tip: "No Dashboard e em Relatórios, o aviso de \"sem categoria\" leva direto pra esses lançamentos." },
+      { h2: "Confirmar ou apagar vários", id: "apagar-varios" },
+      { p: "Com lançamentos marcados, a barra também tem **Confirmar** (pros pendentes) e **Apagar**. Apagar pede confirmação e não tem volta; transferência é apagada inteira, dos dois lados." },
     ],
     related: ["configuracoes/categorias-e-subcategorias"],
   },
