@@ -361,13 +361,25 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "extratos-aceitos",
     topic: "importar",
     title: "Quais extratos dá pra importar",
-    summary: "Extrato em PDF do Regions e da Nomad, fatura do cartão Nubank e prints do app do banco.",
+    summary: "OFX/QFX, CSV ou Excel de qualquer banco ou cartão, PDF do Regions, da Nomad e da fatura Nubank, e prints do app.",
     body: [
       { table: [
+        ["OFX / QFX", "Qualquer banco ou cartão. É o arquivo \"do Quicken/Money\" que o site do banco oferece pra baixar. O mais certeiro: já traz data, valor com sinal e, na conta, o saldo pra conferir."],
+        ["CSV ou Excel (.xlsx)", "Qualquer banco ou cartão. Na primeira vez, você confere quais colunas são data, descrição e valor; o Velun lembra pra próxima vez dessa conta."],
         ["Regions", "Extrato da conta. O Velun refaz o saldo dia a dia pra conferir que nada ficou de fora."],
         ["Nomad", "Extrato da conta. Linhas canceladas ficam de fora; as \"Processando\" entram."],
         ["Nubank (cartão)", "Fatura do cartão de crédito. Só numa conta do tipo cartão; ajusta os dias de fechamento e vencimento pelos da fatura."],
         ["Prints do app", "Prints da lista de lançamentos do app do banco (até 10 de uma vez). Quando o app mostra o saldo embaixo de cada valor, como o da Regions, o Velun confere cada linha por ele."],
+      ] },
+      { h2: "OFX, CSV e Excel", id: "arquivos" },
+      { list: [
+        "Baixe no **site** do banco (pelo computador costuma ter mais opções que o app): abra o extrato ou as transações do cartão e procure **Download** ou **Exportar**. Prefira OFX/QFX (às vezes chamado de Quicken ou Money).",
+        "Na tela de Importar, ao escolher a conta, aparece a dica de onde baixar daquele banco.",
+        "No CSV/Excel o Velun adivinha as colunas pelo cabeçalho. Confira a data (dia/mês ou mês/dia), o valor (uma coluna com sinal, ou débito e crédito separados) e se a saída vem negativa ou positiva — na fatura do cartão a compra costuma vir positiva.",
+        "Linhas de saldo e de total (\"Saldo anterior\", \"Saldo do dia\") ficam de fora sozinhas.",
+        "Com o OFX da conta, o Velun confere: o saldo de antes do período mais os lançamentos do arquivo tem que dar o saldo que o banco informa.",
+        "O que já está no Velun, inclusive o que veio de um PDF ou print, vem marcado como **Já existe**.",
+        "O Excel antigo (.xls) não abre: salve como .xlsx ou .csv.",
       ] },
       { h2: "Prints do app", id: "prints" },
       { list: [
@@ -383,10 +395,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { list: [
         "PDF escaneado (foto do papel) ou protegido por senha.",
         "Fatura de cartão numa conta corrente, ou extrato de conta num cartão.",
-        "Outros bancos, por enquanto. Lance à mão enquanto isso.",
+        "PDF de outros bancos: baixe o OFX, CSV ou Excel no lugar.",
       ] },
       { h2: "Seu arquivo", id: "arquivo" },
-      { p: "O PDF é lido no seu navegador. Só o texto das linhas vai pro Velun, e o arquivo não fica guardado." },
+      { p: "O arquivo é lido no seu navegador. Só os lançamentos vão pro Velun (no CSV/Excel, também os nomes das colunas, pra lembrar na próxima), e o arquivo não fica guardado." },
     ],
     related: ["importar/revisar-antes-de-confirmar"],
   },
@@ -398,7 +410,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     body: [
       { steps: [
         "Em **Importar**, escolha de qual conta é o extrato.",
-        "Mande o PDF e toque em **Ler e revisar**.",
+        "Mande o arquivo (OFX, CSV, Excel, PDF ou prints) e toque em **Ler e revisar**.",
         "Na revisão, confira o aviso de saldo: \"O saldo bate com o extrato\" ou \"não bate\".",
         "Desmarque o que não deve entrar, ajuste nomes e categorias. As sugestões automáticas vêm com ✦.",
         "Toque em **Confirmar** pra lançar tudo de uma vez, ou **Descartar** pra desistir.",

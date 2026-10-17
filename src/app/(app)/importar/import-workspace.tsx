@@ -12,6 +12,7 @@ import {
   Lock,
   Link2Off,
   Pencil,
+  SlidersHorizontal,
   Sparkles,
   Undo2,
   Upload,
@@ -20,6 +21,7 @@ import {
   confirmImport,
   discardImport,
   dismissForecast,
+  getImportMapping,
   importStatement,
   setStagedCategory,
   setStagedMerge,
@@ -30,6 +32,20 @@ import {
   type ActionResult,
 } from "@/lib/actions/imports";
 import { extractPdfText } from "@/lib/import/extract-pdf-text";
+import { decodeText, FileReadError, type FileStatement } from "@/lib/import/file-statement";
+import { looksLikeOfx, parseOfx } from "@/lib/import/ofx";
+import {
+  applyMapping,
+  columnLabels,
+  guessMapping,
+  mappingFits,
+  readTable,
+  tableSignature,
+  type ColumnMapping,
+  type Table,
+} from "@/lib/import/table";
+import { exportTip } from "@/lib/import/export-tips";
+import { ColumnMapper, previewSummary } from "./column-mapper";
 import type { CurrencyCode } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,6 +128,31 @@ type Forecast = {
 };
 
 const NO_CATEGORY = "__none__";
+
+type PickedKind = "pdf" | "image" | "ofx" | "table" | "xls" | null;
+
+function kindOf(f: File): PickedKind {
+  const n = f.name.toLowerCase();
+  if (n.endsWith(".pdf")) return "pdf";
+  if (f.type.startsWith("image/") || /\.(png|jpe?g|webp|heic)$/.test(n)) return "image";
+  if (/\.(ofx|qfx|qbo)$/.test(n)) return "ofx";
+  if (/\.(csv|tsv|txt|xlsx)$/.test(n)) return "table";
+  if (n.endsWith(".xls")) return "xls";
+  return null;
+}
+
+/** Planilha lida, com as colunas escolhidas. */
+type PickedTable = {
+  table: Table;
+  labels: string[];
+  signature: string;
+  mapping: ColumnMapping;
+  /** Colunas vieram lembradas de uma importação anterior. */
+  remembered: boolean;
+  /** Painel de colunas aberto. */
+  editing: boolean;
+};
+
 
 function shortDate(iso: string) {
   const [, m, d] = iso.split("-");
@@ -333,18 +374,86 @@ export function ImportWorkspace({
   // Um PDF, ou vários prints da lista de lançamentos do app.
   const [files, setFiles] = useState<File[]>([]);
   const file = files[0] ?? null;
-  const isImages = files.length > 0 && files.every((f) => f.type.startsWith("image/"));
+  const isImages = files.length > 0 && files.every((f) => kindOf(f) === "image");
+  // OFX já lido, ou planilha lida (com as colunas), quando o arquivo é um deles.
+  const [ofx, setOfx] = useState<FileStatement | null>(null);
+  const [sheet, setSheet] = useState<PickedTable | null>(null);
+  const [reading, setReading] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const chosen = accounts.find((a) => a.id === accountId) ?? null;
   const isCardChosen = chosen?.type === "credit_card";
 
+  function clearPicked() {
+    setFiles([]);
+    setOfx(null);
+    setSheet(null);
+  }
+
+  /**
+   * OFX e planilha são lidos assim que escolhidos, aqui no navegador:
+   * assim a pessoa vê quantos lançamentos e de quando antes de mandar, e
+   * a planilha mostra as colunas pra conferir.
+   */
+  async function readDataFile(f: File, kind: "ofx" | "table") {
+    if (!accountId) return;
+    setReading(true);
+    try {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const isXlsx = f.name.toLowerCase().endsWith(".xlsx");
+      const text = isXlsx ? "" : decodeText(bytes);
+      if (kind === "ofx" || looksLikeOfx(text)) {
+        setOfx(parseOfx(text));
+        setFiles([f]);
+        return;
+      }
+      const table = readTable(f.name, bytes, decodeText);
+      const guess = guessMapping(table.rows, { currency, isCard: isCardChosen });
+      const signature = tableSignature(table.rows, guess.headerRow);
+      const saved = await getImportMapping(accountId, signature).catch(() => null);
+      const useSaved = saved && mappingFits(table.rows, saved) && applyMapping(table, saved).transactions.length > 0;
+      const mapping = useSaved ? saved : guess;
+      setSheet({
+        table,
+        labels: columnLabels(table.rows, mapping.headerRow),
+        signature,
+        mapping,
+        remembered: Boolean(useSaved),
+        editing: !useSaved,
+      });
+      setFiles([f]);
+    } catch (err) {
+      clearPicked();
+      setError(
+        err instanceof FileReadError
+          ? err.message
+          : "Não consegui ler esse arquivo. Baixe de novo no banco e tente outra vez.",
+      );
+    } finally {
+      setReading(false);
+    }
+  }
+
   function pickFiles(list: FileList | File[] | null | undefined) {
     const picked = Array.from(list ?? []);
     if (picked.length === 0) return;
     setError(null);
-    const pdfs = picked.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
-    const images = picked.filter((f) => f.type.startsWith("image/"));
+    setNotice(null);
+    setOfx(null);
+    setSheet(null);
+    const kinds = picked.map(kindOf);
+    const pdfs = picked.filter((_, i) => kinds[i] === "pdf");
+    const images = picked.filter((_, i) => kinds[i] === "image");
+    if (picked.length === 1 && (kinds[0] === "ofx" || kinds[0] === "table")) {
+      setFiles([]);
+      void readDataFile(picked[0], kinds[0]);
+      return;
+    }
+    if (kinds.includes("xls")) {
+      setFiles([]);
+      setError("Esse é o formato antigo do Excel (.xls). Abra no Excel ou no Google Planilhas e salve como .xlsx ou .csv.");
+      return;
+    }
     if (pdfs.length === 1 && picked.length === 1) {
       setFiles(pdfs);
       return;
@@ -352,7 +461,7 @@ export function ImportWorkspace({
     if (images.length === picked.length) {
       if (isCardChosen) {
         setFiles([]);
-        setError("Print funciona pra conta. Pra fatura de cartão, use o PDF da fatura do Nubank.");
+        setError("Print funciona pra conta. Pra cartão, use o OFX/CSV do cartão ou o PDF da fatura do Nubank.");
         return;
       }
       if (images.length > 10) {
@@ -364,7 +473,11 @@ export function ImportWorkspace({
       return;
     }
     setFiles([]);
-    setError("Mande um PDF (extrato da Regions ou da Nomad, ou fatura do Nubank) ou prints da lista de lançamentos do app.");
+    setError(
+      picked.length > 1
+        ? "Mande um arquivo por vez (ou até 10 prints)."
+        : "Esse tipo de arquivo o Velun não lê. Mande OFX/QFX, CSV, Excel (.xlsx), o extrato em PDF ou prints do app.",
+    );
   }
 
   function onUpload(event: React.FormEvent<HTMLFormElement>) {
@@ -372,7 +485,38 @@ export function ImportWorkspace({
     setError(null);
 
     if (!accountId) return setError("Escolha de qual conta é o extrato.");
-    if (!file || file.size === 0) return setError("Escolha o PDF ou os prints.");
+    if (!file || file.size === 0) return setError("Escolha o arquivo ou os prints.");
+
+    if (ofx || sheet) {
+      let statement: FileStatement;
+      if (sheet) {
+        statement = applyMapping(sheet.table, sheet.mapping);
+        if (statement.transactions.length === 0) {
+          setSheet({ ...sheet, editing: true });
+          return setError("Nenhuma linha virou lançamento com essas colunas. Confira a data, o formato e o valor.");
+        }
+      } else statement = ofx as FileStatement;
+      startTransition(async () => {
+        try {
+          const result = await importStatement({
+            accountId,
+            fileName: file.name,
+            file: statement,
+            mapping: sheet ? { signature: sheet.signature, columns: sheet.mapping } : undefined,
+          });
+          if (!result.ok) {
+            setError(result.error);
+            return;
+          }
+          setNotice(result.message);
+          clearPicked();
+          router.refresh();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Algo deu errado ao ler o arquivo.");
+        }
+      });
+      return;
+    }
 
     if (isImages) {
       startTransition(async () => {
@@ -470,6 +614,9 @@ export function ImportWorkspace({
           key={a.id}
           type="button"
           onClick={() => {
+            // Outra conta muda o palpite das colunas (cartão × conta) e o
+            // que foi lembrado: escolhe o arquivo de novo.
+            if (a.id !== accountId) clearPicked();
             setAccountId(a.id);
             setError(null);
           }}
@@ -530,7 +677,7 @@ export function ImportWorkspace({
 
             <div>
               <div className="mb-2.5 text-[11px] font-bold tracking-[0.04em] text-(--text-light) uppercase md:text-xs">
-                2 · {isCardChosen ? "Mande a fatura" : "Mande o PDF ou os prints"}
+                2 · {isCardChosen ? "Mande a fatura ou o arquivo do cartão" : "Mande o arquivo do banco"}
                 {chosen ? <span className="normal-case tracking-normal text-(--primary)"> da {chosen.name}</span> : null}
               </div>
               {/* Só abre depois de escolher a conta: com mais de uma conta,
@@ -558,7 +705,11 @@ export function ImportWorkspace({
               >
                 <input
                   type="file"
-                  accept={isCardChosen ? "application/pdf" : "application/pdf,image/*"}
+                  accept={
+                    isCardChosen
+                      ? ".pdf,.ofx,.qfx,.qbo,.csv,.tsv,.txt,.xlsx,.xls,application/pdf,text/csv"
+                      : ".pdf,.ofx,.qfx,.qbo,.csv,.tsv,.txt,.xlsx,.xls,application/pdf,text/csv,image/*"
+                  }
                   multiple={!isCardChosen}
                   className="sr-only"
                   disabled={!chosen}
@@ -588,7 +739,12 @@ export function ImportWorkspace({
                       {isImages ? (files.length === 1 ? "1 print" : `${files.length} prints`) : file.name}
                     </span>
                     <span className="block text-[13px] text-(--text-muted)">
-                      Pronto pra ler · <span className="font-semibold text-(--primary)">trocar arquivo</span>
+                      {ofx
+                        ? `${previewSummary(ofx)} · `
+                        : sheet
+                          ? `${previewSummary(applyMapping(sheet.table, sheet.mapping))} · `
+                          : "Pronto pra ler · "}
+                      <span className="font-semibold text-(--primary)">trocar arquivo</span>
                     </span>
                   </span>
                 ) : (
@@ -601,34 +757,77 @@ export function ImportWorkspace({
                     </span>
                     <span className="block text-[13px] text-(--text-muted)">
                       <span className="max-md:hidden">
-                        ou <span className="font-semibold text-(--primary)">clique pra escolher</span> ·{" "}
-                        {isCardChosen ? "só PDF" : "PDF ou prints do app"}
+                        ou <span className="font-semibold text-(--primary)">clique pra escolher</span> · OFX, CSV, Excel ou PDF
+                        {isCardChosen ? "" : ", ou prints do app"}
                       </span>
-                      <span className="md:hidden">da {chosen.name}, em PDF{isCardChosen ? "" : " ou prints"}</span>
+                      <span className="md:hidden">da {chosen.name}: OFX, CSV, Excel ou PDF</span>
                     </span>
                   </span>
                 )}
                 </>
                 )}
               </label>
+              {sheet && !sheet.editing ? (
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] bg-(--bg-subtle) px-3.5 py-2.5 text-[13px]">
+                  <SlidersHorizontal className="h-4 w-4 shrink-0 text-(--primary)" />
+                  <span className="min-w-0 flex-1 text-(--text-secondary)">
+                    Colunas lembradas desta conta:{" "}
+                    <b className="font-semibold">
+                      {[
+                        sheet.labels[sheet.mapping.date],
+                        sheet.labels[sheet.mapping.description],
+                        ...(sheet.mapping.amount !== null
+                          ? [sheet.labels[sheet.mapping.amount]]
+                          : [sheet.labels[sheet.mapping.debit ?? 0], sheet.labels[sheet.mapping.credit ?? 0]]),
+                      ].join(" · ")}
+                    </b>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSheet({ ...sheet, editing: true })}
+                    className="font-semibold text-(--primary) hover:text-(--primary-hover)"
+                  >
+                    Conferir colunas
+                  </button>
+                </div>
+              ) : null}
+              {sheet && sheet.editing ? (
+                <div className="mt-3">
+                  <ColumnMapper
+                    table={sheet.table}
+                    labels={sheet.labels}
+                    mapping={sheet.mapping}
+                    remembered={sheet.remembered}
+                    currency={currency}
+                    onChange={(mapping) =>
+                      setSheet({
+                        ...sheet,
+                        mapping,
+                        labels: mapping.headerRow === sheet.mapping.headerRow ? sheet.labels : columnLabels(sheet.table.rows, mapping.headerRow),
+                      })
+                    }
+                  />
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-2 max-md:hidden">
                 <span className="text-xs text-(--text-light)">O Velun lê:</span>
-                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
-                  Extrato Regions
-                </span>
-                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
-                  Extrato Nomad
-                </span>
-                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
-                  Fatura Nubank
-                </span>
-                <span className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)">
-                  Prints do app
-                </span>
-                <span className="inline-flex h-7 items-center rounded-full border-[1.5px] border-dashed border-(--border-strong) px-2.5 text-xs font-semibold text-(--text-light)">
-                  mais bancos em breve
-                </span>
+                {["OFX / QFX de qualquer banco", "CSV e Excel", "Extrato Regions (PDF)", "Extrato Nomad (PDF)", "Fatura Nubank (PDF)", "Prints do app"].map(
+                  (chip) => (
+                    <span
+                      key={chip}
+                      className="inline-flex h-7 items-center rounded-full bg-(--bg-track) px-2.5 text-xs font-semibold text-(--text-secondary)"
+                    >
+                      {chip}
+                    </span>
+                  ),
+                )}
               </div>
+              {chosen && !file ? (
+                <p className="mt-3 text-xs leading-relaxed text-(--text-muted) lg:hidden">
+                  <b className="font-semibold text-(--text-secondary)">Onde baixar:</b>{" "}
+                  {exportTip(chosen.institution, isCardChosen).text}
+                </p>
+              ) : null}
             </div>
 
             {errorBlock}
@@ -638,8 +837,17 @@ export function ImportWorkspace({
               </p>
             ) : null}
 
-            <Button type="submit" disabled={isPending || !chosen || !file} className="h-12 rounded-[14px] text-[15px]">
-              {ocrStatus ?? (isPending ? (isImages ? "Lendo os prints…" : "Lendo o PDF…") : "Ler e revisar")}
+            <Button type="submit" disabled={isPending || reading || !chosen || !file} className="h-12 rounded-[14px] text-[15px]">
+              {ocrStatus ??
+                (reading
+                  ? "Abrindo o arquivo…"
+                  : isPending
+                    ? isImages
+                      ? "Lendo os prints…"
+                      : ofx || sheet
+                        ? "Montando a revisão…"
+                        : "Lendo o PDF…"
+                    : "Ler e revisar")}
             </Button>
 
             <p className="flex items-start gap-2 text-xs leading-relaxed text-(--text-muted) lg:hidden">
@@ -652,7 +860,10 @@ export function ImportWorkspace({
             <h2 className="text-card-title">Como funciona</h2>
             {[
               ["Escolha a conta", "Conta corrente recebe extrato; cartão recebe fatura."],
-              ["Mande o PDF ou prints", "O extrato em PDF que você baixa no banco, ou prints da lista de lançamentos do app (até 10, pode rolar e tirar vários)."],
+              [
+                "Mande o arquivo",
+                "OFX/QFX, CSV ou Excel baixado do site do banco (o OFX é o mais certeiro). Também vale o PDF da Regions, Nomad e da fatura Nubank, ou prints do app (até 10).",
+              ],
               [
                 "Revise antes de entrar",
                 "O Velun sugere categoria, junta o que já foi lançado e marca pagamento de fatura. Você confirma.",
@@ -668,6 +879,17 @@ export function ImportWorkspace({
                 </div>
               </div>
             ))}
+            {(() => {
+              const tip = exportTip(chosen?.institution ?? null, isCardChosen);
+              return (
+                <div className="rounded-[14px] border border-(--border-primary) p-3.5">
+                  <div className="text-[13px] font-bold text-(--text-primary)">
+                    Onde baixar{tip.bank ? ` · ${tip.bank}` : chosen ? ` · ${chosen.name}` : ""}
+                  </div>
+                  <div className="mt-0.5 text-[13px] leading-relaxed text-(--text-muted)">{tip.text}</div>
+                </div>
+              );
+            })()}
             <div className="flex items-start gap-2.5 rounded-[14px] bg-(--primary-soft) p-3.5 text-[13px] leading-relaxed text-(--text-secondary)">
               <Lock className="mt-0.5 h-4 w-4 shrink-0 text-(--primary-hover)" />
               <span>
@@ -805,7 +1027,7 @@ export function ImportWorkspace({
               {openImport.balanceMatches === null
                 ? `${rows.length} lançamentos lidos. O documento não informa saldo inicial e final do período, então a conferência fica pra depois: compare o saldo da conta no Velun com o do app do banco.`
                 : openImport.balanceMatches
-                  ? `${rows.length} lançamentos lidos, e o saldo reconstruído dia a dia fecha com o do banco.`
+                  ? `${rows.length} lançamentos lidos, e o saldo reconstruído fecha com o do banco.`
                   : "Revise os lançamentos antes de confirmar — pode haver linha faltando ou lida errado."}
             </span>
           </div>

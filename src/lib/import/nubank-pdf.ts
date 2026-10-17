@@ -92,7 +92,7 @@ export function parseNubankStatementText(text: string): ParsedCardStatement {
   );
   if (!due || !period) {
     throw new StatementParseError(
-      "Não reconheci essa fatura. Por enquanto o Velun lê faturas do Nubank em PDF.",
+      "Não reconheci essa fatura. Em PDF o Velun lê a do Nubank; de outro cartão, baixe o OFX/QFX ou o CSV no site do banco.",
     );
   }
 
