@@ -10,13 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Money } from "@/components/money";
 import { RecurrenceEditDialog } from "@/components/recurrence-edit-dialog";
+import { FREQUENCY_LABEL, usesDayOfMonth, type RecurrenceFrequency } from "@/lib/recurrence";
 
 export type RecurrenceRow = {
   id: string;
   description: string;
   amount_cents: number;
   direction: "in" | "out";
-  frequency: "monthly" | "weekly" | "yearly";
+  frequency: RecurrenceFrequency;
   day_of_month: number | null;
   account_id: string;
   account_name: string;
@@ -27,11 +28,7 @@ export type RecurrenceRow = {
 type AccountOption = { id: string; name: string };
 type CategoryOption = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean; parent_id?: string | null };
 
-const FREQUENCY_LABELS: Record<RecurrenceRow["frequency"], string> = {
-  monthly: "Mensal",
-  weekly: "Semanal",
-  yearly: "Anual",
-};
+const FREQUENCY_LABELS = FREQUENCY_LABEL;
 
 export function RecurrencesList({
   rows,
@@ -113,7 +110,7 @@ export function RecurrencesList({
                 <span className="sm:hidden">
                   {" · "}
                   {FREQUENCY_LABELS[row.frequency]}
-                  {row.frequency === "monthly" && row.day_of_month ? `, dia ${row.day_of_month}` : ""}
+                  {usesDayOfMonth(row.frequency) && row.day_of_month ? `, dia ${row.day_of_month}` : ""}
                 </span>
               </span>
               {movingId === row.id ? (
@@ -219,7 +216,7 @@ export function RecurrencesList({
               {FREQUENCY_LABELS[row.frequency]}
             </span>
             <span className="text-table-body hidden sm:block">
-              {row.frequency === "monthly" && row.day_of_month
+              {usesDayOfMonth(row.frequency) && row.day_of_month
                 ? row.day_of_month
                 : "—"}
             </span>

@@ -21,15 +21,17 @@ import { TONE } from "@/components/manual-transaction-button";
 import { currencySymbol, formatCents, type CurrencyCode } from "@/lib/money";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { fitsDirection } from "@/lib/category-kind";
-import { describeSchedule, generateOccurrenceDates, type RecurrenceFrequency } from "@/lib/recurrence";
+import { describeSchedule, generateOccurrenceDates, usesDayOfMonth, type RecurrenceFrequency } from "@/lib/recurrence";
 
 type Account = { id: string; name: string; type?: string; institution?: string | null };
 type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean; parent_id?: string | null };
 
 const FREQUENCIES: { value: RecurrenceFrequency; label: string }[] = [
-  { value: "weekly", label: "Toda semana" },
-  { value: "monthly", label: "Todo mês" },
-  { value: "yearly", label: "Todo ano" },
+  { value: "weekly", label: "Semana" },
+  { value: "monthly", label: "Mês" },
+  { value: "quarterly", label: "3 meses" },
+  { value: "semiannual", label: "6 meses" },
+  { value: "yearly", label: "Ano" },
 ];
 const NO_CATEGORY = "__none__";
 const fieldLabel = "text-[13px] font-semibold text-(--text-body)";
@@ -167,7 +169,7 @@ function RecurrenceForm({
         ? generateOccurrenceDates({
             frequency,
             startsOn: nextDate,
-            dayOfMonth: frequency === "monthly" ? Number(nextDate.slice(8, 10)) : null,
+            dayOfMonth: usesDayOfMonth(frequency) ? Number(nextDate.slice(8, 10)) : null,
             endsOn: endsOn || null,
             count: 3,
             from: data.today,
@@ -179,7 +181,7 @@ function RecurrenceForm({
     ? describeSchedule({
         frequency,
         startsOn: nextDate,
-        dayOfMonth: frequency === "monthly" ? Number(nextDate.slice(8, 10)) : null,
+        dayOfMonth: usesDayOfMonth(frequency) ? Number(nextDate.slice(8, 10)) : null,
       })
     : null;
 
@@ -251,8 +253,8 @@ function RecurrenceForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className={fieldLabel}>Repete</span>
-        <div role="radiogroup" aria-label="Repete" className="flex gap-1.5 rounded-[14px] bg-(--bg-hover) p-[5px]">
+        <span className={fieldLabel}>Repete a cada</span>
+        <div role="radiogroup" aria-label="Repete a cada" className="flex gap-1 rounded-[14px] bg-(--bg-hover) p-[5px]">
           {FREQUENCIES.map((f) => {
             const on = f.value === frequency;
             return (
@@ -262,7 +264,7 @@ function RecurrenceForm({
                 role="radio"
                 aria-checked={on}
                 onClick={() => setFrequency(f.value)}
-                className={`h-[42px] flex-1 rounded-[11px] text-sm font-semibold transition-colors ${
+                className={`h-[42px] min-w-0 flex-1 rounded-[11px] px-1 text-[13px] font-semibold whitespace-nowrap transition-colors sm:text-sm ${
                   on ? "bg-(--bg-surface) text-(--text-primary) shadow-[0_1px_3px_rgba(16,24,40,.12)]" : "text-(--text-muted) hover:text-(--text-secondary)"
                 }`}
               >

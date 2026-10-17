@@ -2,7 +2,41 @@
 // quando a recorrência é criada ou editada — nunca gerar sob demanda na
 // leitura. Esta função só calcula as datas; quem grava é a server action.
 
-export type RecurrenceFrequency = "monthly" | "weekly" | "yearly";
+export const RECURRENCE_FREQUENCIES = ["weekly", "monthly", "quarterly", "semiannual", "yearly"] as const;
+export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number];
+
+export function isRecurrenceFrequency(value: string): value is RecurrenceFrequency {
+  return (RECURRENCE_FREQUENCIES as readonly string[]).includes(value);
+}
+
+/** De quantos em quantos meses (só as que caem num dia do mês). */
+export const MONTH_STEP: Partial<Record<RecurrenceFrequency, number>> = {
+  monthly: 1,
+  quarterly: 3,
+  semiannual: 6,
+};
+
+/** Repete num dia do mês (mensal, trimestral, semestral): guarda day_of_month. */
+export function usesDayOfMonth(frequency: RecurrenceFrequency): boolean {
+  return MONTH_STEP[frequency] !== undefined;
+}
+
+export const FREQUENCY_LABEL: Record<RecurrenceFrequency, string> = {
+  weekly: "Semanal",
+  monthly: "Mensal",
+  quarterly: "Trimestral",
+  semiannual: "Semestral",
+  yearly: "Anual",
+};
+
+/** Quanto uma ocorrência pesa por mês, pra somar frequências diferentes. */
+export const PER_MONTH: Record<RecurrenceFrequency, number> = {
+  weekly: 52 / 12,
+  monthly: 1,
+  quarterly: 1 / 3,
+  semiannual: 1 / 6,
+  yearly: 1 / 12,
+};
 
 function toISODate(d: Date): string {
   const year = d.getFullYear();
@@ -68,17 +102,20 @@ export function generateOccurrenceDates(params: {
       d = new Date(year, starts.getMonth(), starts.getDate());
     }
   } else {
+    // Mensal, trimestral, semestral: no dia escolhido, de N em N meses a
+    // partir do mês de início (dia 31 cai no último dia do mês).
+    const step = MONTH_STEP[params.frequency] ?? 1;
     const day = params.dayOfMonth ?? starts.getDate();
     let cursor = new Date(starts.getFullYear(), starts.getMonth(), 1);
     let d = clampedMonthDay(cursor, day);
     while (d < floor) {
-      cursor = addMonths(cursor, 1);
+      cursor = addMonths(cursor, step);
       d = clampedMonthDay(cursor, day);
     }
     while (dates.length < params.count) {
       if (ends && d > ends) break;
       dates.push(d);
-      cursor = addMonths(cursor, 1);
+      cursor = addMonths(cursor, step);
       d = clampedMonthDay(cursor, day);
     }
   }
@@ -88,7 +125,7 @@ export function generateOccurrenceDates(params: {
 
 const WEEKDAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
-/** "toda sexta", "todo dia 21", "todo ano em 05/03". */
+/** "toda sexta", "todo dia 21", "a cada 3 meses, dia 21", "todo ano em 05/03". */
 export function describeSchedule(params: {
   frequency: RecurrenceFrequency;
   startsOn: string;
@@ -103,7 +140,10 @@ export function describeSchedule(params: {
   if (params.frequency === "yearly") {
     return `todo ano em ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
-  return `todo dia ${params.dayOfMonth ?? d.getDate()}`;
+  const day = params.dayOfMonth ?? d.getDate();
+  if (params.frequency === "quarterly") return `a cada 3 meses, dia ${day}`;
+  if (params.frequency === "semiannual") return `a cada 6 meses, dia ${day}`;
+  return `todo dia ${day}`;
 }
 
 /**

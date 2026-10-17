@@ -613,7 +613,7 @@ export function ManualTransactionButton({
                 checked={makeRecurring}
                 onChange={setMakeRecurring}
                 title="Repetir esse lançamento"
-                hint="Toda semana, mês ou ano"
+                hint="Toda semana, mês, trimestre, semestre ou ano"
               />
               {makeRecurring ? (
                 <div className="grid grid-cols-2 gap-3.5 pb-1">
@@ -628,6 +628,8 @@ export function ManualTransactionButton({
                       <SelectContent>
                         <SelectItem value="weekly">Semanal</SelectItem>
                         <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="quarterly">Trimestral (a cada 3 meses)</SelectItem>
+                        <SelectItem value="semiannual">Semestral (a cada 6 meses)</SelectItem>
                         <SelectItem value="yearly">Anual</SelectItem>
                       </SelectContent>
                     </Select>

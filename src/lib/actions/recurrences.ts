@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
 import { parseToCents } from "@/lib/money";
-import type { RecurrenceFrequency } from "@/lib/recurrence";
+import { isRecurrenceFrequency, usesDayOfMonth, type RecurrenceFrequency } from "@/lib/recurrence";
 import {
   materializeOccurrences,
   replaceFutureOccurrences,
@@ -28,7 +28,7 @@ export async function createRecurrence(formData: FormData) {
   if (!description) throw new Error("Descrição é obrigatória.");
   if (direction !== "in" && direction !== "out") throw new Error("Direção inválida.");
   if (!accountId) throw new Error("Conta é obrigatória.");
-  if (!["monthly", "weekly", "yearly"].includes(frequency)) {
+  if (!isRecurrenceFrequency(frequency)) {
     throw new Error("Frequência inválida.");
   }
   if (!startsOn) throw new Error("Data de início é obrigatória.");
@@ -37,8 +37,8 @@ export async function createRecurrence(formData: FormData) {
   if (amountCents <= 0) throw new Error("Valor precisa ser maior que zero.");
 
   const dayOfMonth =
-    frequency === "monthly" ? (dayOfMonthInput ? Number(dayOfMonthInput) : null) : null;
-  if (frequency === "monthly" && (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 31)) {
+    usesDayOfMonth(frequency) ? (dayOfMonthInput ? Number(dayOfMonthInput) : null) : null;
+  if (usesDayOfMonth(frequency) && (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 31)) {
     throw new Error("Dia do mês inválido.");
   }
 
@@ -215,7 +215,7 @@ export async function updateRecurrence(recurrenceId: string, formData: FormData)
 
     if (!description) return { ok: false, error: "Coloque o nome." };
     if (amountCents <= 0) return { ok: false, error: "Valor precisa ser maior que zero." };
-    if (!["monthly", "weekly", "yearly"].includes(frequency)) return { ok: false, error: "Escolha de quanto em quanto tempo repete." };
+    if (!isRecurrenceFrequency(frequency)) return { ok: false, error: "Escolha de quanto em quanto tempo repete." };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return { ok: false, error: "Coloque a data da próxima vez." };
     if (nextDate < today) return { ok: false, error: "A próxima vez tem que ser hoje ou depois." };
     if (endsOn && endsOn < nextDate) return { ok: false, error: "O fim tem que ser depois da próxima vez." };
@@ -251,7 +251,7 @@ export async function updateRecurrence(recurrenceId: string, formData: FormData)
         template,
         frequency,
         starts_on: nextDate,
-        day_of_month: frequency === "monthly" ? Number(nextDate.slice(8, 10)) : null,
+        day_of_month: usesDayOfMonth(frequency) ? Number(nextDate.slice(8, 10)) : null,
         ends_on: endsOn,
       })
       .eq("id", recurrenceId)

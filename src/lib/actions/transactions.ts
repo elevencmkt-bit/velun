@@ -15,7 +15,7 @@ import {
   replaceFutureOccurrences,
   type RecurrenceTemplate,
 } from "@/lib/materialize-occurrences";
-import { recurrenceScopes, type RecurrenceFrequency, type RecurrenceScope } from "@/lib/recurrence";
+import { isRecurrenceFrequency, recurrenceScopes, type RecurrenceFrequency, type RecurrenceScope } from "@/lib/recurrence";
 
 // Se o box de lançamento/edição marcou "repetir esse lançamento",
 // devolve a frequência escolhida; senão null (fluxo sem recorrência).
@@ -27,7 +27,7 @@ function parseRecurrenceInput(
   const frequency = String(
     formData.get("recurrence_frequency") ?? "",
   ) as RecurrenceFrequency;
-  if (!["monthly", "weekly", "yearly"].includes(frequency)) {
+  if (!isRecurrenceFrequency(frequency)) {
     throw new Error("Frequência de recorrência inválida.");
   }
 

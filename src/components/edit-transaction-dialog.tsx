@@ -420,7 +420,7 @@ export function EditTransactionDialog({
             <ToggleRow checked={pending} onChange={setPending} title="Ainda não caiu" hint="Fica como pendente até você confirmar" />
             {transaction.recurrence_id ? null : (
               <>
-                <ToggleRow checked={makeRecurring} onChange={setMakeRecurring} title="Repetir esse lançamento" hint="Toda semana, mês ou ano" />
+                <ToggleRow checked={makeRecurring} onChange={setMakeRecurring} title="Repetir esse lançamento" hint="Toda semana, mês, trimestre, semestre ou ano" />
                 {makeRecurring ? (
                   <div className="grid grid-cols-2 gap-3.5 pb-1">
                     <div className="flex flex-col gap-2">
@@ -434,6 +434,8 @@ export function EditTransactionDialog({
                         <SelectContent>
                           <SelectItem value="weekly">Semanal</SelectItem>
                           <SelectItem value="monthly">Mensal</SelectItem>
+                          <SelectItem value="quarterly">Trimestral (a cada 3 meses)</SelectItem>
+                          <SelectItem value="semiannual">Semestral (a cada 6 meses)</SelectItem>
                           <SelectItem value="yearly">Anual</SelectItem>
                         </SelectContent>
                       </Select>

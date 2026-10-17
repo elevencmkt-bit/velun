@@ -26,18 +26,21 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateInput } from "@/components/date-input";
 import { fitsDirection } from "@/lib/category-kind";
 import { CategorySelectItems } from "@/components/category-select-items";
+import { usesDayOfMonth, type RecurrenceFrequency } from "@/lib/recurrence";
 
 type Account = { id: string; name: string };
 type Category = { id: string; name: string; kind: "income" | "expense"; is_transfer?: boolean; parent_id?: string | null };
-type Frequency = "monthly" | "weekly" | "yearly";
+type Frequency = RecurrenceFrequency;
 
 function todayISO() {
   return localToday();
 }
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
-  monthly: "Mensal",
   weekly: "Semanal",
+  monthly: "Mensal",
+  quarterly: "Trimestral (a cada 3 meses)",
+  semiannual: "Semestral (a cada 6 meses)",
   yearly: "Anual",
 };
 
@@ -172,11 +175,11 @@ export function RecurrenceForm({
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="starts_on">
-                {frequency === "monthly" ? "Primeira ocorrência" : "Data de início"}
+                {usesDayOfMonth(frequency) ? "Primeira ocorrência" : "Data de início"}
               </Label>
               <DateInput id="starts_on" name="starts_on" defaultValue={todayISO()} required />
             </div>
-            {frequency === "monthly" ? (
+            {usesDayOfMonth(frequency) ? (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="day_of_month">Dia do mês</Label>
                 <Input
@@ -196,7 +199,7 @@ export function RecurrenceForm({
               </div>
             )}
           </div>
-          {frequency === "monthly" ? (
+          {usesDayOfMonth(frequency) ? (
             <div className="flex flex-col gap-2">
               <Label htmlFor="ends_on">Termina em (opcional)</Label>
               <DateInput id="ends_on" name="ends_on" />

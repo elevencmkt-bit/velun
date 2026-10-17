@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { computeFingerprint } from "@/lib/fingerprint";
-import { generateOccurrenceDates, type RecurrenceFrequency } from "@/lib/recurrence";
+import { generateOccurrenceDates, usesDayOfMonth, type RecurrenceFrequency } from "@/lib/recurrence";
 
 // As primeiras 12 nascem aqui; daí pra frente a rotina diária do banco
 // (top_up_recurrences, migração 0031) mantém cada recorrência ativa
@@ -91,7 +91,7 @@ export async function createRecurrenceFromAnchor(params: {
   const supabase = await createClient();
 
   const dayOfMonth =
-    params.frequency === "monthly" ? Number(params.anchorDate.split("-")[2]) : null;
+    usesDayOfMonth(params.frequency) ? Number(params.anchorDate.split("-")[2]) : null;
 
   const { data: recurrence, error } = await supabase
     .from("recurrences")
