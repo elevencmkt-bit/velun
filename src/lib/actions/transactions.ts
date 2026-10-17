@@ -329,6 +329,49 @@ export async function updateTransaction(
   revalidatePath("/a-pagar");
 }
 
+/**
+ * Apaga vários lançamentos de uma vez (Transações › Selecionar).
+ * Transferência sai inteira: apagar só um lado deixaria o saldo das duas
+ * contas errado. O RLS decide o que a pessoa pode apagar; devolve quantos
+ * de fato saíram. Devolve o erro em vez de lançar (em produção a mensagem
+ * lançada não chega no navegador).
+ */
+export async function bulkDeleteTransactions(
+  transactionIds: string[],
+): Promise<{ ok: true; deleted: number } | { ok: false; error: string }> {
+  if (transactionIds.length === 0) return { ok: true, deleted: 0 };
+  const supabase = await createClient();
+  const { groups } = await withTransferPairs(supabase, transactionIds);
+
+  let deleted = 0;
+  for (let i = 0; i < transactionIds.length; i += 200) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .delete()
+      .in("id", transactionIds.slice(i, i + 200))
+      .is("transfer_group_id", null)
+      .select("id");
+    if (error) return { ok: false, error: "Não deu pra apagar agora. Tente de novo." };
+    deleted += data?.length ?? 0;
+  }
+  if (groups.length > 0) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .delete()
+      .in("transfer_group_id", groups)
+      .select("id");
+    if (error) return { ok: false, error: "Não deu pra apagar as transferências agora. Tente de novo." };
+    deleted += data?.length ?? 0;
+  }
+
+  revalidatePath("/transacoes");
+  revalidatePath("/contas");
+  revalidatePath("/mes");
+  revalidatePath("/a-pagar");
+  revalidatePath("/metas");
+  return { ok: true, deleted };
+}
+
 export async function deleteTransferGroup(transferGroupId: string) {
   const supabase = await createClient();
   const { error } = await supabase

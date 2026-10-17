@@ -9,8 +9,20 @@ import {
   type CategoryColorPair,
 } from "@/lib/category-colors";
 import { getCategoryIcon } from "@/lib/category-icons";
-import { Check, Lock, Sparkles } from "lucide-react";
+import { Check, Lock, Sparkles, Trash2 } from "lucide-react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  bulkDeleteTransactions,
   bulkMarkPaid,
   bulkUpdateCategory,
   markTransactionPaid,
@@ -151,6 +163,23 @@ export function TransactionsTable({
     });
   }
 
+  const selectedTransfers = rows.filter((r) => selected.has(r.id) && r.transfer_group_id).length;
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function applyBulkDelete() {
+    const ids = Array.from(selected);
+    setDeleteError(null);
+    startTransition(async () => {
+      const res = await bulkDeleteTransactions(ids);
+      if (!res.ok) {
+        setDeleteError(res.error);
+        return;
+      }
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   // Aviso rápido quando a categoria foi junto pra outros lançamentos.
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
@@ -279,6 +308,40 @@ export function TransactionsTable({
                   {selectedPendingIds.length}
                 </Button>
               ) : null}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isPending}
+                    className="text-(--expense) hover:text-(--expense-dark)"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Apagar {selected.size}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Apagar {selected.size} {selected.size === 1 ? "lançamento" : "lançamentos"}?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Não dá pra desfazer. O saldo das contas muda na hora.
+                      {selectedTransfers > 0
+                        ? " Transferência é apagada inteira, dos dois lados."
+                        : ""}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Voltar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={applyBulkDelete}
+                      className="bg-(--expense) text-white hover:bg-(--expense-dark)"
+                    >
+                      Apagar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Button
                 size="sm"
                 variant="ghost"
@@ -286,6 +349,11 @@ export function TransactionsTable({
               >
                 Limpar seleção
               </Button>
+              {deleteError ? (
+                <span role="alert" className="w-full text-[13px] text-(--expense-dark)">
+                  {deleteError}
+                </span>
+              ) : null}
             </>
           ) : (
             <span className="text-[13px] text-(--text-muted)">
