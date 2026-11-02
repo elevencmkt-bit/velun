@@ -39,7 +39,7 @@ import {
   type PendingCandidate,
 } from "@/lib/import/bank-pending";
 import type { ColumnMapping } from "@/lib/import/table";
-import { duplicateCounter } from "@/lib/import/duplicates";
+import { duplicateCounter, statementDuplicates } from "@/lib/import/duplicates";
 import { fitsDirection } from "@/lib/category-kind";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import {
@@ -530,6 +530,17 @@ async function runImportStatement(input: {
             : `${read.cut} linhas cortadas na borda dos prints ficaram de fora: elas aparecem inteiras nos prints vizinhos. Se alguma não aparecer, tire o print de novo mostrando a linha toda.`,
         );
       }
+      if (read.unread.length > 0) {
+        const today = todayIn(timezone);
+        const list = read.unread
+          .slice(0, 3)
+          .map((u) => (u.pending ? readPending(u.description, today).description : u.description))
+          .join(", ");
+        const more = read.unread.length > 3 ? ` e mais ${read.unread.length - 3}` : "";
+        parts.push(
+          `Não deu pra ler o valor de ${list}${more}, e o saldo não explicou: ${read.unread.length === 1 ? "ficou" : "ficaram"} de fora. Lance à mão ou tire o print de novo.`,
+        );
+      }
       if (read.undated > 0) {
         parts.push(
           `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,
@@ -765,44 +776,19 @@ async function runImportStatement(input: {
         return (_fp: string, t: { date: string; direction: string; amountCents: number }) =>
           loose(looseKey(t.date, t.direction, t.amountCents));
       })()
-    : fileInput
-      ? (() => {
-          // Arquivo: o texto do banco no OFX/CSV não é o do PDF (o OFX corta
-          // o nome em 32 letras, o CSV às vezes traz outra descrição). O que
-          // já veio de outra importação vale por dia + valor + direção; o
-          // resto, pela impressão digital. Uma linha existente só é
-          // "gasta" uma vez: o que bate pela impressão digital sai também
-          // da contagem solta.
-          const strict = duplicateCounter(existing.map((t) => t.fingerprint));
-          const imported = existing.filter((t) => t.status === "cleared" && t.import_id);
-          const looseLeft = new Map<string, number>();
-          for (const t of imported) {
-            const k = looseKey(t.date, t.direction, t.amount_cents);
-            looseLeft.set(k, (looseLeft.get(k) ?? 0) + 1);
-          }
-          const importedFp = new Set(imported.map((t) => t.fingerprint));
-          // Primeiro todas as exatas, depois as soltas — senão uma linha
-          // solta poderia gastar a existente de uma exata mais abaixo.
-          const exact = new Map<number, boolean>();
-          statement.transactions.forEach((t, i) => {
-            const fp = computeFingerprint({ accountId, date: t.date, amountCents: t.amountCents, description: t.description });
-            if (!strict(fp)) return;
-            exact.set(i, true);
-            const k = looseKey(t.date, t.direction, t.amountCents);
-            if (importedFp.has(fp) && (looseLeft.get(k) ?? 0) > 0) looseLeft.set(k, (looseLeft.get(k) ?? 0) - 1);
-          });
-          return (_fp: string, t: { date: string; direction: string; amountCents: number }, index: number) => {
-            if (exact.has(index)) return true;
-            const k = looseKey(t.date, t.direction, t.amountCents);
-            const left = looseLeft.get(k) ?? 0;
-            if (left === 0) return false;
-            looseLeft.set(k, left - 1);
-            return true;
-          };
-        })()
-      : (() => {
-        const strict = duplicateCounter(existing.map((t) => t.fingerprint));
-        return (fp: string) => strict(fp);
+    : (() => {
+        // PDF e arquivo: o que veio de outra importação (print, outro
+        // formato) vale por dia + valor + direção (ver statementDuplicates).
+        const dup = statementDuplicates(
+          existing,
+          statement.transactions.map((t) => ({
+            fingerprint: computeFingerprint({ accountId, date: t.date, amountCents: t.amountCents, description: t.description }),
+            date: t.date,
+            direction: t.direction,
+            amountCents: t.amountCents,
+          })),
+        );
+        return (_fp: string, _t: unknown, index: number) => dup[index];
       })();
 
   // Previsões em aberto no período: lançamento `pending` que veio de
