@@ -421,7 +421,9 @@ export function TransactionsTable({
               // a situação, uma etiqueta suave — vermelha se atrasou,
               // âmbar se ainda vai vencer. No celular, tocar na linha abre
               // a edição.
-              const status = row.is_overdue
+              const status = row.bank_pending
+                ? { label: "Pendente no banco", cls: "bg-(--warning-badge) text-(--warning-dark)" }
+                : row.is_overdue
                 ? { label: "Atrasada", cls: "bg-(--danger-badge) text-(--danger-text)" }
                 : row.status === "pending"
                   ? { label: "Pendente", cls: "bg-(--warning-badge) text-(--warning-dark)" }

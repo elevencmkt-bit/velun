@@ -205,6 +205,11 @@ assert.deepEqual(
 );
 assert.deepEqual(sticky.unchecked, []);
 assert.equal(sticky.pending, 3);
+assert.deepEqual(
+  sticky.pendingRows.map((p) => `${p.amountCents} ${p.description} ${p.checked ? "ok" : "?"}`),
+  ["-900 Cafe Novo ok", "-1100 Posto Azul ok", "-500 Loja Pend ok"],
+  "os pendentes saem com o valor conferido pela corrente, do mais novo pro mais antigo",
+);
 // Sem saldo nenhum no print, a linha da ponta não é "cortada": entra.
 assert.equal(screensToStatement([screen([{ date: "9/30/2026" }, { name: "Netflix", amount: "-$15.49" }])]).cut, 0);
 

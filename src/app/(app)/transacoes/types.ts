@@ -8,6 +8,8 @@ export type TransactionRow = {
   amount_cents: number;
   direction: "in" | "out";
   status: "pending" | "cleared";
+  /** Veio de um print na seção "Pending" do banco: conta no saldo, mas ainda não lançou. */
+  bank_pending?: boolean;
   is_overdue: boolean;
   import_id: string | null;
   transfer_group_id: string | null;

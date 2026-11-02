@@ -1,5 +1,7 @@
 "use client";
 
+import { StalePending, type StalePendingRow } from "./stale-pending";
+
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownLeft, ArrowUpRight, ListChecks, X } from "lucide-react";
@@ -49,6 +51,7 @@ export function TransactionsWorkspace({
   counts,
   activeStatus,
   emptyState,
+  stalePending = [],
 }: {
   rows: TransactionRow[];
   accounts: AccountOption[];
@@ -78,6 +81,8 @@ export function TransactionsWorkspace({
     monthLabel: string;
     nearest: { label: string; href: string } | null;
   } | null;
+  /** Pendentes do banco há mais de uma semana sem lançar. */
+  stalePending?: StalePendingRow[];
 }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const router = useRouter();
@@ -140,6 +145,8 @@ export function TransactionsWorkspace({
           </Button>
         </div>
       </div>
+
+      <StalePending rows={stalePending} currency={currency} />
 
       {/* Resumo do período. No celular, uma faixa azul só; no computador,
           três blocos com o saldo em azul. */}
