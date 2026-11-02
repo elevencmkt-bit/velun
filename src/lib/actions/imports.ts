@@ -475,6 +475,13 @@ async function runImportStatement(input: {
           `${read.pending} ${read.pending === 1 ? "lançamento pendente ficou" : "lançamentos pendentes ficaram"} de fora: ${read.pending === 1 ? "entra" : "entram"} quando o banco lançar, no próximo print ou extrato.`,
         );
       }
+      if (read.cut > 0) {
+        parts.push(
+          read.cut === 1
+            ? "1 linha cortada na borda de um print ficou de fora: ela aparece inteira no print vizinho. Se não aparecer, tire o print de novo mostrando a linha toda."
+            : `${read.cut} linhas cortadas na borda dos prints ficaram de fora: elas aparecem inteiras nos prints vizinhos. Se alguma não aparecer, tire o print de novo mostrando a linha toda.`,
+        );
+      }
       if (read.undated > 0) {
         parts.push(
           `${read.undated} ${read.undated === 1 ? "linha ficou" : "linhas ficaram"} de fora por não ter data à vista. Role um pouco pra cima no app e tire o print de novo.`,

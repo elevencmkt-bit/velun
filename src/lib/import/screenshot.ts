@@ -209,21 +209,47 @@ function rowKey(r: ScreenRow): string {
 }
 
 /**
+ * Tira as linhas cortadas na borda do print. A data do dia fica presa no
+ * topo da tela enquanto se rola, e a linha que passa por baixo dela
+ * aparece pela metade: sem o valor, o leitor pega o SALDO como se fosse o
+ * valor ("algree +$741.01"). Na borda de baixo, o saldo é o que some. Uma
+ * linha assim, na ponta e sem saldo, num print em que as outras têm
+ * saldo, é pedaço de linha: ela aparece inteira no print vizinho.
+ */
+export function dropCutRows(rows: ScreenRow[]): { rows: ScreenRow[]; cut: number } {
+  const withBalance = rows.filter((r) => r.balance).length;
+  if (withBalance < 2) return { rows, cut: 0 };
+  const isCut = (i: number) => (i === 0 || i === rows.length - 1) && !rows[i].balance;
+  const kept = rows.filter((_, i) => !isCut(i));
+  return { rows: kept, cut: rows.length - kept.length };
+}
+
+/**
  * Junta várias imagens (rolando a tela, uma pega o fim da outra) numa
  * lista só, do mais novo pro mais antigo, sem repetir o trecho em comum.
  */
 export function mergeScreens(screens: ScreenRow[][]): { rows: ScreenRow[]; undated: number } {
   // Mais nova primeiro: a que tem "Pending" (fica no topo da lista do
   // app), depois pela data mais recente que aparece em cada uma.
+  // Com dois prints que têm "Pending", o de mais pendentes é o de cima (o
+  // outro já rolou pra baixo e só pega o fim dos pendentes).
   const newest = (rows: ScreenRow[]) => rows.reduce((m, r) => (r.date && r.date > m ? r.date : m), "");
-  const hasPending = (rows: ScreenRow[]) => (rows.some((r) => r.pending) ? 1 : 0);
+  const pendingCount = (rows: ScreenRow[]) => rows.filter((r) => r.pending).length;
   const ordered = screens
     .map((rows, i) => ({ rows, i }))
     .sort(
       (a, b) =>
-        hasPending(b.rows) - hasPending(a.rows) || newest(b.rows).localeCompare(newest(a.rows)) || a.i - b.i,
+        Math.sign(pendingCount(b.rows)) - Math.sign(pendingCount(a.rows)) ||
+        pendingCount(b.rows) - pendingCount(a.rows) ||
+        newest(b.rows).localeCompare(newest(a.rows)) ||
+        a.i - b.i,
     )
     .map((s) => s.rows);
+
+  // Linha com saldo é única na lista (nome + saldo): se já entrou por outro
+  // print, não entra de novo, mesmo fora do trecho em comum (a ordem dos
+  // prints pode deixar o trecho repetido longe da emenda).
+  const seen = new Set<string>();
 
   const out: ScreenRow[] = [];
   for (const rows of ordered) {
@@ -246,6 +272,11 @@ export function mergeScreens(screens: ScreenRow[][]): { rows: ScreenRow[]; undat
     // imagem anterior (a lista vem do mais novo pro mais antigo).
     const last = out.length > 0 ? out[out.length - 1] : null;
     for (const r of rows.slice(overlap)) {
+      if (r.balance) {
+        const key = rowKey(r);
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
       const header = r.date !== null || r.pending;
       out.push({ ...r, date: header ? r.date : (last?.date ?? null), pending: header ? r.pending : (last?.pending ?? false) });
     }
@@ -406,6 +437,8 @@ export function screensToStatement(
   hasBalances: boolean;
   corrected: number;
   undated: number;
+  /** Linhas cortadas na borda de um print: ficaram de fora (aparecem inteiras no vizinho). */
+  cut: number;
   /** Na seção "Pending": ficam de fora até o banco lançar. */
   pending: number;
   /** A linha mais antiga (não pendente). `excluded`: ficou de fora por não dar pra conferir. */
@@ -413,7 +446,13 @@ export function screensToStatement(
   /** Linhas cujo valor não deu pra conferir pelo saldo (do mais novo pro mais antigo). */
   unchecked: { date: string; description: string; amountCents: number }[];
 } {
-  const { rows, undated } = mergeScreens(screens.map(rowsFromScreen));
+  let cut = 0;
+  const perScreen = screens.map((s) => {
+    const trimmed = dropCutRows(rowsFromScreen(s));
+    cut += trimmed.cut;
+    return trimmed.rows;
+  });
+  const { rows, undated } = mergeScreens(perScreen);
   // Os pendentes entram na conferência (o saldo deles emenda com o resto)
   // mas não na importação: o banco ainda pode mudar valor e data, e o
   // lançamento de verdade vem no próximo print ou extrato.
@@ -443,6 +482,7 @@ export function screensToStatement(
     hasBalances,
     corrected: reconciled.filter((r) => r.corrected).length,
     undated,
+    cut,
     pending: all.length - all.filter((r) => !r.pending).length,
     oldest,
     unchecked: reconciled
