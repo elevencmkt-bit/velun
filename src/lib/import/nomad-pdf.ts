@@ -26,7 +26,7 @@
 //    revisa comparar com a conta depois.
 // 4. Cabeçalho e rodapé (nome, CPF, número da conta, aviso legal) se
 //    repetem em toda página e são ignorados — nada disso é guardado.
-// 5. Desde nov/2026 o app também gera o demonstrativo em INGLÊS
+// 5. Na hora de exportar, dá pra escolher português ou INGLÊS. Em inglês
 //    ("Deposit account statement"): situações "Settled"/"Canceled",
 //    data no formato americano (mês/dia, "11/02/2026 - 8:50 AM"),
 //    período "October, 3rd 2026 of November, 2nd 2026". O valor continua
