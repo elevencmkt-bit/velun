@@ -166,4 +166,46 @@ assert.deepEqual(
 );
 assert.deepEqual(gap.unchecked.map((u) => u.description), ["Padaria", "Sem Saldo", "Farmacia"], "sem saldo na mais antiga: entra, marcada");
 
+// Rolando a tela, a data do dia fica presa no topo e a linha que passa
+// por baixo dela sai pela metade: sem o valor, o leitor pegava o saldo
+// como valor ("acia +$741.01"). E com dois prints que têm "Pending", o
+// que só tem pendentes (o de cima) vinha depois do outro, a emenda não
+// casava e a última linha comum entrava duas vezes.
+const pendTop = screen([
+  { date: "Pending" },
+  { name: "Cafe Novo", amount: "-$9.00", balance: "$40.00" },
+  { name: "Posto Azul", amount: "-$11.00", balance: "$49.00" },
+  { name: "Loja Pend", amount: "-$5.00", balance: "$60.00" },
+]);
+const pendScrolled = screen([
+  { date: "Pending" },
+  { name: "Loja Pend", amount: "-$5.00", balance: "$60.00" },
+  { date: "10/30/2026" },
+  { name: "Mercadinho", amount: "-$30.18", balance: "$65.00" },
+]);
+const midList = screen([
+  { date: "10/30/2026" },
+  { name: "Mercadinho", amount: "-$30.18", balance: "$65.00" },
+  { date: "10/28/2026" },
+  { name: "Farmacia Sol", amount: "56.38", balance: "$95.18", conf: 55 },
+]);
+const scrolled = screen([
+  { date: "10/28/2026" },
+  { name: "acia", amount: "$95.18" },
+  { name: "Padaria Lua", amount: "-$12.00", balance: "$101.56" },
+  { name: "Zelle Credit", amount: "3266.50", balance: "$113.56", conf: 50 },
+]);
+const sticky = screensToStatement([pendScrolled, midList, scrolled, pendTop], -15294);
+assert.equal(sticky.cut, 1, "a linha cortada embaixo da data fica de fora, e é contada");
+assert.equal(sticky.hasBalances, true, "e não desliga a conferência pelo saldo");
+assert.deepEqual(
+  sticky.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`),
+  ["in 26650 Zelle Credit", "out 1200 Padaria Lua", "out 638 Farmacia Sol", "out 3018 Mercadinho"],
+  "sem o saldo virando lançamento, Mercadinho uma vez só, 56.38 → -6.38 e 3266.50 → 266.50",
+);
+assert.deepEqual(sticky.unchecked, []);
+assert.equal(sticky.pending, 3);
+// Sem saldo nenhum no print, a linha da ponta não é "cortada": entra.
+assert.equal(screensToStatement([screen([{ date: "9/30/2026" }, { name: "Netflix", amount: "-$15.49" }])]).cut, 0);
+
 console.log("check-screenshot-import: ok");
