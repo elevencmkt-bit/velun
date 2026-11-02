@@ -356,6 +356,7 @@ export async function bulkDeleteTransactions(
   }
   if (groups.length > 0) {
     const { data, error } = await supabase
+      // limite: duas pernas por transferência selecionada
       .from("transactions")
       .delete()
       .in("transfer_group_id", groups)

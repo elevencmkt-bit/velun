@@ -6,7 +6,18 @@ import assert from "node:assert/strict";
 import { verifyStatement } from "../src/lib/import/verify";
 import { screensToStatement, type OcrScreen, type OcrWord } from "../src/lib/import/screenshot";
 
-type Item = { date?: string; name?: string; amount?: string; balance?: string; conf?: number; green?: boolean };
+type Item = {
+  date?: string;
+  name?: string;
+  amount?: string;
+  balance?: string;
+  conf?: number;
+  green?: boolean;
+  /** Caixa do valor com o dobro da altura, engolindo a linha do saldo. */
+  tall?: boolean;
+  /** Fim do cartão no meio da linha ("9889"), na metade direita da tela. */
+  tail?: string;
+};
 
 function screen(items: Item[]): OcrScreen {
   const words: OcrWord[] = [];
@@ -22,15 +33,17 @@ function screen(items: Item[]): OcrScreen {
       words.push({ text: part, confidence: 95, x0: x, y0: y + 22, x1: x + part.length * 14, y1: y + 52 });
       x += part.length * 14 + 12;
     }
-    words.push({
-      text: it.amount!,
-      confidence: it.conf ?? 92,
-      x0: 930,
-      y0: y,
-      x1: 1064,
-      y1: y + 36,
-      ...(it.green === undefined ? {} : { green: it.green }),
-    });
+    if (it.tail) words.push({ text: it.tail, confidence: 95, x0: 640, y0: y + 22, x1: 700, y1: y + 52 });
+    if (it.amount !== undefined)
+      words.push({
+        text: it.amount,
+        confidence: it.conf ?? 92,
+        x0: 930,
+        y0: y,
+        x1: 1064,
+        y1: y + (it.tall ? 84 : 36),
+        ...(it.green === undefined ? {} : { green: it.green }),
+      });
     if (it.balance) words.push({ text: it.balance, confidence: 92, x0: 980, y0: y + 58, x1: 1064, y1: y + 84 });
     words.push({ text: ">", confidence: 90, x0: 1089, y0: y + 24, x1: 1109, y1: y + 58 });
     y += 200;
@@ -167,12 +180,17 @@ const gap = screensToStatement([
     { name: "Farmacia", amount: "-$3.00", balance: "$30.00" },
   ]),
 ]);
-assert.equal(gap.hasBalances, false, "\"Sem Saldo\" é nome de loja, não rótulo");
+// O saldo da linha sem saldo sai da conta; aqui a conta não fecha
+// (Padaria $14 ≠ $30 − $1 − $6), então as duas ficam pra conferir. A mais
+// antiga não tem a de baixo: fica de fora e o saldo dela é o ponto de
+// partida, como em qualquer print com saldo.
 assert.deepEqual(
   gap.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`).reverse(),
-  ["out 400 Mercado", "out 600 Padaria", "out 100 Sem Saldo", "out 300 Farmacia"],
+  ["out 400 Mercado", "out 600 Padaria", "out 100 Sem Saldo"],
+  "\"Sem Saldo\" é nome de loja, não rótulo",
 );
-assert.deepEqual(gap.unchecked.map((u) => u.description), ["Padaria", "Sem Saldo", "Farmacia"], "sem saldo na mais antiga: entra, marcada");
+assert.deepEqual(gap.unchecked.map((u) => u.description), ["Padaria", "Sem Saldo"]);
+assert.equal(gap.oldest?.description, "Farmacia");
 
 // Rolando a tela, a data do dia fica presa no topo e a linha que passa
 // por baixo dela sai pela metade: sem o valor, o leitor pegava o saldo
@@ -246,5 +264,88 @@ const greenIn = screensToStatement([
   screen([{ date: "Pending" }, { name: "Deposito", amount: "$50.00", balance: "$60.00", green: true }, { name: "Taxa", amount: "-$1.00", balance: "$10.00", green: false }]),
 ]);
 assert.deepEqual(greenIn.pendingRows.map((p) => p.amountCents), [5000, -100]);
+
+// Leituras ruins de verdade, num print só (valores inventados):
+// - o saldo de uma linha lido errado ("$94.08" virou "6290.08"): ele sai
+//   da conta, e o valor de cima ("926.76", o "$" lido como 9) confere
+//   pelos saldos vizinhos;
+// - vírgula no lugar do ponto ("51,34", o "-$" lido como 5);
+// - valor sem o ponto e numa caixa dupla, sem a linha do saldo
+//   ("31680" = -$16.80), duas linhas seguidas;
+// - nome sem valor nenhum (o leitor não entendeu a caixa): o valor sai
+//   da diferença dos saldos;
+// - o fim do cartão no meio da linha não é valor.
+const rough = screensToStatement([
+  screen([
+    { date: "Pending" },
+    { name: "Cafe Norte", amount: "-$3.00", balance: "-$6.20", tail: "4321" },
+    { name: "Nuvem Mensal", amount: "31680", tall: true, tail: "4321" },
+    { name: "Nuvem Anual", amount: "32640", tall: true, tail: "4321" },
+    { name: "Estacionamento", amount: "345.00", balance: "$40.00", conf: 20, green: false, tail: "4321" },
+    { name: "Garagem Centro" },
+    { name: "Posto Sul", amount: "-$10.00", balance: "$135.00", tail: "4321" },
+    { date: "10/27/2026" },
+    { name: "Imposto", amount: "-$120.00", balance: "$145.00" },
+    { name: "Mercado Online", amount: "926.76", balance: "$265.00", conf: 55 },
+    { name: "Estacionamento", amount: "-$45.50", balance: "6290.08", conf: 31 },
+    { name: "Loja Azul", amount: "-$17.59", balance: "$337.26" },
+    { date: "10/23/2026" },
+    { name: "Estudio Criativo", amount: "51.34", balance: "$354.85", conf: 60 },
+    { name: "Estudio Criativo", amount: "51,34", balance: "$356.19", conf: 62 },
+    { name: "Dominio", amount: "-$13.19", balance: "$357.53" },
+  ]),
+]);
+assert.deepEqual(
+  rough.statement.transactions.map((x) => `${x.date} ${x.direction} ${x.amountCents} ${x.description}`).reverse(),
+  [
+    "2026-10-27 out 12000 Imposto",
+    "2026-10-27 out 2676 Mercado Online",
+    "2026-10-27 out 4550 Estacionamento",
+    "2026-10-27 out 1759 Loja Azul",
+    "2026-10-23 out 134 Estudio Criativo",
+    "2026-10-23 out 134 Estudio Criativo",
+  ],
+  "saldo errado ignorado: 926.76 → -26.76; vírgula: 51,34 → -1.34",
+);
+assert.deepEqual(rough.unchecked, [], "com o saldo do meio tirado da conta, tudo confere");
+assert.deepEqual(
+  rough.pendingRows.map((p) => `${p.amountCents} ${p.description} ${p.checked ? "ok" : "?"}`),
+  [
+    "-300 Cafe Norte 4321 ?",
+    "-1680 Nuvem Mensal 4321 ?",
+    "-2640 Nuvem Anual 4321 ?",
+    "-4500 Estacionamento 4321 ?",
+    "-5000 Garagem Centro ?",
+    "-1000 Posto Sul 4321 ok",
+  ],
+  "sem ponto, sem saldo e sem valor: tudo sai da conta, e fica pra conferir",
+);
+assert.deepEqual(rough.unread, []);
+
+// Nome sem valor sem saldo em volta pra explicar: fica de fora, e avisa.
+const unreadable = screensToStatement([
+  screen([
+    { date: "10/2/2026" },
+    { name: "Mercado", amount: "-$4.00", balance: "$10.00" },
+    { name: "Padaria", amount: "-$6.00" },
+    { name: "Sem Valor Legivel" },
+    { name: "Farmacia", amount: "-$3.00" },
+  ]),
+]);
+assert.deepEqual(unreadable.unread, [{ description: "Sem Valor Legivel", pending: false }]);
+assert.equal(unreadable.statement.transactions.length, 3);
+
+// "$100.00" lido duas vezes, uma delas como "100." (sobreposta): não é $1.00.
+const twice = screen([
+  { date: "10/26/2026" },
+  { name: "Zelle Credit", amount: "3100.00", balance: "$513.91", green: true },
+  { name: "Assinatura", amount: "-$8.94", balance: "$413.91" },
+]);
+twice.words.push({ text: "100.", confidence: 96, x0: 951, y0: 305, x1: 1021, y1: 332, green: true });
+const tw = screensToStatement([twice], 42285);
+assert.deepEqual(
+  tw.statement.transactions.map((x) => `${x.direction} ${x.amountCents} ${x.description}`).reverse(),
+  ["in 10000 Zelle Credit", "out 894 Assinatura"],
+);
 
 console.log("check-screenshot-import: ok");

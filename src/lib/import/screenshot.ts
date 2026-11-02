@@ -44,6 +44,12 @@ export type ScreenRow = {
   balance: Money | null;
   /** Na seção "Pending" do app: ainda não foi lançado pelo banco. */
   pending?: boolean;
+  /**
+   * Linha com nome e sem valor legível (o leitor fez uma caixa só do
+   * valor e do saldo e não entendeu nada). O valor sai da conta dos
+   * saldos vizinhos, quando dá.
+   */
+  unread?: boolean;
 };
 
 export type ReconciledRow = {
@@ -61,25 +67,37 @@ export type ReconciledRow = {
   green?: boolean;
 };
 
-const MONEY_RE = /^(-)?\s*(\$)?\s*(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})$/;
+// O separador dos centavos às vezes vem lido como vírgula ("51,34"): com
+// dois dígitos depois, é centavo (milhar tem três).
+const MONEY_RE = /^(-)?\s*(\$)?\s*(\d{1,3}(?:,\d{3})+|\d+)[.,](\d{2})$/;
+// Sem o ponto ("-$16.80" lido como "31680", "-$10.27" como "1027"): os
+// dois últimos dígitos são os centavos. Só número solto na beirada
+// direita (a coluna dos valores), de 3 a 6 dígitos.
+const MONEY_NO_POINT_RE = /^(-)?\s*(\$)?\s*(\d{1,4})(\d{2})$/;
 const DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/;
 
 function cleanToken(t: string): string {
   return t.replace(/^[^\d$-]+/, "").replace(/[^\d]+$/, "");
 }
 
-function readMoney(text: string, confidence: number, green?: boolean): Money | null {
+function readMoney(text: string, confidence: number, green?: boolean, allowNoPoint = false): Money | null {
   const t = cleanToken(text.replace(/[—–]/g, "-"));
-  const m = t.match(MONEY_RE);
+  const pointed = t.match(MONEY_RE);
+  // Sem ponto só quando não há separador nenhum no que foi lido: "100."
+  // é pedaço de "$100.00" lido duas vezes, não $1.00.
+  const m = pointed ?? (allowNoPoint && !/[.,]/.test(text) ? t.match(MONEY_NO_POINT_RE) : null);
   if (!m) return null;
+  // Leitura sem o ponto custa um pouco: a corrente de saldos prefere
+  // explicar a conta com o que foi lido inteiro.
+  const extra = pointed ? 0 : 0.5;
   const negative = Boolean(m[1]);
   const hasDollar = Boolean(m[2]);
   const digits = m[3].replace(/,/g, "");
   const abs = Number(digits) * 100 + Number(m[4]);
   const unsure = confidence < 60 ? 0.5 : 1;
   const out: { cents: number; cost: number }[] = [
-    { cents: negative ? -abs : abs, cost: 0 },
-    { cents: negative ? abs : -abs, cost: 1 * unsure },
+    { cents: negative ? -abs : abs, cost: extra },
+    { cents: negative ? abs : -abs, cost: extra + 1 * unsure },
   ];
   // "-$4.21" lido como "54.21", "$100.00" como "3100.00": sem o "$", o
   // primeiro dígito pode ser o "$" (ou "-$") mal lido. Com o "$" lido,
@@ -87,7 +105,7 @@ function readMoney(text: string, confidence: number, green?: boolean): Money | n
   const firstLooksLikeSign = /^[358]/.test(digits);
   if (digits.length >= 2 && (!hasDollar || firstLooksLikeSign)) {
     const alt = Number(digits.slice(1)) * 100 + Number(m[4]);
-    const cost = (hasDollar ? 2 : 1.5) * unsure;
+    const cost = extra + (hasDollar ? 2 : 1.5) * unsure;
     out.push({ cents: -alt, cost }, { cents: alt, cost });
   }
   return { raw: text, candidates: out, ...(green === undefined ? {} : { green }) };
@@ -111,6 +129,8 @@ const BALANCE_LABEL =
   /\b(?:projected|available|current|ledger|pending|total)\s+(?:available\s+)?balance\b|^(?:available\s+)?balance$|\bsaldo\s+(?:dispon[ií]vel|projetado|previsto|atual|em\s+conta)\b|^saldo$/i;
 /** Cabeçalho da seção de lançamentos que o banco ainda não lançou. */
 const PENDING = /^(?:pending|pendentes?|processing)$/i;
+/** Títulos de seção da lista ("Pending transactions", "Posted transactions"). */
+const SECTION = /^(?:pending|posted|processing|recent)\s+transactions$|^(?:pendentes|lan[çc]ados|lan[çc]amentos)$/i;
 
 /** Palavras na ordem de leitura: agrupa por linha (caixas com alturas um
  * pouco diferentes contam como a mesma linha) e lê da esquerda pra direita. */
@@ -145,7 +165,9 @@ export function rowsFromScreen(screen: OcrScreen): ScreenRow[] {
   // Valores: coluna da direita, fora os rótulos de saldo do topo.
   const money = words
     .filter((w) => w.x0 > W * 0.5)
-    .map((w) => ({ w, m: readMoney(w.text, w.confidence, w.green) }))
+    // Número sem ponto só na beirada direita, onde fica o valor: no meio
+    // da linha ele é o fim do cartão ("... 10301327 9889").
+    .map((w) => ({ w, m: readMoney(w.text, w.confidence, w.green, w.x0 > W * 0.7) }))
     .filter((x): x is { w: OcrWord; m: Money } => x.m !== null)
     .filter((x) => !BALANCE_LABEL.test(leftOf(x.w)));
 
@@ -155,10 +177,17 @@ export function rowsFromScreen(screen: OcrScreen): ScreenRow[] {
     .map((w) => ({ w, iso: readDate(w.text), pending: PENDING.test(w.text.trim()) }))
     .filter((x) => x.iso !== null || x.pending);
 
-  const rows: ScreenRow[] = [];
+  // Altura comum de um valor. O leitor às vezes junta o valor e o saldo
+  // numa caixa só, com o dobro da altura ("-$16.80" + saldo virando
+  // "31680"): a altura dessa caixa não serve de régua.
+  const heights = money.map((x) => x.w.y1 - x.w.y0).sort((p, q) => p - q);
+  const typical = heights.length > 0 ? heights[Math.floor(heights.length / 2)] : 0;
+
+  const rows: (ScreenRow & { y0: number; y1: number })[] = [];
+  const used = new Set<OcrWord>();
   for (let i = 0; i < money.length; i++) {
     const a = money[i];
-    const h = a.w.y1 - a.w.y0;
+    const h = Math.min(a.w.y1 - a.w.y0, typical * 1.3);
     // O saldo vem logo abaixo, alinhado à direita, em letra menor.
     const next = money[i + 1];
     const isBalance =
@@ -184,6 +213,7 @@ export function rowsFromScreen(screen: OcrScreen): ScreenRow[] {
     const descWordsClean = descWords.filter((w) => !descWords.some((v) => inside(w, v)));
     const desc = inReadingOrder(descWordsClean, h).map((w) => w.text).join(" ").trim();
 
+    for (const w of descWords) used.add(w);
     const header = [...headers].reverse().find((d) => d.w.y1 <= a.w.y0 + h * 0.2);
     rows.push({
       date: header?.iso ?? null,
@@ -191,9 +221,54 @@ export function rowsFromScreen(screen: OcrScreen): ScreenRow[] {
       amount: a.m,
       balance: bal?.m ?? null,
       pending: header?.pending ?? false,
+      y0: a.w.y0,
+      y1: bal ? bal.w.y1 : a.w.y1,
     });
   }
-  return rows.filter((r) => r.description.length > 0);
+  const named = rows.filter((r) => r.description.length > 0);
+
+  // Nome sem valor entre duas linhas lidas: é um lançamento cujo valor o
+  // leitor não pegou. Só entre a primeira e a última linha (fora disso é
+  // cabeçalho e menu do app).
+  if (named.length >= 2 && typical > 0) {
+    const first = named[0].y0;
+    const last = named[named.length - 1].y1;
+    const loose = words
+      .filter((w) => !used.has(w) && w.x1 < W * 0.62 && w.x0 < W * 0.5)
+      .filter((w) => w.y0 > first && w.y1 < last)
+      .filter((w) => !readDate(w.text) && !JUNK.test(w.text) && w.confidence >= 60);
+    const lines: OcrWord[][] = [];
+    for (const w of [...loose].sort((p, q) => p.y0 - q.y0)) {
+      const line = lines[lines.length - 1];
+      if (line && Math.abs(w.y0 - line[0].y0) < typical * 0.6) line.push(w);
+      else lines.push([w]);
+    }
+    for (const line of lines) {
+      const text = inReadingOrder(line, typical).map((w) => w.text).join(" ").trim();
+      if (text.replace(/[^A-Za-zÀ-ÿ]/g, "").length < 3 || SECTION.test(text)) continue;
+      const y0 = Math.min(...line.map((w) => w.y0));
+      const header = [...headers].reverse().find((d) => d.w.y1 <= y0);
+      named.push({
+        date: header?.iso ?? null,
+        description: text,
+        amount: { raw: "", candidates: [] },
+        balance: null,
+        pending: header?.pending ?? false,
+        unread: true,
+        y0,
+        y1: Math.max(...line.map((w) => w.y1)),
+      });
+    }
+    named.sort((p, q) => p.y0 - q.y0);
+  }
+  return named.map((r) => ({
+    date: r.date,
+    description: r.description,
+    amount: r.amount,
+    balance: r.balance,
+    pending: r.pending,
+    ...(r.unread ? { unread: true } : {}),
+  }));
 }
 
 /** Só os dígitos do valor: "-$9.99", "$9.99" e "39.99" (o "-$" lido como 3) dão "999"/"3999". */
@@ -297,7 +372,27 @@ export function mergeScreens(screens: ScreenRow[][]): { rows: ScreenRow[]; undat
  * Linhas do mais novo pro mais antigo. A conferência é por trecho: uma
  * linha sem saldo não impede de conferir as outras.
  */
-export function reconcile(rows: ScreenRow[], openingCents?: number): ReconciledRow[] {
+export function reconcile(
+  input: ScreenRow[],
+  openingCents?: number,
+  /** Linhas sem valor legível que não deu pra tirar da conta (ficam de fora). */
+  dropped: ScreenRow[] = [],
+): ReconciledRow[] {
+  // Linha sem valor legível sai da lista e fica presa à de cima: o valor
+  // dela é a diferença entre o saldo da de cima e o da de baixo, menos o
+  // valor da de cima.
+  const rows: ScreenRow[] = [];
+  const gapBelow = new Map<ScreenRow, ScreenRow>();
+  for (const r of input) {
+    if (!r.unread) {
+      rows.push(r);
+      continue;
+    }
+    const above = rows[rows.length - 1];
+    if (above && above.balance && !gapBelow.has(above)) gapBelow.set(above, r);
+    else dropped.push(r);
+  }
+
   const out: ReconciledRow[] = [];
   let i = 0;
   while (i < rows.length) {
@@ -306,15 +401,58 @@ export function reconcile(rows: ScreenRow[], openingCents?: number): ReconciledR
       i++;
       continue;
     }
-    let j = i;
-    while (j < rows.length && rows[j].balance) j++;
+    // O trecho vai de uma linha com saldo até a última com saldo. Linhas
+    // sem saldo no meio (o leitor não pegou a linha do saldo) entram: o
+    // saldo delas sai da conta, e o das vizinhas confere o valor.
+    let j = i + 1;
+    let end = i + 1;
+    while (j < rows.length && (rows[j].balance || j - end < MAX_GAP)) {
+      if (rows[j].balance) end = j + 1;
+      j++;
+    }
     // O trecho que chega na linha mais antiga confere ela com o saldo que
     // o Velun já tem antes dela (quando foi passado).
-    out.push(...reconcileRun(rows.slice(i, j), j === rows.length ? openingCents : undefined));
-    i = j;
+    const run = rows.slice(i, end);
+    // A mais antiga do trecho não tem a de baixo: a linha sem valor presa
+    // a ela não tem como sair da conta.
+    const last = run[run.length - 1];
+    const lost = gapBelow.get(last);
+    if (lost) {
+      dropped.push(lost);
+      gapBelow.delete(last);
+    }
+    out.push(...reconcileRun(run, end === rows.length ? openingCents : undefined, gapBelow));
+    i = end;
   }
   return out;
 }
+
+/**
+ * Quanto custa explicar a diferença dos saldos com uma linha sem valor
+ * legível de valor `x`, com a de cima valendo `cents`. A explicação mais
+ * barata é a de valor menor; entrada (que o app pinta de verde, e aqui
+ * não se vê) e valor da de cima com o sinal contra a cor custam mais.
+ */
+function gapCost(x: number, cents: number, green: boolean | undefined): number {
+  if (x === 0) return BREAK;
+  let cost = 1 + Math.abs(x) / 10_000;
+  if (x > 0) cost += 2;
+  if (green !== undefined && cents !== 0 && cents > 0 !== green) cost += 2;
+  return cost;
+}
+
+/** Até quantas linhas seguidas sem saldo um trecho atravessa. */
+const MAX_GAP = 3;
+/** Saldo que não fecha: só quando não há outro jeito. */
+const BREAK = 50;
+/**
+ * Saldo lido que é ignorado e sai da conta ("$494.08" lido como
+ * "6290.08"). Mais caro que qualquer correção de valor, bem mais barato
+ * que deixar a corrente quebrar.
+ */
+const IGNORE_BALANCE = 4;
+/** Estados guardados por linha, por segurança (com MAX_GAP, ficam bem abaixo disso). */
+const KEEP_STATES = 2000;
 
 /** Sem saldo pra conferir: vale o que foi lido. */
 function asRead(r: ScreenRow): ReconciledRow {
@@ -330,71 +468,187 @@ function asRead(r: ScreenRow): ReconciledRow {
   };
 }
 
-/** Um trecho em que todas as linhas têm saldo. */
-function reconcileRun(rows: ScreenRow[], openingCents?: number): ReconciledRow[] {
+/**
+ * Um estado da corrente: o saldo da linha (lido ou tirado da conta) e o
+ * menor custo dela até a mais antiga do trecho.
+ */
+type ChainState = {
+  cents: number;
+  cost: number;
+  /** Candidato do valor escolhido nesta linha. */
+  a: number;
+  /** Candidato do saldo lido; -1 quando o saldo saiu da conta. */
+  b: number;
+  /** Estado escolhido na linha de baixo (-1 na mais antiga). */
+  next: number;
+  /** Fechou com a linha de baixo. */
+  fits: boolean;
+  /** Quantas linhas seguidas, até esta, estão com o saldo tirado da conta. */
+  depth: number;
+  /** Valor tirado da conta da linha sem valor legível logo abaixo desta. */
+  gap?: number;
+};
+
+/**
+ * Um trecho que começa e termina em linha com saldo. Pra cada linha, os
+ * saldos possíveis: os que o leitor leu (cada leitura plausível) e o que
+ * sai da conta com a linha de baixo, quando a linha não tem saldo ou o
+ * saldo lido não serve.
+ */
+function reconcileRun(
+  rows: ScreenRow[],
+  openingCents: number | undefined,
+  gapBelow: Map<ScreenRow, ScreenRow>,
+): ReconciledRow[] {
   const n = rows.length;
-  const BREAK = 50;
-  // dp[i][b]: menor custo da linha i até a mais antiga, com o saldo da
-  // linha i escolhido como o candidato b.
-  const dp: number[][] = rows.map((r) => r.balance!.candidates.map(() => Infinity));
-  const choice: { a: number; nb: number }[][] = rows.map((r) => r.balance!.candidates.map(() => ({ a: 0, nb: -1 })));
+  const states: ChainState[][] = new Array(n);
+
+  // Os saldos lidos ficam sempre (são as âncoras da conta, mesmo quando
+  // não fecham); dos tirados da conta, só os mais baratos.
+  const keep = (list: ChainState[]): ChainState[] => {
+    const byCents = new Map<number, ChainState>();
+    for (const s of list) {
+      const cur = byCents.get(s.cents);
+      if (!cur || s.cost < cur.cost || (s.cost === cur.cost && s.b >= 0 && cur.b < 0)) byCents.set(s.cents, s);
+    }
+    const all = [...byCents.values()].sort((x, y) => x.cost - y.cost);
+    const read = all.filter((s) => s.b >= 0);
+    const derived = all.filter((s) => s.b < 0).slice(0, KEEP_STATES);
+    return [...read, ...derived].sort((x, y) => x.cost - y.cost);
+  };
 
   for (let i = n - 1; i >= 0; i--) {
-    const bals = rows[i].balance!.candidates;
+    const bals = rows[i].balance?.candidates ?? [];
     const amts = rows[i].amount.candidates;
-    for (let b = 0; b < bals.length; b++) {
-      if (i === n - 1) {
-        // A mais antiga só confere com o saldo que o Velun tem antes dela.
-        // Sem isso (ou se não fecha), vale o valor lido.
-        let best = { a: 0, cost: bals[b].cost };
+    const list: ChainState[] = [];
+    if (i === n - 1) {
+      // A mais antiga (sempre com saldo) só confere com o saldo que o
+      // Velun tem antes dela. Sem isso (ou se não fecha), vale o valor lido.
+      for (let b = 0; b < bals.length; b++) {
+        let best: ChainState = { cents: bals[b].cents, cost: bals[b].cost, a: 0, b, next: -1, fits: false, depth: 0 };
         if (openingCents !== undefined) {
           for (let a = 0; a < amts.length; a++) {
             const fits = bals[b].cents === openingCents + amts[a].cents;
             const cost = bals[b].cost + amts[a].cost + (fits ? 0 : BREAK);
-            if (a === 0 || cost < best.cost) best = { a, cost };
+            if (a === 0 || cost < best.cost) best = { cents: bals[b].cents, cost, a, b, next: -1, fits, depth: 0 };
           }
         }
-        dp[i][b] = best.cost;
-        choice[i][b] = { a: best.a, nb: -1 };
-        continue;
+        list.push(best);
       }
-      const nextBals = rows[i + 1].balance!.candidates;
-      let best = Infinity;
-      let pick = { a: 0, nb: 0 };
-      for (let a = 0; a < amts.length; a++) {
-        for (let nb = 0; nb < nextBals.length; nb++) {
-          const fits = bals[b].cents === nextBals[nb].cents + amts[a].cents;
-          const cost = bals[b].cost + amts[a].cost + (fits ? 0 : BREAK) + dp[i + 1][nb];
-          if (cost < best) {
-            best = cost;
-            pick = { a, nb };
-          }
-        }
-      }
-      dp[i][b] = best;
-      choice[i][b] = pick;
+      states[i] = keep(list);
+      continue;
     }
+    const below = states[i + 1];
+    const cheapestBelow = below.reduce((m, s, k) => (s.cost < below[m].cost ? k : m), 0);
+    if (gapBelow.has(rows[i])) {
+      // Linha sem valor logo abaixo: o saldo lido desta não precisa fechar
+      // com a de baixo; a diferença é o valor da que não deu pra ler.
+      for (let a = 0; a < amts.length; a++) {
+        for (let b = 0; b < bals.length; b++) {
+          let best: ChainState | null = null;
+          for (let k = 0; k < below.length; k++) {
+            const x = bals[b].cents - amts[a].cents - below[k].cents;
+            const cost = bals[b].cost + amts[a].cost + below[k].cost + gapCost(x, amts[a].cents, rows[i].amount.green);
+            if (!best || cost < best.cost) best = { cents: bals[b].cents, cost, a, b, next: k, fits: false, depth: 0, gap: x };
+          }
+          if (best) list.push(best);
+        }
+      }
+      states[i] = keep(list);
+      continue;
+    }
+    for (let a = 0; a < amts.length; a++) {
+      for (let k = 0; k < below.length; k++) {
+        // No máximo MAX_GAP saldos seguidos tirados da conta: mais que
+        // isso, a conta explica qualquer coisa.
+        if (below[k].depth >= MAX_GAP) continue;
+        const cents = below[k].cents + amts[a].cents;
+        // Saldo tirado da conta: o da linha de baixo mais o valor desta.
+        // Sem saldo lido, é o único jeito; com saldo lido, é ignorá-lo.
+        const ignore = bals.length === 0 ? 0 : IGNORE_BALANCE;
+        list.push({ cents, cost: below[k].cost + amts[a].cost + ignore, a, b: -1, next: k, fits: true, depth: below[k].depth + 1 });
+      }
+      for (let b = 0; b < bals.length; b++) {
+        // O saldo lido que fecha com algum estado de baixo.
+        let fitK = -1;
+        for (let k = 0; k < below.length; k++) {
+          if (below[k].cents + amts[a].cents === bals[b].cents && (fitK < 0 || below[k].cost < below[fitK].cost)) fitK = k;
+        }
+        if (fitK >= 0) {
+          list.push({ cents: bals[b].cents, cost: bals[b].cost + amts[a].cost + below[fitK].cost, a, b, next: fitK, fits: true, depth: 0 });
+        } else {
+          list.push({
+            cents: bals[b].cents,
+            cost: bals[b].cost + amts[a].cost + BREAK + below[cheapestBelow].cost,
+            a,
+            b,
+            next: cheapestBelow,
+            fits: false,
+            depth: 0,
+          });
+        }
+      }
+    }
+    // A mais nova do trecho sempre tem saldo lido: ela ancora a conta.
+    states[i] = keep(i === 0 ? list.filter((s) => s.b >= 0) : list);
   }
 
-  let b = dp[0].indexOf(Math.min(...dp[0]));
+  const path: ChainState[] = [];
+  let k = states[0].reduce((m, s, idx) => (s.cost < states[0][m].cost ? idx : m), 0);
+  for (let i = 0; i < n; i++) {
+    const s = states[i][k];
+    path.push(s);
+    k = s.next;
+  }
+
+  // Conferido: fechou com a de baixo, e a conta passa por no máximo uma
+  // linha sem saldo lido até o próximo saldo lido. Com duas ou mais
+  // seguidas, os valores saem da conta mas a soma é que confere, não
+  // cada um.
+  const free = (i: number) => path[i].b < 0;
+  const freeRunAt = (i: number) => {
+    // Tamanho do bloco de linhas sem saldo lido que contém i (ou logo abaixo de i).
+    let s = i;
+    while (s > 0 && free(s - 1)) s--;
+    let e = i;
+    while (e < n && free(e)) e++;
+    return e - s;
+  };
   const out: ReconciledRow[] = [];
   for (let i = 0; i < n; i++) {
-    const { a, nb } = choice[i][b];
-    const amount = rows[i].amount.candidates[a];
-    const balance = rows[i].balance!.candidates[b];
-    const below = nb >= 0 ? rows[i + 1].balance!.candidates[nb].cents : openingCents;
-    const checked = below !== undefined && balance.cents === below + amount.cents;
+    const s = path[i];
+    const lost = gapBelow.get(rows[i]);
+    let checked: boolean;
+    if (i === n - 1) checked = s.fits;
+    else if (free(i)) {
+      // Sem saldo lido: confere pela de cima, que tem saldo e fecha.
+      checked = freeRunAt(i) === 1 && i > 0 && !free(i - 1) && path[i - 1].fits && path[i + 1] !== undefined && !free(i + 1);
+    } else {
+      checked = s.fits && (!free(i + 1) || freeRunAt(i + 1) === 1);
+    }
     out.push({
       date: rows[i].date ?? "",
       description: rows[i].description,
-      amountCents: amount.cents,
-      balanceCents: balance.cents,
-      corrected: a !== 0 || b !== 0,
+      amountCents: rows[i].amount.candidates[s.a].cents,
+      balanceCents: s.cents,
+      // Saldo que saiu da conta numa linha que tinha saldo lido também é correção.
+      corrected: s.a !== 0 || (rows[i].balance !== null && s.b !== 0),
       checked,
       pending: rows[i].pending ?? false,
       green: rows[i].amount.green,
     });
-    b = nb < 0 ? 0 : nb;
+    if (lost && s.gap !== undefined) {
+      // Valor tirado da conta: entra pra conferir, nunca como conferido.
+      out.push({
+        date: lost.date ?? "",
+        description: lost.description,
+        amountCents: s.gap,
+        balanceCents: s.cents - rows[i].amount.candidates[s.a].cents,
+        corrected: true,
+        checked: false,
+        pending: lost.pending ?? false,
+      });
+    }
   }
   return out;
 }
@@ -472,6 +726,8 @@ export function screensToStatement(
   oldest: { date: string; description: string; balanceCents: number | null; excluded: boolean } | null;
   /** Linhas cujo valor não deu pra conferir pelo saldo (do mais novo pro mais antigo). */
   unchecked: { date: string; description: string; amountCents: number }[];
+  /** Linhas com nome e sem valor legível, que nem o saldo explicou: ficaram de fora. */
+  unread: { description: string; pending: boolean }[];
 } {
   let cut = 0;
   const perScreen = screens.map((s) => {
@@ -483,7 +739,8 @@ export function screensToStatement(
   // Os pendentes entram na conferência (o saldo deles emenda com o resto)
   // mas não na importação: o banco ainda pode mudar valor e data, e o
   // lançamento de verdade vem no próximo print ou extrato.
-  const all = reconcile(rows, openingCents).map(bySignColor);
+  const dropped: ScreenRow[] = [];
+  const all = reconcile(rows, openingCents, dropped).map(bySignColor);
   let reconciled = all.filter((r) => !r.pending);
   // A linha mais antiga só confere com a de baixo dela, que não está no
   // print. Se nem o saldo do Velun fecha com ela, o valor é um chute do
@@ -518,5 +775,6 @@ export function screensToStatement(
     unchecked: reconciled
       .filter((r) => !r.checked)
       .map((r) => ({ date: r.date, description: r.description, amountCents: r.amountCents })),
+    unread: dropped.map((r) => ({ description: r.description, pending: r.pending ?? false })),
   };
 }
