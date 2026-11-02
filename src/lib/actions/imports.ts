@@ -32,6 +32,12 @@ import { looksLikeNomad, parseNomadStatementText } from "@/lib/import/nomad-pdf"
 import { suggestCategoryId } from "@/lib/import/mcc";
 import { screensToStatement, type OcrScreen } from "@/lib/import/screenshot";
 import { isIsoDate, type FileStatement } from "@/lib/import/file-statement";
+import {
+  isKnownPending,
+  matchPending,
+  readPending,
+  type PendingCandidate,
+} from "@/lib/import/bank-pending";
 import type { ColumnMapping } from "@/lib/import/table";
 import { duplicateCounter } from "@/lib/import/duplicates";
 import { fitsDirection } from "@/lib/category-kind";
@@ -152,6 +158,9 @@ async function balanceBefore(
       .eq("household_id", householdId)
       .eq("account_id", accountId)
       .eq("status", "cleared")
+      // O pendente do banco não está no saldo lançado que o app mostra
+      // ao lado de cada linha lançada.
+      .eq("bank_pending", false)
       .lt("date", date)
       .order("id")
       .range(from, to),
@@ -338,6 +347,8 @@ async function runImportStatement(input: {
   let cardDaysNote: string | null = null;
   let nomadNote: string | null = null;
   let fileNote: string | null = null;
+  /** Pendentes do banco vistos nos prints (entram marcados). */
+  let pendingSource: ParsedStatement["transactions"] = [];
   // `matches` null: o documento não traz como conferir (Nomad).
   let verification: {
     matches: boolean | null;
@@ -404,13 +415,11 @@ async function runImportStatement(input: {
         };
       }
       let read = screensToStatement(screens);
-      if (read.statement.transactions.length === 0) {
+      if (read.statement.transactions.length === 0 && read.pendingRows.length === 0) {
         return {
           ok: false,
           error:
-            read.pending > 0
-              ? "Esses prints só mostram lançamentos pendentes. Eles entram quando o banco lançar: importe de novo daqui a uns dias."
-              : "Não achei lançamentos nesses prints. Use prints da lista de lançamentos do app, com a data e os valores aparecendo.",
+            "Não achei lançamentos nesses prints. Use prints da lista de lançamentos do app, com a data e os valores aparecendo.",
         };
       }
       // O print mostra o saldo antes do lançamento mais antigo. Com o saldo
@@ -470,10 +479,25 @@ async function runImportStatement(input: {
       } else if (read.unchecked.length > 5) {
         parts.push(`${read.unchecked.length} valores não deram pra conferir pelo saldo: compare com o app antes de confirmar.`);
       }
-      if (read.pending > 0) {
+      if (read.pendingRows.length > 0) {
+        const n = read.pendingRows.length;
         parts.push(
-          `${read.pending} ${read.pending === 1 ? "lançamento pendente ficou" : "lançamentos pendentes ficaram"} de fora: ${read.pending === 1 ? "entra" : "entram"} quando o banco lançar, no próximo print ou extrato.`,
+          n === 1
+            ? "1 lançamento pendente no banco entra marcado como pendente: conta no saldo, como no app, e o lançamento de verdade toma o lugar dele quando o banco lançar."
+            : `${n} lançamentos pendentes no banco entram marcados como pendentes: contam no saldo, como no app, e o lançamento de verdade toma o lugar deles quando o banco lançar.`,
         );
+        // Lido do mais novo pro mais antigo; a data vem do código do banco no nome.
+        const today = todayIn(timezone);
+        pendingSource = read.pendingRows.map((r) => {
+          const { description, date } = readPending(r.description, today);
+          return {
+            date,
+            description,
+            amountCents: Math.abs(r.amountCents),
+            direction: (r.amountCents >= 0 ? "in" : "out") as "in" | "out",
+            mcc: null,
+          };
+        });
       }
       if (read.cut > 0) {
         parts.push(
@@ -591,6 +615,15 @@ async function runImportStatement(input: {
     throw err;
   }
 
+  // Os pendentes alargam o período: são os dias mais recentes. Print só
+  // com pendentes não tem período lançado nenhum.
+  if (pendingSource.length > 0) {
+    const pendingDates = pendingSource.map((t) => t.date).sort();
+    if (!statement.periodStart) statement.periodStart = pendingDates[0];
+    const lastPending = pendingDates[pendingDates.length - 1];
+    if (!statement.periodEnd || lastPending > statement.periodEnd) statement.periodEnd = lastPending;
+  }
+
   // O nome do arquivo é registrado, não o conteúdo: o PDF não é guardado
   // em lugar nenhum. O que fica é o que foi extraído e revisado.
   const { data: created, error: importError } = await supabase
@@ -661,11 +694,37 @@ async function runImportStatement(input: {
       .select("fingerprint, date, amount_cents, direction, status, import_id")
       .eq("household_id", householdId)
       .eq("account_id", accountId)
+      // Pendente do banco não é repetido do lançado: é o que ele substitui
+      // (cruzamento próprio, mais abaixo).
+      .eq("bank_pending", false)
       .gte("date", statement.periodStart)
       .lte("date", statement.periodEnd)
       .order("id")
       .range(from, to),
   );
+
+  // Pendentes do banco já no Velun (de um print anterior), que um
+  // lançado deste extrato pode estar substituindo, ou que um pendente
+  // deste print repete.
+  const { data: pendingRows } = await supabase
+    // limite: pendentes do banco nesta conta, poucas dezenas
+    .from("transactions")
+    .select("id, date, amount_cents, direction, description, bank_description")
+    .eq("household_id", householdId)
+    .eq("account_id", accountId)
+    .eq("bank_pending", true)
+    .gte("date", shiftDays(statement.periodStart, -12))
+    .order("date");
+  const pendingCandidates: PendingCandidate[] = (pendingRows ?? []).map((p) => ({
+    id: p.id as string,
+    date: p.date as string,
+    amountCents: p.amount_cents as number,
+    direction: p.direction as "in" | "out",
+    // O texto do banco, não o nome dado: "ZELLE TRANSACTION CREDIT" que
+    // quitou a previsão "High Soccer Holdings - 2" continua reconhecível.
+    description: (p.bank_description as string | null) ?? (p.description as string),
+  }));
+  const takenPending = new Set<string>();
 
   // Por contagem: três saques iguais no mesmo dia são três lançamentos.
   //
@@ -736,6 +795,7 @@ async function runImportStatement(input: {
     .eq("household_id", householdId)
     .eq("account_id", accountId)
     .eq("status", "pending")
+    .eq("bank_pending", false)
     .not("recurrence_id", "is", null)
     .gte("date", shiftDays(statement.periodStart, -5))
     .lte("date", shiftDays(statement.periodEnd, 5))
@@ -782,24 +842,39 @@ async function runImportStatement(input: {
     return fitsDirection(category, direction) ? id : null;
   };
 
-  const rows = statement.transactions.map((t, index) => {
+  // Lançados primeiro (os índices batem com statement.transactions, que
+  // o cruzamento de repetidos usa), depois os pendentes do banco.
+  const source = [
+    ...statement.transactions.map((t) => ({ t, bankPending: false })),
+    ...pendingSource.map((t) => ({ t, bankPending: true })),
+  ];
+  const rows = source.map(({ t, bankPending }, index) => {
     const fingerprint = computeFingerprint({
       accountId,
       date: t.date,
       amountCents: t.amountCents,
       description: t.description,
     });
-    const isDuplicate = isExistingDuplicate(fingerprint, t, index);
+    // Pendente repetido: o mesmo pendente já veio de um print anterior.
+    const knownPending = bankPending ? isKnownPending(t, pendingCandidates, takenPending) : null;
+    if (knownPending) takenPending.add(knownPending.id);
+    const isDuplicate = bankPending ? Boolean(knownPending) : isExistingDuplicate(fingerprint, t, index);
     const learnedId = learnedFor(t.description, t.direction);
     const suggested =
       learnedId ?? suggestCategoryId(t.mcc, categoriesByName, t.direction);
 
-    // Duplicata não procura previsão: se essa linha já existe na conta,
-    // não é ela que vai quitar previsão nenhuma.
+    // Lançado que substitui um pendente do banco: junção já marcada (o
+    // pendente era provisório). Senão, a previsão que ele quita.
+    // Duplicata não procura nada: se essa linha já existe na conta, não é
+    // ela que vai quitar previsão nenhuma.
+    const pendingMatch = isDuplicate || bankPending ? null : matchPending(t, pendingCandidates, takenPending);
+    if (pendingMatch) takenPending.add(pendingMatch.candidate.id);
     const match = isDuplicate
       ? null
-      : matchForecast(t, candidates, takenForecasts);
-    if (match) takenForecasts.add(match.id);
+      : pendingMatch
+        ? { id: pendingMatch.candidate.id }
+        : matchForecast(t, candidates, takenForecasts);
+    if (match && !pendingMatch) takenForecasts.add(match.id);
 
     // Nome pra lista; o texto do banco segue junto, e a impressão digital
     // (acima) continua sendo calculada sobre ele.
@@ -827,6 +902,7 @@ async function runImportStatement(input: {
       is_included: !isDuplicate,
       match_transaction_id: match?.id ?? null,
       merge_accepted: true,
+      bank_pending: bankPending,
     };
   });
 
@@ -846,7 +922,8 @@ async function runImportStatement(input: {
       amountCents: r.amount_cents,
       direction: r.direction,
       fingerprint: r.fingerprint,
-      free: r.dup_status === "none" && r.match_transaction_id === null,
+      // Pendente não junta com lançamento confirmado à mão: ainda nem lançou.
+      free: r.dup_status === "none" && r.match_transaction_id === null && !r.bank_pending,
     }));
 
   // Mesmo dia e valor: o lançamento digitado à mão é esta linha. Junção
@@ -895,7 +972,7 @@ async function runImportStatement(input: {
         amountCents: r.amount_cents,
         direction: r.direction,
         description: r.bank_description,
-        free: r.dup_status === "none" && r.match_transaction_id === null,
+        free: r.dup_status === "none" && r.match_transaction_id === null && !r.bank_pending,
       })),
       cards,
       existing,
@@ -965,10 +1042,11 @@ async function runImportStatement(input: {
       const { data: replaced } = await supabase
         // limite: só os lançamentos casados nesta importação
         .from("transactions")
-        .select("date, amount_cents, direction, status")
+        .select("date, amount_cents, direction, status, bank_pending")
         .in("id", replacedIds);
       for (const t of replaced ?? []) {
-        if (t.status !== "cleared" || (t.date as string) >= statement.periodStart) continue;
+        // Pendente do banco já fica fora do saldo de antes (balanceBefore).
+        if (t.status !== "cleared" || t.bank_pending || (t.date as string) >= statement.periodStart) continue;
         before -= t.direction === "in" ? (t.amount_cents as number) : -(t.amount_cents as number);
       }
     }

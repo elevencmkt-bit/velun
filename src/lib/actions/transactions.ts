@@ -782,3 +782,19 @@ async function applyToRecurrence(
     keep: { id: p.transactionId, date: p.newDate },
   });
 }
+
+/**
+ * Pendente do banco que passou dias sem lançar, e a pessoa confirma que
+ * aconteceu: a marca sai e ele fica como lançamento normal.
+ */
+export async function keepBankPending(transactionId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transactions")
+    .update({ bank_pending: false })
+    .eq("id", transactionId)
+    .eq("bank_pending", true);
+  if (error) return { ok: false, error: "Não deu pra salvar agora. Tente de novo." };
+  revalidatePath("/transacoes");
+  return { ok: true };
+}

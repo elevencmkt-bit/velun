@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -103,15 +103,19 @@ type Row = {
   /** Linha que parece ser pagamento da fatura de um cartão. */
   cardPayment: { cardName: string; accepted: boolean } | null;
   isIncluded: boolean;
+  /** Pendente no banco (seção "Pending" do print): entra marcado. */
+  bankPending: boolean;
   /**
-   * Lançamento seu que esta linha parece ser: uma previsão (vem marcada
-   * pra juntar) ou um lançamento já confirmado (vem desmarcado).
+   * Lançamento seu que esta linha parece ser: um pendente do banco que
+   * ela substitui ou uma previsão (vêm marcados pra juntar), ou um
+   * lançamento já confirmado (vem desmarcado).
    */
   match: {
     description: string;
     date: string;
+    amountCents: number;
     accepted: boolean;
-    kind: "forecast" | "confirmed";
+    kind: "forecast" | "confirmed" | "bank_pending";
   } | null;
 };
 type Double = {
@@ -605,19 +609,23 @@ export function ImportWorkspace({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lastPicked, setLastPicked] = useState<number | null>(null);
   const [bulkKey, setBulkKey] = useState(0);
+  // Pendentes do banco em cima, num bloco à parte; depois os lançados.
+  const table = [...rows.filter((r) => r.bankPending), ...rows.filter((r) => !r.bankPending)];
+  const pendingRows = rows.filter((r) => r.bankPending && !r.isDuplicate);
+  const pendingIncluded = pendingRows.length > 0 && pendingRows.every((r) => r.isIncluded);
   const selectedRows = rows.filter((r) => selected.has(r.id));
   const selectedIds = selectedRows.map((r) => r.id);
 
   function pickRow(index: number, shift: boolean) {
-    const id = rows[index].id;
+    const id = table[index].id;
     const next = new Set(selected);
     const turnOn = !next.has(id);
     if (shift && lastPicked !== null) {
       // Shift: marca (ou desmarca) o trecho entre a última e esta.
       const [a, b] = lastPicked < index ? [lastPicked, index] : [index, lastPicked];
       for (let i = a; i <= b; i++) {
-        if (turnOn) next.add(rows[i].id);
-        else next.delete(rows[i].id);
+        if (turnOn) next.add(table[i].id);
+        else next.delete(table[i].id);
       }
     } else if (turnOn) next.add(id);
     else next.delete(id);
@@ -1100,6 +1108,41 @@ export function ImportWorkspace({
         </p>
       ) : null}
 
+      {pendingRows.length > 0 ? (
+        <div className="flex items-center gap-4 rounded-[16px] bg-(--warning-soft) px-4 py-3.5">
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-bold text-(--text-primary)">
+              Trazer {pendingRows.length === 1 ? "o pendente" : `os ${pendingRows.length} pendentes`} do banco
+            </div>
+            <div className="text-[13px] text-(--text-secondary)">
+              Entram marcados como pendentes e contam no saldo, como no app. Quando o banco lançar, o lançamento de
+              verdade toma o lugar deles.
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={pendingIncluded}
+            aria-label="Trazer os pendentes do banco"
+            disabled={isPending}
+            onClick={() =>
+              run(() =>
+                bulkSetStagedIncluded(
+                  openImport.id,
+                  pendingRows.map((r) => r.id),
+                  !pendingIncluded,
+                ),
+              )
+            }
+            className={`flex h-7 w-12 shrink-0 items-center rounded-full p-[3px] transition-colors ${
+              pendingIncluded ? "justify-end bg-(--primary)" : "justify-start bg-(--border-strong)"
+            }`}
+          >
+            <span className="h-[22px] w-[22px] rounded-full bg-white shadow-[0_1px_3px_rgba(16,24,40,.25)]" />
+          </button>
+        </div>
+      ) : null}
+
       {selecting ? (
         <div
           className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-[16px] border border-(--primary-border) bg-(--bg-surface) p-2.5 pl-4 shadow-(--shadow-card)"
@@ -1245,9 +1288,20 @@ export function ImportWorkspace({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
+              {table.map((row, index) => (
+                <Fragment key={row.id}>
+                {pendingRows.length > 0 && (index === 0 || (!row.bankPending && table[index - 1].bankPending)) ? (
+                  <tr className="border-b bg-(--bg-subtle)">
+                    <td
+                      colSpan={5}
+                      className="px-4 py-2 text-[11px] font-bold tracking-[0.04em] uppercase"
+                      style={{ color: row.bankPending ? "var(--warning-dark)" : "var(--text-light)" }}
+                    >
+                      {row.bankPending ? "Pendentes no banco · contam no saldo, como no app" : "Lançados"}
+                    </td>
+                  </tr>
+                ) : null}
                 <tr
-                  key={row.id}
                   className={`border-b last:border-0 ${
                     selecting && selected.has(row.id) ? "bg-(--primary-soft)" : ""
                   }`}
@@ -1293,8 +1347,13 @@ export function ImportWorkspace({
                             run(() => renameStagedRow(row.id, name))
                           }
                         />
+                        {row.bankPending ? (
+                          <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-(--warning-soft) px-2 text-[11px] font-bold text-(--warning-dark)">
+                            Pendente
+                          </span>
+                        ) : null}
                         {row.isDuplicate ? (
-                          <Badge variant="secondary">Já existe</Badge>
+                          <Badge variant="secondary">{row.bankPending ? "Já entrou" : "Já existe"}</Badge>
                         ) : null}
                       </div>
 
@@ -1358,15 +1417,34 @@ export function ImportWorkspace({
                                 className="h-3.5 w-3.5 shrink-0"
                                 style={{ color: "var(--income)" }}
                               />
-                              <span className="text-(--text-muted)">
-                                {row.match.kind === "forecast"
-                                  ? "Quita"
-                                  : "Substitui seu lançamento"}{" "}
-                                <span className="text-(--text-primary)">
-                                  {row.match.description}
-                                </span>{" "}
-                                de {shortDate(row.match.date)}
-                              </span>
+                              {row.match.kind === "bank_pending" ? (
+                                <span className="text-(--text-muted)">
+                                  Substitui o pendente de{" "}
+                                  <span className="font-semibold text-(--text-primary)">
+                                    <Money cents={row.match.amountCents} currency={currency} />
+                                  </span>{" "}
+                                  de {shortDate(row.match.date)}
+                                  {row.match.amountCents !== row.amountCents ? (
+                                    <>
+                                      {" "}
+                                      (lançou <Money cents={row.amountCents} currency={currency} />
+                                      {row.amountCents > row.match.amountCents && row.direction === "out" ? ": gorjeta?" : ""})
+                                    </>
+                                  ) : null}
+                                </span>
+                              ) : (
+                                <span className="text-(--text-muted)">
+                                  {row.match.kind === "forecast"
+                                    ? row.bankPending
+                                      ? "Vai quitar"
+                                      : "Quita"
+                                    : "Substitui seu lançamento"}{" "}
+                                  <span className="text-(--text-primary)">
+                                    {row.match.description}
+                                  </span>{" "}
+                                  de {shortDate(row.match.date)}
+                                </span>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="xs"
@@ -1382,7 +1460,13 @@ export function ImportWorkspace({
                             <>
                               <Link2Off className="h-3.5 w-3.5 shrink-0 text-(--text-muted)" />
                               <span className="text-(--text-muted)">
-                                {row.match.kind === "forecast" ? (
+                                {row.match.kind === "bank_pending" ? (
+                                  <>
+                                    Entra separado do pendente de{" "}
+                                    <Money cents={row.match.amountCents} currency={currency} /> de{" "}
+                                    {shortDate(row.match.date)}
+                                  </>
+                                ) : row.match.kind === "forecast" ? (
                                   <>Entra separado de {row.match.description}</>
                                 ) : (
                                   <>
@@ -1449,6 +1533,7 @@ export function ImportWorkspace({
                     <Money cents={row.amountCents} currency={currency} />
                   </td>
                 </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -86,7 +86,7 @@ export default async function ImportarPage() {
         supabase
         .from("staged_transactions")
         .select(
-          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, category_source, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status), card_payment_accepted, card:accounts!staged_transactions_card_payment_account_id_fkey(name)",
+          "id, date, description, bank_description, amount_cents, direction, suggested_category_id, category_source, dup_status, is_included, merge_accepted, fingerprint, match:transactions!staged_transactions_match_transaction_id_fkey(id, date, description, status, amount_cents, bank_pending), card_payment_accepted, bank_pending, card:accounts!staged_transactions_card_payment_account_id_fkey(name)",
         )
         .eq("import_id", openImport.id)
         .order("date")
@@ -116,6 +116,7 @@ export default async function ImportarPage() {
         .eq("household_id", householdId)
         .eq("account_id", openImport.account_id as string)
         .eq("status", "pending")
+        .eq("bank_pending", false)
         .not("recurrence_id", "is", null)
         .gte("date", openImport.statement_start as string)
         .lte("date", openImport.statement_end as string)
@@ -132,7 +133,7 @@ export default async function ImportarPage() {
           amountCents: s.amount_cents as number,
           direction: s.direction as "in" | "out",
           fingerprint: s.fingerprint as string,
-          free: true,
+          free: !s.bank_pending,
         })),
         await fetchConfirmedCandidates(
           supabase,
@@ -177,10 +178,8 @@ export default async function ImportarPage() {
           : null
       }
       rows={(staged ?? []).map((s) => {
-        const m = s.match as
-          | { id: string; date: string; description: string; status: string }
-          | { id: string; date: string; description: string; status: string }[]
-          | null;
+        type M = { id: string; date: string; description: string; status: string; amount_cents: number; bank_pending: boolean };
+        const m = s.match as M | M[] | null;
         const match = Array.isArray(m) ? (m[0] ?? null) : m;
 
         return {
@@ -205,16 +204,20 @@ export default async function ImportarPage() {
               : null;
           })(),
           isIncluded: s.is_included as boolean,
+          bankPending: (s.bank_pending as boolean | null) ?? false,
           match: match
             ? {
                 description: match.description,
                 date: match.date,
+                amountCents: match.amount_cents,
                 accepted: s.merge_accepted as boolean,
-                // Previsão (pendente) ou lançamento já confirmado: muda a
-                // frase e o padrão — previsão vem marcada pra juntar,
-                // confirmado vem desmarcado.
-                kind:
-                  match.status === "pending"
+                // Pendente do banco que este lançado substitui; previsão
+                // (pendente) que ele quita; ou lançamento já confirmado.
+                // Muda a frase e o padrão — previsão e pendente vêm
+                // marcados pra juntar, confirmado vem desmarcado.
+                kind: match.bank_pending
+                  ? ("bank_pending" as const)
+                  : match.status === "pending"
                     ? ("forecast" as const)
                     : ("confirmed" as const),
               }

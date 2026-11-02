@@ -439,8 +439,14 @@ export function screensToStatement(
   undated: number;
   /** Linhas cortadas na borda de um print: ficaram de fora (aparecem inteiras no vizinho). */
   cut: number;
-  /** Na seção "Pending": ficam de fora até o banco lançar. */
+  /** Na seção "Pending": quantos. */
   pending: number;
+  /**
+   * Os pendentes, do mais novo pro mais antigo, com o valor já conferido
+   * pela corrente de saldos. O nome vem como o banco mostra ("PIE FECTION
+   * 10292109 3145"); data e nome limpo saem em readPending.
+   */
+  pendingRows: { description: string; amountCents: number; checked: boolean }[];
   /** A linha mais antiga (não pendente). `excluded`: ficou de fora por não dar pra conferir. */
   oldest: { date: string; description: string; balanceCents: number | null; excluded: boolean } | null;
   /** Linhas cujo valor não deu pra conferir pelo saldo (do mais novo pro mais antigo). */
@@ -484,6 +490,9 @@ export function screensToStatement(
     undated,
     cut,
     pending: all.length - all.filter((r) => !r.pending).length,
+    pendingRows: all
+      .filter((r) => r.pending)
+      .map((r) => ({ description: r.description, amountCents: r.amountCents, checked: r.checked })),
     oldest,
     unchecked: reconciled
       .filter((r) => !r.checked)

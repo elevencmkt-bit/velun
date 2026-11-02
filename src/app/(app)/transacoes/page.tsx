@@ -12,6 +12,9 @@ import {
   parseMonthParam,
 } from "@/lib/month";
 import { TransactionsWorkspace } from "./workspace";
+import type { StalePendingRow } from "./stale-pending";
+import { STALE_PENDING_DAYS } from "@/lib/import/bank-pending";
+import { addDaysISO } from "@/lib/today";
 import type { StatusKey, TransactionRow } from "./types";
 import { CATEGORY_JOIN, familyIds, resolveJoinedCategory } from "@/lib/subcategories";
 
@@ -136,7 +139,7 @@ export default async function TransacoesPage({
       // limite: paginada por fetchAll logo abaixo
       .from("transactions")
       .select(
-        `id, date, description, notes, bank_description, amount_cents, direction, status, import_id,
+        `id, date, description, notes, bank_description, amount_cents, direction, status, import_id, bank_pending,
          transfer_group_id, recurrence_id, account_id, category_id, installment_number, installment_total,
          account:accounts(name),
          ${CATEGORY_JOIN},
@@ -177,6 +180,27 @@ export default async function TransacoesPage({
   const single = <T,>(value: T | T[] | null): T | null =>
     Array.isArray(value) ? (value[0] ?? null) : value;
 
+  // Pendentes do banco parados há mais de uma semana, em qualquer mês:
+  // provavelmente eram só reserva e sumiram do app.
+  const { data: staleRaw } = await supabase
+    // limite: pendentes do banco antigos, poucos
+    .from("transactions")
+    .select("id, date, description, amount_cents, direction, account_id, account:accounts(name)")
+    .eq("household_id", householdId)
+    .eq("bank_pending", true)
+    .in("account_id", [...writableIds])
+    .lt("date", addDaysISO(today, -STALE_PENDING_DAYS))
+    .order("date")
+    .limit(20);
+  const stalePending: StalePendingRow[] = (staleRaw ?? []).map((r) => ({
+    id: r.id as string,
+    date: r.date as string,
+    description: r.description as string,
+    amount_cents: r.amount_cents as number,
+    direction: r.direction as "in" | "out",
+    account_name: single<{ name: string }>(r.account)?.name ?? "—",
+  }));
+
   const rows: TransactionRow[] = (rawRows ?? []).map((row) => ({
     id: row.id,
     date: row.date,
@@ -186,6 +210,7 @@ export default async function TransacoesPage({
     amount_cents: row.amount_cents,
     direction: row.direction,
     status: row.status,
+    bank_pending: (row.bank_pending as boolean | null) ?? false,
     is_overdue: row.status === "pending" && row.date < today,
     import_id: row.import_id,
     transfer_group_id: row.transfer_group_id,
@@ -299,6 +324,7 @@ export default async function TransacoesPage({
       month={allPeriod || hasCustomRange ? null : monthParam(year, monthIndex)}
       allPeriod={allPeriod}
       today={today}
+      stalePending={stalePending}
       prevHref={monthHref(params, monthParam(prev.year, prev.monthIndex))}
       nextHref={monthHref(params, monthParam(next.year, next.monthIndex))}
       summary={{
