@@ -78,4 +78,56 @@ assert.deepEqual(
 
 assert.throws(() => parseNomadStatementText(header.replace(/Período[\s\S]*$/, "")), /período/);
 
+// Versão em inglês (o app passou a gerar assim): mês/dia, hora com AM/PM,
+// "Settled"/"Canceled", período "October, 3rd 2026 of November, 2nd 2026"
+// e saldo negativo. Texto inventado no mesmo formato.
+const en = `Client: JOHN DOE
+CPF: 000.000.000-00
+Address: Example Street, 1
+Example District, City 00000-000 - XX
+Bank: Community Federal Savings Bank
+Electronic/ACH Payment: 000000000
+WIRE Routing Number: 000000000
+Account number: 000000000000
+Deposit account statement
+Report generated on November 02, 2026 at 12:54 PM
+Balance on November 02, 2026 at 12:54 PM
+US$ -3,38
+Period of activity
+October, 3rd 2026 of November, 2nd 2026
+Purchase STREAMING CO
+Canceled\t
+11/02/2026 - 8:50 AM \t- US$ 9,99
+Purchase GROCERY EXAMPLE
+Settled\t
+10/12/2026 - 10:40 PM \t- US$ 37,19
+Added funds
+Settled\t
+10/05/2026 - 3:15 PM \t+ US$ 1.217,56
+Purchase PENDING SHOP
+Processing\t
+10/31/2026 - 11:05 AM \t- US$ 4,50
+Transactions
+This is a transaction report for simple checking and does not replace the official bank statement, provided by Community Federal Savings Bank. This document is a portrait of the
+transactions carried out by you in the indicated period, and there may be delays in indicating transactions, due to processing flows. Unofficial document, not valid before third. \t1 / 1
+
+-- 1 of 1 --`;
+assert.equal(looksLikeNomad(en), true);
+const e = parseNomadStatementText(en);
+assert.equal(e.periodStart, "2026-10-03");
+assert.equal(e.periodEnd, "2026-11-02");
+assert.deepEqual(e.reportedBalance, { cents: -338, date: "2026-11-02" });
+assert.equal(e.cancelledCount, 1);
+assert.equal(e.processingCount, 1);
+assert.deepEqual(e.unknownStatuses, {});
+assert.deepEqual(
+  e.transactions.map((t) => `${t.date} ${t.direction} ${t.amountCents} ${t.description}`),
+  [
+    "2026-10-05 in 121756 Added funds",
+    "2026-10-12 out 3719 Purchase GROCERY EXAMPLE",
+    "2026-10-31 out 450 Purchase PENDING SHOP",
+  ],
+  "mês/dia: 10/12 é 12 de outubro",
+);
+
 console.log("check-nomad: ok");
