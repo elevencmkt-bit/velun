@@ -37,7 +37,7 @@ function getWorker(): Promise<Worker> {
  * banco isso tira o "verde de entrada" e o cinza do saldo do caminho e
  * melhora muito a leitura de "-$" e dos centavos.
  */
-async function binarize(file: File): Promise<HTMLCanvasElement> {
+async function binarize(file: File): Promise<{ canvas: HTMLCanvasElement; original: ImageData }> {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
@@ -46,6 +46,9 @@ async function binarize(file: File): Promise<HTMLCanvasElement> {
   ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  // Cópia com as cores: o verde de "entrada" some no preto-e-branco, e
+  // ele diz o sinal quando o saldo não dá pra conferir.
+  const original = new ImageData(new Uint8ClampedArray(img.data), img.width, img.height);
   const px = img.data;
   let min = 255;
   let max = 0;
@@ -63,7 +66,33 @@ async function binarize(file: File): Promise<HTMLCanvasElement> {
     px[i + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  return canvas;
+  return { canvas, original };
+}
+
+/**
+ * A palavra está escrita em verde? Olha só os pixels de tinta (os mais
+ * escuros que o fundo) dentro da caixa dela. null: pouca tinta pra dizer.
+ */
+function isGreen(img: ImageData, box: { x0: number; y0: number; x1: number; y1: number }): boolean | null {
+  let n = 0;
+  let green = 0;
+  const x0 = Math.max(0, Math.floor(box.x0));
+  const x1 = Math.min(img.width, Math.ceil(box.x1));
+  const y0 = Math.max(0, Math.floor(box.y0));
+  const y1 = Math.min(img.height, Math.ceil(box.y1));
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = (y * img.width + x) * 4;
+      const r = img.data[i];
+      const g = img.data[i + 1];
+      const b = img.data[i + 2];
+      if (0.299 * r + 0.587 * g + 0.114 * b > 170) continue; // fundo
+      n++;
+      if (g - Math.max(r, b) > 25) green++;
+    }
+  }
+  if (n < 12) return null;
+  return green / n > 0.5;
 }
 
 /** Texto corrido da imagem (recibo). */
@@ -81,7 +110,7 @@ export async function recognizeText(file: File, progress?: (pct: number) => void
 /** Palavras com posição (lista de lançamentos de um print). */
 export async function recognizeScreen(file: File, progress?: (pct: number) => void): Promise<OcrScreen> {
   const worker = await getWorker();
-  const canvas = await binarize(file);
+  const { canvas, original } = await binarize(file);
   onProgress = progress ?? null;
   try {
     const { data } = await worker.recognize(canvas, {}, { blocks: true });
@@ -90,6 +119,7 @@ export async function recognizeScreen(file: File, progress?: (pct: number) => vo
       for (const para of block.paragraphs) {
         for (const line of para.lines) {
           for (const w of line.words) {
+            const green = /\d/.test(w.text) ? isGreen(original, w.bbox) : null;
             words.push({
               text: w.text,
               confidence: Math.round(w.confidence),
@@ -97,6 +127,7 @@ export async function recognizeScreen(file: File, progress?: (pct: number) => vo
               y0: w.bbox.y0,
               x1: w.bbox.x1,
               y1: w.bbox.y1,
+              ...(green === null ? {} : { green }),
             });
           }
         }

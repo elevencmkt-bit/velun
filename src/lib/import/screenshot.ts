@@ -22,6 +22,8 @@ export type OcrWord = {
   y0: number;
   x1: number;
   y1: number;
+  /** Escrita em verde no print (o app pinta entrada de verde). Sem a informação: ausente. */
+  green?: boolean;
 };
 
 export type OcrScreen = { width: number; height: number; words: OcrWord[] };
@@ -29,6 +31,8 @@ export type OcrScreen = { width: number; height: number; words: OcrWord[] };
 /** Um valor como foi lido, com as leituras alternativas plausíveis. */
 type Money = {
   raw: string;
+  /** A cor do valor no print, quando dá pra saber: verde é entrada. */
+  green?: boolean;
   /** Valores com sinal (centavos) que esse texto pode ser, do mais provável ao menos. */
   candidates: { cents: number; cost: number }[];
 };
@@ -53,6 +57,8 @@ export type ReconciledRow = {
   /** O valor fecha com o saldo da linha de baixo (dá pra confiar). */
   checked: boolean;
   pending: boolean;
+  /** Cor do valor no print (verde é entrada), quando se sabe. */
+  green?: boolean;
 };
 
 const MONEY_RE = /^(-)?\s*(\$)?\s*(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})$/;
@@ -62,7 +68,7 @@ function cleanToken(t: string): string {
   return t.replace(/^[^\d$-]+/, "").replace(/[^\d]+$/, "");
 }
 
-function readMoney(text: string, confidence: number): Money | null {
+function readMoney(text: string, confidence: number, green?: boolean): Money | null {
   const t = cleanToken(text.replace(/[—–]/g, "-"));
   const m = t.match(MONEY_RE);
   if (!m) return null;
@@ -84,7 +90,7 @@ function readMoney(text: string, confidence: number): Money | null {
     const cost = (hasDollar ? 2 : 1.5) * unsure;
     out.push({ cents: -alt, cost }, { cents: alt, cost });
   }
-  return { raw: text, candidates: out };
+  return { raw: text, candidates: out, ...(green === undefined ? {} : { green }) };
 }
 
 function readDate(text: string): string | null {
@@ -139,7 +145,7 @@ export function rowsFromScreen(screen: OcrScreen): ScreenRow[] {
   // Valores: coluna da direita, fora os rótulos de saldo do topo.
   const money = words
     .filter((w) => w.x0 > W * 0.5)
-    .map((w) => ({ w, m: readMoney(w.text, w.confidence) }))
+    .map((w) => ({ w, m: readMoney(w.text, w.confidence, w.green) }))
     .filter((x): x is { w: OcrWord; m: Money } => x.m !== null)
     .filter((x) => !BALANCE_LABEL.test(leftOf(x.w)));
 
@@ -320,6 +326,7 @@ function asRead(r: ScreenRow): ReconciledRow {
     corrected: false,
     checked: false,
     pending: r.pending ?? false,
+    green: r.amount.green,
   };
 }
 
@@ -385,6 +392,7 @@ function reconcileRun(rows: ScreenRow[], openingCents?: number): ReconciledRow[]
       corrected: a !== 0 || b !== 0,
       checked,
       pending: rows[i].pending ?? false,
+      green: rows[i].amount.green,
     });
     b = nb < 0 ? 0 : nb;
   }
@@ -427,6 +435,19 @@ export function toStatement(rows: ReconciledRow[]): {
   };
 }
 
+/**
+ * Valor que o saldo não confere (a última linha do print, sem a de baixo)
+ * fica como foi lido, e o leitor perde o "-" com facilidade: "-$16.43"
+ * vira "$16.43", uma compra virando entrada. O app pinta entrada de
+ * verde; quando a cor do valor é conhecida, ela decide o sinal.
+ */
+function bySignColor(r: ReconciledRow): ReconciledRow {
+  if (r.checked || r.green === undefined || r.amountCents === 0) return r;
+  const positive = r.amountCents > 0;
+  if (positive === r.green) return r;
+  return { ...r, amountCents: -r.amountCents, corrected: true };
+}
+
 /** Do reconhecimento de várias imagens até o extrato pronto pra revisar. */
 export function screensToStatement(
   screens: OcrScreen[],
@@ -462,7 +483,7 @@ export function screensToStatement(
   // Os pendentes entram na conferência (o saldo deles emenda com o resto)
   // mas não na importação: o banco ainda pode mudar valor e data, e o
   // lançamento de verdade vem no próximo print ou extrato.
-  const all = reconcile(rows, openingCents);
+  const all = reconcile(rows, openingCents).map(bySignColor);
   let reconciled = all.filter((r) => !r.pending);
   // A linha mais antiga só confere com a de baixo dela, que não está no
   // print. Se nem o saldo do Velun fecha com ela, o valor é um chute do
