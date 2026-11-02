@@ -34,6 +34,8 @@ const cases: [string,string][] = [
 // Nomad (nomes inventados no formato do extrato)
 ["Compra PUBLIX #2022","Publix"],
 ["Compra PUBLIX SUPER MAR 2435","Publix"],
+["Purchase PUBLIX #2022","Publix"],
+["Purchase ANTHROPIC* CLAUDE SUB","Anthropic"],
 ["Compra WM SUPERCENTER #1220","Walmart"],
 ["Compra DD *DOORDASH TARGET","DoorDash"],
 ["Compra UBER * EATS PENDING","Uber Eats"],

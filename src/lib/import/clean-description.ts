@@ -24,6 +24,7 @@ const PURCHASE_PREFIXES = [
   /^pos purchase\s+/i,
   /^card refund\s+/i,
   /^compra\s+/i, // Nomad: "Compra PUBLIX #2022"
+  /^purchase\s+/i, // Nomad em inglês: "Purchase PUBLIX #2022"
 ];
 
 // Intermediários de pagamento que aparecem antes do nome da loja.

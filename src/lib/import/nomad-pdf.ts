@@ -26,12 +26,22 @@
 //    revisa comparar com a conta depois.
 // 4. Cabeçalho e rodapé (nome, CPF, número da conta, aviso legal) se
 //    repetem em toda página e são ignorados — nada disso é guardado.
+// 5. Desde nov/2026 o app também gera o demonstrativo em INGLÊS
+//    ("Deposit account statement"): situações "Settled"/"Canceled",
+//    data no formato americano (mês/dia, "11/02/2026 - 8:50 AM"),
+//    período "October, 3rd 2026 of November, 2nd 2026". O valor continua
+//    no formato brasileiro ("US$ 1.217,56"), e o saldo pode ser negativo
+//    ("US$ -3,38").
 
 import { StatementParseError, type ParsedStatement, type ParsedTransaction } from "./regions-pdf";
 
 const MONTHS: Record<string, number> = {
   janeiro: 1, fevereiro: 2, "março": 3, marco: 3, abril: 4, maio: 5, junho: 6,
   julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
+};
+const MONTHS_EN: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
 };
 
 export type ParsedNomadStatement = ParsedStatement & {
@@ -63,18 +73,38 @@ function longDate(text: string): string | null {
   return month ? iso(Number(m[3]), month, Number(m[1])) : null;
 }
 
-export function looksLikeNomad(text: string) {
-  return (
-    /Demonstrativo de transa[çc][õo]es da conta dep[óo]sito/i.test(text) &&
-    /Community Federal Savings Bank/i.test(text)
-  );
+/** "October, 3rd 2026" / "November 02, 2026" → ISO. */
+function longDateEn(text: string): string | null {
+  const m = text.match(/([a-z]+),?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/i);
+  if (!m) return null;
+  const month = MONTHS_EN[m[1].toLowerCase()];
+  return month ? iso(Number(m[3]), month, Number(m[2])) : null;
 }
 
-const DONE = /^(Conclu[íi]do)$/i;
-const PROCESSING = /^(Processando|Pendente|Em processamento)$/i;
-const CANCELLED = /^(Cancelado)$/i;
-const DATE_AMOUNT = /^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*\d{2}:\d{2}\s+([+\-−])\s*US\$\s*([\d.]+,\d{2})$/;
+const PT_HEADER = /Demonstrativo de transa[çc][õo]es da conta dep[óo]sito/i;
+const EN_HEADER = /Deposit account statement/i;
+
+export function looksLikeNomad(text: string) {
+  return (PT_HEADER.test(text) || EN_HEADER.test(text)) && /Community Federal Savings Bank/i.test(text);
+}
+
+const DONE = /^(Conclu[íi]do|Settled|Completed)$/i;
+const PROCESSING = /^(Processando|Pendente|Em processamento|Processing|Pending)$/i;
+const CANCELLED = /^(Cancelado|Canceled|Cancelled)$/i;
+// Hora com AM/PM e de um dígito na versão em inglês ("8:50 AM").
+const DATE_AMOUNT = /^(\d{2})\/(\d{2})\/(\d{4})\s*-\s*\d{1,2}:\d{2}(?:\s*[AP]M)?\s+([+\-−])\s*US\$\s*([\d.]+,\d{2})$/i;
 const NOISE = [
+  /^Client:/i,
+  /^Address:/i,
+  /^Bank:/i,
+  /^Account number/i,
+  /^Deposit account statement/i,
+  /^Report generated/i,
+  /^Balance on/i,
+  /^Period of activity$/i,
+  /^Transactions$/i,
+  /^This is a transaction report/i,
+  /^transactions carried out by you/i,
   /^Cliente:/i,
   /^CPF:/i,
   /^Endere[çc]o:/i,
@@ -85,7 +115,7 @@ const NOISE = [
   /^Demonstrativo de transa/i,
   /^Relat[óo]rio gerado/i,
   /^Saldo em/i,
-  /^US\$\s/,
+  /^US\$\s*-?\s*[\d.]+,\d{2}$/,
   /^Per[íi]odo$/i,
   /^Transa[çc][õo]es$/i,
   /^--\s*\d+ of \d+\s*--$/,
@@ -101,17 +131,25 @@ export function parseNomadStatementText(text: string): ParsedNomadStatement {
     .map((l) => l.replace(/\s+/g, " ").trim())
     .filter(Boolean);
 
-  const periodLine = text.match(/(\d{1,2} de [a-zçã]+ de \d{4})\s+at[ée]\s+(\d{1,2} de [a-zçã]+ de \d{4})/i);
-  const periodStart = periodLine ? longDate(periodLine[1]) : null;
-  const periodEnd = periodLine ? longDate(periodLine[2]) : null;
+  const english = !PT_HEADER.test(text) && EN_HEADER.test(text);
+  const readLong = english ? longDateEn : longDate;
+
+  const periodLine = english
+    ? text.match(/Period of activity\s*\n\s*([a-z]+,?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})\s+(?:of|to|until|-)\s+([a-z]+,?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})/i)
+    : text.match(/(\d{1,2} de [a-zçã]+ de \d{4})\s+at[ée]\s+(\d{1,2} de [a-zçã]+ de \d{4})/i);
+  const periodStart = periodLine ? readLong(periodLine[1]) : null;
+  const periodEnd = periodLine ? readLong(periodLine[2]) : null;
   if (!periodStart || !periodEnd) {
     throw new StatementParseError("Não achei o período nesse demonstrativo da Nomad.");
   }
 
-  const balance = text.match(/Saldo em (\d{1,2} de [a-zçã]+ de \d{4})[^\n]*\n\s*US\$\s*([\d.]+,\d{2})/i);
+  const balance = english
+    ? text.match(/Balance on ([a-z]+ \d{1,2}, \d{4})[^\n]*\n\s*US\$\s*(-?)\s*([\d.]+,\d{2})/i)
+    : text.match(/Saldo em (\d{1,2} de [a-zçã]+ de \d{4})[^\n]*\n\s*US\$\s*(-?)\s*([\d.]+,\d{2})/i);
+  const balanceDate = balance ? readLong(balance[1]) : null;
   const reportedBalance =
-    balance && longDate(balance[1])
-      ? { cents: brlStyleToCents(balance[2]), date: longDate(balance[1])! }
+    balance && balanceDate
+      ? { cents: (balance[2] ? -1 : 1) * brlStyleToCents(balance[3]), date: balanceDate }
       : null;
 
   const transactions: ParsedTransaction[] = [];
@@ -125,6 +163,7 @@ export function parseNomadStatementText(text: string): ParsedNomadStatement {
   for (const line of lines) {
     if (NOISE.some((re) => re.test(line))) continue;
     if (/^\d{1,2} de [a-zçã]+ de \d{4} at[ée]/i.test(line)) continue;
+    if (/^[a-z]+,?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\s+(?:of|to|until|-)\s/i.test(line)) continue;
 
     const m = line.match(DATE_AMOUNT);
     if (!m) {
@@ -149,7 +188,8 @@ export function parseNomadStatementText(text: string): ParsedNomadStatement {
     if (isProcessing) processingCount += 1;
 
     transactions.push({
-      date: iso(Number(m[3]), Number(m[2]), Number(m[1])),
+      // Português: dia/mês. Inglês: mês/dia.
+      date: english ? iso(Number(m[3]), Number(m[1]), Number(m[2])) : iso(Number(m[3]), Number(m[2]), Number(m[1])),
       // Texto como veio ("Compra PUBLIX #2022"): a impressão digital
       // sai dele, e o nome limpo ("Publix") sai na limpeza, junto com
       // os outros bancos.
