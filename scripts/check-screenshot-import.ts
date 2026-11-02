@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { verifyStatement } from "../src/lib/import/verify";
 import { screensToStatement, type OcrScreen, type OcrWord } from "../src/lib/import/screenshot";
 
-type Item = { date?: string; name?: string; amount?: string; balance?: string; conf?: number };
+type Item = { date?: string; name?: string; amount?: string; balance?: string; conf?: number; green?: boolean };
 
 function screen(items: Item[]): OcrScreen {
   const words: OcrWord[] = [];
@@ -22,7 +22,15 @@ function screen(items: Item[]): OcrScreen {
       words.push({ text: part, confidence: 95, x0: x, y0: y + 22, x1: x + part.length * 14, y1: y + 52 });
       x += part.length * 14 + 12;
     }
-    words.push({ text: it.amount!, confidence: it.conf ?? 92, x0: 930, y0: y, x1: 1064, y1: y + 36 });
+    words.push({
+      text: it.amount!,
+      confidence: it.conf ?? 92,
+      x0: 930,
+      y0: y,
+      x1: 1064,
+      y1: y + 36,
+      ...(it.green === undefined ? {} : { green: it.green }),
+    });
     if (it.balance) words.push({ text: it.balance, confidence: 92, x0: 980, y0: y + 58, x1: 1064, y1: y + 84 });
     words.push({ text: ">", confidence: 90, x0: 1089, y0: y + 24, x1: 1109, y1: y + 58 });
     y += 200;
@@ -212,5 +220,31 @@ assert.deepEqual(
 );
 // Sem saldo nenhum no print, a linha da ponta não é "cortada": entra.
 assert.equal(screensToStatement([screen([{ date: "9/30/2026" }, { name: "Netflix", amount: "-$15.49" }])]).cut, 0);
+
+// Print só com pendentes: a última linha não tem a de baixo pra conferir e
+// o "-" sumiu ("$16.43"). Valor escrito em preto, no app, é saída; verde é
+// entrada. Sem a cor (leitor antigo), fica como foi lido.
+const onlyPend = screen([
+  { date: "Pending" },
+  { name: "Zelle Credit", amount: "$625.00", balance: "$888.70", green: true },
+  { name: "Mercado Bom", amount: "-$6.90", balance: "$263.70", green: false },
+  { name: "Cafe Lua", amount: "$16.43", balance: "$270.60", green: false },
+]);
+const op = screensToStatement([onlyPend]);
+assert.equal(op.statement.transactions.length, 0);
+assert.deepEqual(
+  op.pendingRows.map((p) => `${p.amountCents} ${p.description} ${p.checked ? "ok" : "?"}`),
+  ["62500 Zelle Credit ok", "-690 Mercado Bom ok", "-1643 Cafe Lua ?"],
+  "a cor dá o sinal da linha que o saldo não confere",
+);
+const noColor = screensToStatement([
+  screen([{ date: "Pending" }, { name: "Mercado Bom", amount: "-$6.90", balance: "$263.70" }, { name: "Cafe Lua", amount: "$16.43", balance: "$270.60" }]),
+]);
+assert.equal(noColor.pendingRows[1].amountCents, 1643, "sem cor, vale o lido");
+// Verde lido sem "+" numa linha conferida não muda nada (o saldo manda).
+const greenIn = screensToStatement([
+  screen([{ date: "Pending" }, { name: "Deposito", amount: "$50.00", balance: "$60.00", green: true }, { name: "Taxa", amount: "-$1.00", balance: "$10.00", green: false }]),
+]);
+assert.deepEqual(greenIn.pendingRows.map((p) => p.amountCents), [5000, -100]);
 
 console.log("check-screenshot-import: ok");

@@ -184,7 +184,15 @@ function validScreens(screens: unknown): OcrScreen[] | null {
       if (!w || typeof w.text !== "string" || w.text.length > 80) return null;
       const nums = [w.confidence, w.x0, w.y0, w.x1, w.y1];
       if (!nums.every((n) => typeof n === "number" && Number.isFinite(n))) return null;
-      clean.push({ text: w.text, confidence: w.confidence, x0: w.x0, y0: w.y0, x1: w.x1, y1: w.y1 });
+      clean.push({
+        text: w.text,
+        confidence: w.confidence,
+        x0: w.x0,
+        y0: w.y0,
+        x1: w.x1,
+        y1: w.y1,
+        ...(typeof w.green === "boolean" ? { green: w.green } : {}),
+      });
     }
     out.push({ width, height, words: clean });
   }
@@ -460,8 +468,11 @@ async function runImportStatement(input: {
       const fmt = (c: number) => `${c < 0 ? "−" : ""}$${(Math.abs(c) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
       const signed = (c: number) => `${c < 0 ? "−" : "+"}${fmt(Math.abs(c))}`;
       const parts: string[] = [];
+      const onlyPending = statement.transactions.length === 0;
       parts.push(
-        `Lido de ${screens.length} ${screens.length === 1 ? "print" : "prints"}: ${statement.transactions.length} lançamentos.`,
+        onlyPending
+          ? `Lido de ${screens.length === 1 ? "1 print" : `${screens.length} prints`}: só lançamentos pendentes.`
+          : `Lido de ${screens.length} ${screens.length === 1 ? "print" : "prints"}: ${statement.transactions.length} lançamentos.`,
       );
       if (read.hasBalances && read.corrected > 0) {
         parts.push(
@@ -470,7 +481,7 @@ async function runImportStatement(input: {
             : `${read.corrected} valores mal lidos foram corrigidos pelo saldo que o app mostra.`,
         );
       }
-      if (!read.hasBalances) {
+      if (!read.hasBalances && !onlyPending) {
         parts.push("Atenção: nem todas as linhas mostram o saldo, então não deu pra conferir tudo. Compare cada valor com o app antes de confirmar.");
       }
       if (read.unchecked.length > 0 && read.unchecked.length <= 5) {
@@ -486,6 +497,19 @@ async function runImportStatement(input: {
             ? "1 lançamento pendente no banco entra marcado como pendente: conta no saldo, como no app, e o lançamento de verdade toma o lugar dele quando o banco lançar."
             : `${n} lançamentos pendentes no banco entram marcados como pendentes: contam no saldo, como no app, e o lançamento de verdade toma o lugar deles quando o banco lançar.`,
         );
+        // O pendente mais antigo do print só confere com a linha de baixo
+        // dele: sem ela (o print termina ali), o valor é o que foi lido.
+        const loose = read.pendingRows.filter((r) => !r.checked);
+        if (loose.length > 0 && loose.length <= 3) {
+          const list = loose.map((r) => `${readPending(r.description, todayIn(timezone)).description} ${signed(r.amountCents)}`).join(", ");
+          parts.push(
+            `Confira no app: ${list} (pendente${loose.length === 1 ? "" : "s"}; não deu pra conferir pelo saldo). Na próxima, tire também um print rolando até os primeiros lançados: aí o saldo confere tudo.`,
+          );
+        } else if (loose.length > 3) {
+          parts.push(
+            `${loose.length} pendentes não deram pra conferir pelo saldo: compare com o app, ou tire também um print rolando até os primeiros lançados.`,
+          );
+        }
         // Lido do mais novo pro mais antigo; a data vem do código do banco no nome.
         const today = todayIn(timezone);
         pendingSource = read.pendingRows.map((r) => {
