@@ -25,6 +25,12 @@ export type OverdueSummary = {
   count: number;
   /** Saídas menos entradas atrasadas (positivo = vai faltar dinheiro). */
   netOutCents: number;
+  /** Pagamentos atrasados (saídas): quantos e quanto. */
+  outCount: number;
+  outCents: number;
+  /** Recebimentos atrasados (entradas): quantos e quanto. */
+  inCount: number;
+  inCents: number;
 };
 
 export type UpcomingEvent = {
@@ -165,9 +171,15 @@ export async function getCashFlowProjection(
 
   const overdueList = ((overdueRows ?? []) as { amount_cents: number; direction: string; account_id: string }[])
     .filter((r) => !cardIds.has(r.account_id));
+  const overdueOut = overdueList.filter((r) => r.direction === "out");
+  const overdueIn = overdueList.filter((r) => r.direction !== "out");
   const overdue: OverdueSummary = {
     count: overdueList.length,
     netOutCents: overdueList.reduce((n, r) => n + (r.direction === "out" ? r.amount_cents : -r.amount_cents), 0),
+    outCount: overdueOut.length,
+    outCents: overdueOut.reduce((n, r) => n + r.amount_cents, 0),
+    inCount: overdueIn.length,
+    inCents: overdueIn.reduce((n, r) => n + r.amount_cents, 0),
   };
   if (options.includeOverdue && overdue.count > 0) {
     for (const p of points) p.with_overdue_cents = p.balance_cents - overdue.netOutCents;

@@ -175,15 +175,30 @@ export default async function FluxoDeCaixaPage({
         <div className="flex flex-col gap-3 rounded-[16px] bg-(--danger-soft) px-4 py-3.5 md:flex-row md:items-center md:gap-4 md:px-5">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-(--danger-text)" />
-            <p className="text-sm leading-relaxed text-(--danger-ink)">
-              <b>
-                {overdue.count} {overdue.count === 1 ? "lançamento atrasado" : "lançamentos atrasados"} (
-                {signed(overdue.netOutCents)})
-              </b>{" "}
-              {includeOverdue
-                ? "estão na projeção como se saíssem hoje. A linha tracejada mostra o efeito."
-                : "ficaram fora da projeção. Se ainda vão sair da conta, o saldo real será menor."}
-            </p>
+            <div className="flex flex-col gap-1 text-sm leading-relaxed text-(--danger-ink)">
+              {overdue.outCount > 0 ? (
+                <p>
+                  <b>
+                    {overdue.outCount} {overdue.outCount === 1 ? "pagamento atrasado" : "pagamentos atrasados"} ({signed(-overdue.outCents)})
+                  </b>{" "}
+                  {includeOverdue
+                    ? `${overdue.outCount === 1 ? "está" : "estão"} na projeção como se ${overdue.outCount === 1 ? "saísse" : "saíssem"} hoje.`
+                    : `${overdue.outCount === 1 ? "ficou" : "ficaram"} fora da projeção. Se ainda ${overdue.outCount === 1 ? "vai" : "vão"} sair, o saldo real será menor.`}
+                </p>
+              ) : null}
+              {overdue.inCount > 0 ? (
+                <p>
+                  <b>
+                    {overdue.inCount} {overdue.inCount === 1 ? "recebimento atrasado" : "recebimentos atrasados"} (+
+                    <Money cents={overdue.inCents} currency={currency} />)
+                  </b>{" "}
+                  {includeOverdue
+                    ? `${overdue.inCount === 1 ? "está" : "estão"} na projeção como se ${overdue.inCount === 1 ? "caísse" : "caíssem"} hoje.`
+                    : `${overdue.inCount === 1 ? "ficou" : "ficaram"} fora da projeção. Se ${overdue.inCount === 1 ? "cair" : "caírem"}, o saldo real será maior.`}
+                </p>
+              ) : null}
+              {includeOverdue ? <p>A linha tracejada mostra o efeito.</p> : null}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 max-md:pl-8">
             <Link
@@ -287,7 +302,7 @@ export default async function FluxoDeCaixaPage({
           {withOverdue ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="w-[18px] border-t-[2.5px] border-dashed" style={{ borderColor: "var(--expense)" }} />
-              Se os atrasados ainda saírem
+              Com os atrasados
             </span>
           ) : null}
         </div>
