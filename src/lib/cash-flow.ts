@@ -17,6 +17,10 @@ export type CashFlowPoint = {
   balance_cents: number;
   /** Saldo se os lançamentos atrasados ainda saírem (só quando pedido). */
   with_overdue_cents?: number;
+  /** Só o que está lançado (a tela mostra pra comparar quando soma estimados ou atrasados). */
+  reference_cents?: number;
+  /** Gasto estimado neste dia (limites das Metas). */
+  estimated_cents?: number;
   events: CashFlowEvent[];
 };
 
@@ -40,6 +44,8 @@ export type UpcomingEvent = {
   direction: "in" | "out";
   amount_cents: number;
   category_name: string | null;
+  /** Entrada garantida ou variável (vazio = variável). */
+  certainty?: "guaranteed" | "variable" | null;
 };
 
 export type CashFlowInsight = {
@@ -76,7 +82,7 @@ export async function getCashFlowProjection(
     supabase
       // limite: pendentes da projeção (até 90 dias)
       .from("transactions")
-      .select(`id, date, description, amount_cents, direction, account_id, ${CATEGORY_JOIN}`)
+      .select(`id, date, description, amount_cents, direction, account_id, income_certainty, ${CATEGORY_JOIN}`)
       .eq("household_id", householdId)
       .eq("status", "pending")
       .in("account_id", scope.ids)
@@ -110,6 +116,7 @@ export async function getCashFlowProjection(
     amount_cents: number;
     direction: "in" | "out";
     category: unknown;
+    income_certainty?: "guaranteed" | "variable" | null;
   };
   const rows: Row[] = [
     ...((pending ?? []) as (Row & { account_id?: string })[]).filter((r) => !cardIds.has(r.account_id ?? "")),
@@ -151,6 +158,7 @@ export async function getCashFlowProjection(
       direction: row.direction,
       amount_cents: row.amount_cents,
       category_name: resolveJoinedCategory(row.category as never).name,
+      certainty: row.income_certainty ?? null,
     });
   }
 
@@ -291,6 +299,17 @@ export function buildCashFlowNote(input: {
 }
 
 // ── Por conta ───────────────────────────────────────────────────────────
+
+/**
+ * Escopo do dinheiro disponível: as contas de quem está vendo, menos as
+ * de investimento (corretora, trading). O que está investido não paga o
+ * mercado da semana: fica fora do saldo e da projeção, e aparece à parte.
+ * Os cartões ficam (a fatura sai da conta que paga).
+ */
+export function withoutInvestments(scope: AccountScope, accounts: { id: string; type: string }[]): AccountScope {
+  const investment = new Set(accounts.filter((a) => a.type === "investment").map((a) => a.id));
+  return { ...scope, ids: scope.ids.filter((id) => !investment.has(id)) };
+}
 
 export type CashAccount = { id: string; name: string; type: string; payment_account_id: string | null };
 

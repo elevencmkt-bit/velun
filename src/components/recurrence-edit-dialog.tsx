@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateInput } from "@/components/date-input";
 import { AccountSelect } from "@/components/account-select";
 import { CategorySelectItems } from "@/components/category-select-items";
-import { TONE } from "@/components/manual-transaction-button";
+import { TONE, ToggleRow } from "@/components/manual-transaction-button";
 import { currencySymbol, formatCents, type CurrencyCode } from "@/lib/money";
 import { amountToCents, normalizeAmount } from "@/lib/amount-input";
 import { fitsDirection } from "@/lib/category-kind";
@@ -152,6 +152,7 @@ function RecurrenceForm({
   const [endsOn, setEndsOn] = useState(data.ends_on ?? "");
   const [accountId, setAccountId] = useState(data.account_id);
   const [categoryId, setCategoryId] = useState(data.category_id ?? "");
+  const [guaranteed, setGuaranteed] = useState(data.certainty === "guaranteed");
   const [confirmStop, setConfirmStop] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -197,6 +198,10 @@ function RecurrenceForm({
     formData.set("ends_on", endsOn);
     formData.set("account_id", accountId);
     formData.set("category_id", categoryId);
+    if (data.direction === "in") {
+      formData.set("income_certainty_field", "1");
+      if (guaranteed) formData.set("income_guaranteed", "on");
+    }
     startTransition(async () => {
       const result = await updateRecurrence(data.id, formData);
       if (!result.ok) return setError(result.error);
@@ -301,6 +306,15 @@ function RecurrenceForm({
           {!endsOn ? <span className="text-xs text-(--text-muted)">Sem data pra acabar</span> : null}
         </div>
       </div>
+
+      {data.direction === "in" ? (
+        <ToggleRow
+          checked={guaranteed}
+          onChange={setGuaranteed}
+          title="Entrada garantida"
+          hint="Salário, contrato. Conta no Livre antes de cair; variável só depois"
+        />
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <div className="flex flex-col gap-2">

@@ -5,6 +5,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -105,9 +106,14 @@ function ChartTooltip({
       >
         <Money cents={point.balance_cents} currency={currency} />
       </div>
-      {point.with_overdue_cents !== undefined ? (
+      {point.reference_cents !== undefined ? (
         <div className="text-[11px] text-(--text-muted)">
-          Se os atrasados saírem: <Money cents={point.with_overdue_cents} currency={currency} />
+          Só o lançado: <Money cents={point.reference_cents} currency={currency} />
+        </div>
+      ) : null}
+      {point.estimated_cents ? (
+        <div className="text-[11px] text-(--text-muted)">
+          Gasto estimado no dia: −<Money cents={point.estimated_cents} currency={currency} />
         </div>
       ) : null}
       {point.events.length > 0 ? (
@@ -134,11 +140,15 @@ export function ProjectionChart({
   points,
   currency,
   highlightedEventIds,
+  floorCents = 0,
 }: {
   points: CashFlowPoint[];
   currency: CurrencyCode;
   highlightedEventIds: string[];
+  /** Piso de segurança: linha amarela e faixa entre zero e ele. 0 = sem. */
+  floorCents?: number;
 }) {
+  const min = Math.min(0, ...points.map((p) => Math.min(p.balance_cents, p.reference_cents ?? p.balance_cents)));
   const gradientId = useId();
   const stops = buildStrokeStops(points);
   const EventDot = makeEventDot(new Set(highlightedEventIds));
@@ -176,14 +186,28 @@ export function ProjectionChart({
             strokeDasharray="6 6"
             label={{ value: "Hoje", position: "insideTopLeft", fill: "#5B6CFF", fontSize: 11, fontWeight: 600 }}
           />
+          {floorCents > 0 ? (
+            <ReferenceArea y1={0} y2={floorCents} fill="var(--warning-soft)" fillOpacity={0.9} ifOverflow="extendDomain" />
+          ) : null}
+          {min < 0 ? <ReferenceArea y1={min} y2={0} fill="var(--danger-soft)" fillOpacity={0.9} /> : null}
           <ReferenceLine y={0} stroke="var(--text-light)" strokeDasharray="5 5" strokeOpacity={0.8} />
-          {points.some((p) => p.with_overdue_cents !== undefined) ? (
+          {floorCents > 0 ? (
+            <ReferenceLine
+              y={floorCents}
+              stroke="var(--warning)"
+              strokeDasharray="6 5"
+              strokeWidth={1.5}
+              ifOverflow="extendDomain"
+              label={{ value: "Piso", position: "insideTopRight", fill: "var(--warning-dark)", fontSize: 11, fontWeight: 700 }}
+            />
+          ) : null}
+          {points.some((p) => p.reference_cents !== undefined) ? (
             <Line
               type="basis"
-              dataKey="with_overdue_cents"
-              stroke="var(--expense)"
-              strokeWidth={2}
-              strokeDasharray="6 5"
+              dataKey="reference_cents"
+              stroke="var(--text-light)"
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
               dot={false}
               activeDot={false}
               isAnimationActive={false}

@@ -593,14 +593,18 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "fluxo-de-caixa",
     topic: "dashboard-e-fluxo",
     title: "Fluxo de caixa e saldo projetado",
-    summary: "Quanto vai ter na conta nos próximos dias, contando o que já está previsto.",
+    summary: "Quanto vai ter na conta nos próximos dias, com o previsto e os gastos do dia a dia.",
     body: [
-      { p: "O **Fluxo de caixa** pega o saldo de hoje e soma o que está previsto, dia a dia, por 30, 60 ou 90 dias, ou 6 meses." },
+      { p: "O **Fluxo de caixa** pega o **disponível hoje** (contas correntes e dinheiro) e soma o que está previsto, dia a dia, por 30, 60 ou 90 dias, ou 6 meses. Contas de investimento ficam fora da conta e aparecem à parte." },
       { table: [
         ["Menor saldo", "O ponto mais baixo do período e quando acontece."],
+        ["Dias abaixo do piso", "Quantos dias o saldo fica abaixo do piso de segurança."],
         ["Dias no negativo", "Quantos dias o saldo projetado fica abaixo de zero."],
         ["Próximos eventos", "O que mexe no saldo, em ordem."],
       ] },
+      { p: "**Gastos estimados.** Mercado, gasolina e restaurante não têm lançamento antes de acontecer. Os limites de gasto das **Metas** viram saídas estimadas, espalhadas igual por dia: no mês corrente, só o que ainda falta gastar; nos próximos, o limite menos o que já está lançado na categoria. A linha tracejada cinza mostra a projeção só com o lançado. Dá pra desligar em **Incluir gastos estimados**." },
+      { p: "**Piso de segurança.** O quanto a casa não quer deixar o saldo descer: aparece como uma linha amarela. Por padrão é a soma das metas **Colchão** e **Reserva de impostos**; em Configurações dá pra pôr um valor fixo ou tirar." },
+      { p: "**Livre esta semana.** Quanto dá pra gastar além do essencial até a próxima **entrada garantida** (no mínimo 7 dias): o disponível, mais as entradas garantidas até lá, menos as saídas previstas, os atrasados, os gastos estimados e o piso. Entrada variável (freela, show) só conta depois que cai. Marque salário e contrato como **Entrada garantida** no lançamento ou na recorrência." },
       { list: [
         "Compras no cartão não tiram dinheiro da conta na hora: o que sai é o pagamento da fatura, no vencimento.",
         "Lançamentos atrasados ficam de fora da projeção. O aviso no topo deixa incluir com **Incluir na projeção**.",
@@ -897,9 +901,9 @@ export const SCREEN_HELP: Record<ScreenHelpKey, { title: string; points: string[
   "fluxo-de-caixa": {
     title: "Como funciona o fluxo de caixa",
     points: [
-      "Parte do saldo de hoje e soma o que está previsto, dia a dia.",
-      "Compra no cartão só sai da conta no vencimento da fatura.",
-      "Atrasados ficam de fora, a menos que você inclua.",
+      "Parte do disponível hoje e soma o previsto e os gastos estimados (limites das Metas).",
+      "A linha amarela é o piso de segurança; o Livre diz quanto sobra até a próxima entrada garantida.",
+      "Compra no cartão só sai da conta no vencimento da fatura; atrasados ficam de fora, a menos que você inclua.",
     ],
     article: "dashboard-e-fluxo/fluxo-de-caixa",
   },

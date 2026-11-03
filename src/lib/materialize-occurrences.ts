@@ -14,7 +14,11 @@ export type RecurrenceTemplate = {
   amount_cents: number;
   description: string;
   notes: string | null;
+  /** Entrada: garantida (salário, contrato) ou variável. Saída não usa. */
+  certainty?: IncomeCertainty | null;
 };
+
+export type IncomeCertainty = "guaranteed" | "variable";
 
 // Gera e grava as próximas ocorrências `pending` de uma recorrência —
 // usado tanto ao criar uma recorrência avulsa (tela A vencer) quanto
@@ -58,6 +62,7 @@ export async function materializeOccurrences(params: {
     notes: params.template.notes,
     status: "pending" as const,
     recurrence_id: params.recurrenceId,
+    income_certainty: params.template.direction === "in" ? (params.template.certainty ?? null) : null,
     fingerprint: computeFingerprint({
       accountId: params.template.account_id,
       date,

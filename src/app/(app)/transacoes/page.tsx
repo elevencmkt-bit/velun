@@ -139,7 +139,7 @@ export default async function TransacoesPage({
       // limite: paginada por fetchAll logo abaixo
       .from("transactions")
       .select(
-        `id, date, description, notes, bank_description, amount_cents, direction, status, import_id, bank_pending,
+        `id, date, description, notes, bank_description, amount_cents, direction, status, import_id, bank_pending, income_certainty,
          transfer_group_id, recurrence_id, account_id, category_id, installment_number, installment_total,
          account:accounts(name),
          ${CATEGORY_JOIN},
@@ -215,6 +215,7 @@ export default async function TransacoesPage({
     import_id: row.import_id,
     transfer_group_id: row.transfer_group_id,
     recurrence_id: row.recurrence_id,
+    income_certainty: (row.income_certainty as "guaranteed" | "variable" | null) ?? null,
     installment: row.installment_total
       ? `${row.installment_number} de ${row.installment_total}`
       : null,

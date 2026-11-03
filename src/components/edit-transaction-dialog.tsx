@@ -53,6 +53,8 @@ export type EditableTransaction = {
   bank_description?: string | null;
   status: "pending" | "cleared";
   recurrence_id: string | null;
+  /** Entrada: garantida ou variável (vazio = variável). */
+  income_certainty?: "guaranteed" | "variable" | null;
 };
 
 const MODES = [
@@ -94,6 +96,7 @@ export function EditTransactionDialog({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [notesOpen, setNotesOpen] = useState(Boolean(transaction.notes));
   const [pending, setPending] = useState(transaction.status === "pending");
+  const [guaranteed, setGuaranteed] = useState(transaction.income_certainty === "guaranteed");
   const [makeRecurring, setMakeRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +148,7 @@ export function EditTransactionDialog({
     formData.set("category_id", categoryId);
     if (pending) formData.set("is_pending", "on");
     else formData.delete("is_pending");
+    if (direction === "in" && guaranteed) formData.set("income_guaranteed", "on");
     if (makeRecurring) formData.set("make_recurring", "on");
 
     // Lançamento de recorrência e mudou nome, valor, tipo ou categoria:
@@ -418,6 +422,18 @@ export function EditTransactionDialog({
 
           <div className="flex flex-col">
             <ToggleRow checked={pending} onChange={setPending} title="Ainda não caiu" hint="Fica como pendente até você confirmar" />
+            {direction === "in" ? (
+              <ToggleRow
+                checked={guaranteed}
+                onChange={setGuaranteed}
+                title="Entrada garantida"
+                hint={
+                  transaction.recurrence_id
+                    ? "Salário, contrato. Conta no Livre antes de cair. Vale pras próximas também"
+                    : "Salário, contrato. Conta no Livre antes de cair; variável só depois"
+                }
+              />
+            ) : null}
             {transaction.recurrence_id ? null : (
               <>
                 <ToggleRow checked={makeRecurring} onChange={setMakeRecurring} title="Repetir esse lançamento" hint="Toda semana, mês, trimestre, semestre ou ano" />
