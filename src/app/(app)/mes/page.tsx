@@ -1,5 +1,5 @@
 import { loadFreeThisWeek } from "@/lib/free-this-week-load";
-import { FreeThisWeekCard } from "@/components/free-this-week-card";
+import { FreeThisWeekPill } from "@/components/free-this-week-card";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -291,8 +291,9 @@ export default async function MesPage({
   const balanceScope = only(fullBalanceScope);
   const transactionsScope = only(fullTransactionsScope);
 
-  // "Livre esta semana": é sobre agora e sobre a casa toda, então só no
-  // mês corrente e sem filtro de conta.
+  // "Livre esta semana" (a pílula no card do saldo): é sobre agora e sobre
+  // a casa toda, então só no mês corrente e sem filtro de conta. A conta
+  // aberta fica no Fluxo de caixa.
   const freePromise =
     !accountFilter && monthParam(year, monthIndex) === today.slice(0, 7)
       ? loadFreeThisWeek({ supabase, householdId, memberId, today }).catch(() => null)
@@ -544,8 +545,6 @@ export default async function MesPage({
         </div>
       </div>
 
-      {free ? <FreeThisWeekCard free={free} currency={currency} /> : null}
-
       <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
         {/* Saldo: o único bloco colorido da tela. */}
         <section className="relative flex min-h-[236px] flex-col overflow-hidden rounded-[24px] bg-(--primary) p-6 text-white md:p-7 lg:col-span-5">
@@ -567,6 +566,7 @@ export default async function MesPage({
               currency={currency}
             />
           </span>
+          {free ? <FreeThisWeekPill free={free} currency={currency} /> : null}
           <div className="mt-auto pt-4">
             <Sparkline points={cashFlow.points} />
           </div>
