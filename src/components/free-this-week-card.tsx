@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CurrencyCode } from "@/lib/money";
 import type { FreeThisWeek } from "@/lib/free-this-week";
 import { Money } from "@/components/money";
@@ -96,5 +97,32 @@ export function FreeThisWeekCard({ free, currency }: { free: FreeThisWeek; curre
         </div>
       </details>
     </section>
+  );
+}
+
+const PILL_TEXT = { free: "Pode gastar", essentials: "Dá pra gastar com cuidado", short: "Segura até o essencial" } as const;
+
+/**
+ * O "Livre esta semana" em uma linha, pro card azul do Dashboard: a cor
+ * do semáforo, o valor e uma frase curta. Leva pro Fluxo de caixa, onde
+ * está a conta aberta.
+ */
+export function FreeThisWeekPill({ free, currency }: { free: FreeThisWeek; currency: CurrencyCode }) {
+  return (
+    <Link
+      href="/fluxo-de-caixa"
+      className="mt-3 inline-flex max-w-full items-center gap-2 self-start rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-semibold transition-colors hover:bg-white/25"
+    >
+      <span
+        aria-hidden
+        className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white/40"
+        style={{ background: TONES[free.state].dot }}
+      />
+      <span className="truncate">
+        Livre esta semana: {free.freeCents < 0 ? "−" : ""}
+        <Money cents={Math.abs(free.freeCents)} currency={currency} />
+        <span className="font-normal text-white/80"> · {PILL_TEXT[free.state]}</span>
+      </span>
+    </Link>
   );
 }
