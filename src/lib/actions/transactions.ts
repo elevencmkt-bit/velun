@@ -13,6 +13,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import {
   createRecurrenceFromAnchor,
   replaceFutureOccurrences,
+  type IncomeCertainty,
   type RecurrenceTemplate,
 } from "@/lib/materialize-occurrences";
 import { isRecurrenceFrequency, recurrenceScopes, type RecurrenceFrequency, type RecurrenceScope } from "@/lib/recurrence";
@@ -37,6 +38,34 @@ function parseRecurrenceInput(
   };
 }
 
+/** Entrada: "garantida" quando marcada; senão variável. Saída: nada. */
+function incomeCertainty(formData: FormData, direction: string): IncomeCertainty | null {
+  if (direction !== "in") return null;
+  return formData.get("income_guaranteed") === "on" ? "guaranteed" : "variable";
+}
+
+/** Garantida/variável no modelo da recorrência e nas previsões dela de hoje em diante. */
+async function setRecurrenceCertainty(
+  supabase: SupabaseClient,
+  recurrenceId: string,
+  certainty: IncomeCertainty | null,
+  today: string,
+) {
+  const { data: rec } = await supabase.from("recurrences").select("template").eq("id", recurrenceId).maybeSingle();
+  if (!rec) return;
+  const template = { ...(rec.template as RecurrenceTemplate), certainty };
+  const { error } = await supabase.from("recurrences").update({ template }).eq("id", recurrenceId);
+  if (error) throw new Error(error.message);
+  const { error: occError } = await supabase
+    .from("transactions")
+    .update({ income_certainty: certainty })
+    .eq("recurrence_id", recurrenceId)
+    .eq("status", "pending")
+    .eq("direction", "in")
+    .gte("date", today);
+  if (occError) throw new Error(occError.message);
+}
+
 export async function createTransaction(formData: FormData) {
   const { memberId, householdId } = await getCurrentMember();
   const supabase = await createClient();
@@ -50,6 +79,7 @@ export async function createTransaction(formData: FormData) {
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const isPending = formData.get("is_pending") === "on";
   const amountInput = String(formData.get("amount") ?? "");
+  const certainty = incomeCertainty(formData, direction);
 
   if (!accountId) throw new Error("Conta é obrigatória.");
   if (direction !== "in" && direction !== "out")
@@ -146,6 +176,7 @@ export async function createTransaction(formData: FormData) {
       status: isPending ? "pending" : "cleared",
       fingerprint,
       created_by: memberId,
+      income_certainty: certainty,
     })
     .select("id")
     .single();
@@ -163,6 +194,7 @@ export async function createTransaction(formData: FormData) {
         amount_cents: amountCents,
         description,
         notes,
+        certainty,
       },
       frequency: recurrenceInput.frequency,
       anchorDate: date,
@@ -197,6 +229,7 @@ export async function updateTransaction(
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const isPending = formData.get("is_pending") === "on";
   const amountInput = String(formData.get("amount") ?? "");
+  const certainty = incomeCertainty(formData, direction);
 
   if (!accountId) throw new Error("Conta é obrigatória.");
   if (direction !== "in" && direction !== "out")
@@ -217,7 +250,7 @@ export async function updateTransaction(
 
   const { data: current } = await supabase
     .from("transactions")
-    .select("recurrence_id, description, bank_description, category_id, amount_cents, direction, date")
+    .select("recurrence_id, description, bank_description, category_id, amount_cents, direction, date, income_certainty")
     .eq("id", transactionId)
     .maybeSingle();
   const applyTo = (String(formData.get("apply_to") ?? "one") || "one") as RecurrenceScope;
@@ -256,11 +289,22 @@ export async function updateTransaction(
       notes,
       status: isPending ? "pending" : "cleared",
       fingerprint,
+      income_certainty: certainty,
     })
     .eq("id", transactionId)
     .is("transfer_group_id", null);
 
   if (error) throw new Error(error.message);
+
+  // Garantida ou variável é da fonte da entrada, não de um mês: numa
+  // recorrência, vale pro modelo e pras próximas previsões dela.
+  if (
+    current?.recurrence_id &&
+    direction === "in" &&
+    certainty !== ((current.income_certainty as string | null) ?? null)
+  ) {
+    await setRecurrenceCertainty(supabase, current.recurrence_id as string, certainty, today);
+  }
 
   // Renomeou um lançamento do banco: a próxima importação já traz esse
   // nome pro mesmo estabelecimento.
@@ -311,6 +355,7 @@ export async function updateTransaction(
         amount_cents: amountCents,
         description,
         notes,
+        certainty,
       },
       frequency: recurrenceInput.frequency,
       anchorDate: date,

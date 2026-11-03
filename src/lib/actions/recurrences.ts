@@ -42,14 +42,16 @@ export async function createRecurrence(formData: FormData) {
     throw new Error("Dia do mês inválido.");
   }
 
-  const template = {
+  const template: RecurrenceTemplate = {
     account_id: accountId,
     category_id: categoryId,
     direction,
     amount_cents: amountCents,
     description,
     notes: null,
-  } as const;
+    // Entrada: garantida (salário, contrato) ou variável (freela, show).
+    certainty: direction === "in" ? (formData.get("income_guaranteed") === "on" ? "guaranteed" : "variable") : null,
+  };
 
   const { data: recurrence, error } = await supabase
     .from("recurrences")
@@ -154,6 +156,8 @@ export type RecurrenceForEdit = {
   /** Próxima previsão a partir de hoje (ou null se não houver). */
   next_date: string | null;
   today: string;
+  /** Entrada: garantida ou variável (vazio = variável). */
+  certainty: "guaranteed" | "variable" | null;
 };
 
 /** Dados pra editar uma recorrência (e pro aviso no "Editar lançamento"). */
@@ -189,6 +193,7 @@ export async function getRecurrenceForEdit(recurrenceId: string): Promise<Recurr
     ends_on: (rec.ends_on as string | null) ?? null,
     next_date: (next?.date as string | undefined) ?? null,
     today,
+    certainty: t.certainty ?? null,
   };
 }
 
@@ -244,6 +249,10 @@ export async function updateRecurrence(recurrenceId: string, formData: FormData)
       description,
       amount_cents: amountCents,
       category_id: categoryId,
+      // O formulário só manda o campo quando é entrada.
+      ...(current.direction === "in" && formData.has("income_certainty_field")
+        ? { certainty: formData.get("income_guaranteed") === "on" ? ("guaranteed" as const) : ("variable" as const) }
+        : {}),
     };
     const { data: updated, error: updateError } = await supabase
       .from("recurrences")

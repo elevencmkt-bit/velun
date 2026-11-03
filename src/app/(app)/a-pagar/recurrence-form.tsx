@@ -1,5 +1,6 @@
 "use client";
 
+import { ToggleRow } from "@/components/manual-transaction-button";
 import { localToday } from "@/lib/today";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -56,6 +57,7 @@ export function RecurrenceForm({
   const [open, setOpen] = useState(false);
   const [direction, setDirection] = useState<"in" | "out">("out");
   const [frequency, setFrequency] = useState<Frequency>("monthly");
+  const [guaranteed, setGuaranteed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -71,6 +73,7 @@ export function RecurrenceForm({
     const formData = new FormData(event.currentTarget);
     formData.set("direction", direction);
     formData.set("frequency", frequency);
+    if (direction === "in" && guaranteed) formData.set("income_guaranteed", "on");
     startTransition(async () => {
       try {
         await createRecurrence(formData);
@@ -204,6 +207,15 @@ export function RecurrenceForm({
               <Label htmlFor="ends_on">Termina em (opcional)</Label>
               <DateInput id="ends_on" name="ends_on" />
             </div>
+          ) : null}
+
+          {direction === "in" ? (
+            <ToggleRow
+              checked={guaranteed}
+              onChange={setGuaranteed}
+              title="Entrada garantida"
+              hint="Salário, contrato. Conta no Livre antes de cair; variável só depois"
+            />
           ) : null}
 
           {error ? <p className="text-sm text-(--out)">{error}</p> : null}

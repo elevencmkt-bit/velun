@@ -131,3 +131,26 @@ export async function resetAllData() {
 
   revalidateEverything();
 }
+
+/**
+ * Piso de segurança da casa: null = automático (metas Colchão e Reserva
+ * de impostos), 0 = sem piso, valor = esse valor.
+ */
+export async function updateCashFloor(cents: number | null): Promise<HouseholdSettingsResult> {
+  if (cents !== null && (!Number.isInteger(cents) || cents < 0 || cents > 100_000_000_00)) {
+    return { ok: false, error: "Valor inválido." };
+  }
+  const { householdId } = await getCurrentMember();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("households")
+    .update({ cash_floor_cents: cents })
+    .eq("id", householdId)
+    .select("id");
+  if (error) return { ok: false, error: `Não foi possível salvar: ${error.message}` };
+  if (!data || data.length === 0) return { ok: false, error: "Não foi possível salvar (permissão negada)." };
+  revalidatePath("/fluxo-de-caixa");
+  revalidatePath("/mes");
+  revalidatePath("/configuracoes");
+  return { ok: true };
+}

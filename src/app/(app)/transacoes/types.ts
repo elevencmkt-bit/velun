@@ -14,6 +14,8 @@ export type TransactionRow = {
   import_id: string | null;
   transfer_group_id: string | null;
   recurrence_id: string | null;
+  /** Entrada garantida ou variável (vazio = variável). */
+  income_certainty?: "guaranteed" | "variable" | null;
   /** "3 de 6" em compra parcelada. */
   installment?: string | null;
   account_id: string;

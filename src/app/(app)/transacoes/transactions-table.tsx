@@ -655,6 +655,7 @@ export function TransactionsTable({
             bank_description: editingRow.bank_description,
             status: editingRow.status,
             recurrence_id: editingRow.recurrence_id,
+            income_certainty: editingRow.income_certainty ?? null,
           }}
           accounts={accounts}
           categories={categories}

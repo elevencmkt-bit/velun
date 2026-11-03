@@ -1,3 +1,5 @@
+import { loadCashFloor } from "@/lib/cash-floor";
+import { CashFloorForm } from "./cash-floor-form";
 import { ChartNoAxesColumnIncreasing, Folder, Plus, UserRoundCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMember } from "@/lib/current-member";
@@ -61,6 +63,15 @@ function MemberRow({
 export default async function ConfiguracoesPage() {
   const { memberId, householdId, currency, country, timezone } = await getCurrentMember();
   const supabase = await createClient();
+  const [floorInfo, { data: floorRow }] = await Promise.all([
+    loadCashFloor(supabase, householdId, memberId),
+    supabase.from("households").select("cash_floor_cents").eq("id", householdId).maybeSingle(),
+  ]);
+  const cashFloor = {
+    manual: (floorRow?.cash_floor_cents as number | null | undefined) ?? null,
+    goalsCents: floorInfo.goalsCents,
+    goals: floorInfo.goals,
+  };
 
   const [withAvatar, categoriesResult, colorMap, membersResult, inviteResult, emailSettings] = await Promise.all([
     supabase.from("members").select("display_name, avatar_url").eq("id", memberId).maybeSingle(),
@@ -154,6 +165,21 @@ export default async function ConfiguracoesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card id="piso">
+        <CardContent className="flex flex-col gap-4 lg:flex-row lg:gap-8">
+          <div className="lg:w-[38%]">
+            <h2 className="text-card-title">Piso de segurança</h2>
+            <p className="mt-1 text-sm leading-relaxed text-(--text-muted)">
+              O quanto a casa não quer deixar o saldo descer. Aparece como uma linha no Fluxo de caixa, conta os dias
+              abaixo dele e sai do “Livre esta semana”.
+            </p>
+          </div>
+          <div className="min-w-0 flex-1">
+            <CashFloorForm manualCents={cashFloor.manual} goalsCents={cashFloor.goalsCents} goals={cashFloor.goals} currency={currency} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

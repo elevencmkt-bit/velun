@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CurrencyCode } from "@/lib/money";
 import type { UpcomingEvent } from "@/lib/cash-flow";
+import type { CategoryEstimate } from "@/lib/cash-flow-estimates";
 import { addDaysISO } from "@/lib/today";
 import { Money } from "@/components/money";
 
@@ -102,16 +103,21 @@ export function PeriodSummaryCard({
   totalIncome,
   totalExpense,
   netResult,
+  estimatedCents,
   note,
   currency,
 }: {
   periodLabel: string;
   totalIncome: number;
   totalExpense: number;
+  /** Entra − sai lançados (sem estimados). */
   netResult: number;
+  /** Gastos estimados no período; null = desligados. */
+  estimatedCents: number | null;
   note: string;
   currency: CurrencyCode;
 }) {
+  const net = netResult - (estimatedCents ?? 0);
   return (
     <article className="flex min-w-0 flex-col gap-4 self-start rounded-[20px] bg-(--bg-surface) p-5 shadow-(--shadow-card) md:p-6">
       <h2 className="text-card-title">Nos próximos {periodLabel}</h2>
@@ -123,18 +129,32 @@ export function PeriodSummaryCard({
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-(--text-muted)">Sai</span>
+          <span className="text-(--text-muted)">{estimatedCents !== null ? "Sai (lançado)" : "Sai"}</span>
           <span className="font-bold tabular-nums text-(--text-primary)">
             −<Money cents={totalExpense} currency={currency} />
           </span>
         </div>
+        {estimatedCents !== null ? (
+          <div className="flex justify-between text-sm">
+            <span className="text-(--text-muted)">Estimado (limites)</span>
+            <span className="font-bold tabular-nums text-(--text-primary)">
+              −<Money cents={estimatedCents} currency={currency} />
+            </span>
+          </div>
+        ) : null}
         <div className="flex justify-between border-t border-(--border-soft) pt-3 text-[15px]">
-          <span className="font-semibold text-(--text-primary)">{netResult >= 0 ? "Sobra" : "Falta"}</span>
+          <span className="font-semibold text-(--text-primary)">{net >= 0 ? "Sobra" : "Falta"}</span>
           <span className="font-bold tabular-nums text-(--text-primary)">
-            {netResult >= 0 ? "+" : "−"}
-            <Money cents={Math.abs(netResult)} currency={currency} />
+            {net >= 0 ? "+" : "−"}
+            <Money cents={Math.abs(net)} currency={currency} />
           </span>
         </div>
+        {estimatedCents !== null && estimatedCents > 0 ? (
+          <p className="text-xs text-(--text-muted)">
+            Sem os estimados, {netResult >= 0 ? "sobraria" : "faltaria"} {netResult >= 0 ? "+" : "−"}
+            <Money cents={Math.abs(netResult)} currency={currency} />.
+          </p>
+        ) : null}
       </div>
       {note ? (
         <div className="rounded-[16px] bg-(--primary-soft) p-4 text-sm leading-relaxed text-(--text-secondary)">
@@ -142,6 +162,83 @@ export function PeriodSummaryCard({
           {note}
         </div>
       ) : null}
+    </article>
+  );
+}
+
+/** De onde vêm os gastos estimados: cada limite das Metas e quanto ainda conta. */
+export function EstimatesCard({
+  categories,
+  floor,
+  currency,
+}: {
+  categories: CategoryEstimate[];
+  floor: { cents: number; source: "manual" | "goals" | "none" };
+  currency: CurrencyCode;
+}) {
+  return (
+    <article className="flex min-w-0 flex-col rounded-[20px] bg-(--bg-surface) p-5 shadow-(--shadow-card) md:p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-card-title">Gastos estimados</h2>
+        <Link href="/metas" className="text-[13px] font-semibold text-(--primary) hover:underline">
+          Limites em Metas →
+        </Link>
+      </div>
+      <p className="mt-1 text-[13px] leading-relaxed text-(--text-muted)">
+        Dos limites de gasto das Metas, espalhados igual por dia. Este mês, só o que ainda falta gastar; nos
+        próximos, o limite menos o que já está lançado na categoria.
+      </p>
+      {categories.length === 0 ? (
+        <p className="mt-4 text-sm text-(--text-muted)">
+          Nenhum limite de gasto em Metas. Crie limites (mercado, gasolina) pra projeção contar com eles.
+        </p>
+      ) : (
+        <div className="mt-2">
+          {categories.map((c) => {
+            const used = c.limitCents > 0 ? Math.min(1, c.spentCents / c.limitCents) : 0;
+            return (
+              <div key={c.categoryId} className="flex items-center justify-between gap-4 border-b border-(--border-soft) py-2.5 last:border-0">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-(--text-primary)">
+                    {c.name} <span className="font-normal text-(--text-muted)">· limite <Money cents={c.limitCents} currency={currency} /></span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 max-w-[220px] overflow-hidden rounded-full bg-(--bg-track)">
+                    <div className="h-full rounded-full bg-(--primary-border)" style={{ width: `${used * 100}%` }} />
+                  </div>
+                  {c.plannedThisMonthCents > 0 ? (
+                    <div className="mt-1 text-xs text-(--text-muted)">
+                      <Money cents={c.plannedThisMonthCents} currency={currency} /> já lançados na categoria este mês
+                    </div>
+                  ) : null}
+                </div>
+                <div className="shrink-0 text-right text-sm">
+                  <b className="tabular-nums">
+                    <Money cents={c.remainingThisMonthCents} currency={currency} />
+                  </b>{" "}
+                  este mês
+                  <div className="text-xs text-(--text-muted)">
+                    <Money cents={c.spentCents} currency={currency} /> já gastos
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-3 text-xs text-(--text-muted)">
+        Categoria sem limite não entra.{" "}
+        {floor.cents > 0 ? (
+          <>
+            Piso de segurança: <b className="text-(--text-secondary)"><Money cents={floor.cents} currency={currency} /></b>
+            {floor.source === "goals" ? " (metas Colchão e Reserva de impostos)" : ""} ·{" "}
+          </>
+        ) : (
+          "Sem piso de segurança · "
+        )}
+        <Link href="/configuracoes#piso" className="font-semibold text-(--primary) hover:underline">
+          mudar em Configurações
+        </Link>
+      </p>
     </article>
   );
 }

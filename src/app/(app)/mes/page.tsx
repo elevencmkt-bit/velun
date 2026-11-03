@@ -1,3 +1,5 @@
+import { loadFreeThisWeek } from "@/lib/free-this-week-load";
+import { FreeThisWeekCard } from "@/components/free-this-week-card";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -289,6 +291,13 @@ export default async function MesPage({
   const balanceScope = only(fullBalanceScope);
   const transactionsScope = only(fullTransactionsScope);
 
+  // "Livre esta semana": é sobre agora e sobre a casa toda, então só no
+  // mês corrente e sem filtro de conta.
+  const freePromise =
+    !accountFilter && monthParam(year, monthIndex) === today.slice(0, 7)
+      ? loadFreeThisWeek({ supabase, householdId, memberId, today }).catch(() => null)
+      : Promise.resolve(null);
+
   const [
     currentRows,
     prevRows,
@@ -349,6 +358,7 @@ export default async function MesPage({
     loadCards(supabase, householdId, memberId, today),
   ]);
 
+  const free = await freePromise;
   const current = excludeTransfers(currentRows);
   const previous = excludeTransfers(prevRows);
   const trend = excludeTransfers(trendRows);
@@ -533,6 +543,8 @@ export default async function MesPage({
           />
         </div>
       </div>
+
+      {free ? <FreeThisWeekCard free={free} currency={currency} /> : null}
 
       <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-12">
         {/* Saldo: o único bloco colorido da tela. */}

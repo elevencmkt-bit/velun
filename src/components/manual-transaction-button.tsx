@@ -169,6 +169,7 @@ export function ManualTransactionButton({
   const [toAccountId, setToAccountId] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [guaranteed, setGuaranteed] = useState(false);
   const [makeRecurring, setMakeRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState("monthly");
   const [installments, setInstallments] = useState("1");
@@ -264,6 +265,7 @@ export function ManualTransactionButton({
     setAmount("");
     setNotesOpen(false);
     setPending(false);
+    setGuaranteed(false);
     setMakeRecurring(false);
     setRecurrenceFrequency("monthly");
     setInstallments("1");
@@ -296,6 +298,7 @@ export function ManualTransactionButton({
       formData.set("direction", mode);
       formData.set("category_id", categoryId);
       if (pending && !parcelado) formData.set("is_pending", "on");
+      if (mode === "in" && guaranteed) formData.set("income_guaranteed", "on");
       if (makeRecurring && !parcelado) formData.set("make_recurring", "on");
     }
     startTransition(async () => {
@@ -609,6 +612,14 @@ export function ManualTransactionButton({
                 title="Ainda não caiu"
                 hint="Fica como pendente até você confirmar"
               />
+              {mode === "in" ? (
+                <ToggleRow
+                  checked={guaranteed}
+                  onChange={setGuaranteed}
+                  title="Entrada garantida"
+                  hint="Salário, contrato. Conta no Livre antes de cair; variável só depois"
+                />
+              ) : null}
               <ToggleRow
                 checked={makeRecurring}
                 onChange={setMakeRecurring}
