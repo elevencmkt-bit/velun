@@ -422,11 +422,15 @@ export function TransactionsTable({
               // âmbar se ainda vai vencer. No celular, tocar na linha abre
               // a edição.
               const status = row.bank_pending
-                ? { label: "Pendente no banco", cls: "bg-(--warning-badge) text-(--warning-dark)" }
+                ? {
+                    label: "Pendente",
+                    title: "Pendente no banco: o banco ainda não lançou, mas já conta no saldo",
+                    cls: "bg-(--warning-badge) text-(--warning-dark)",
+                  }
                 : row.is_overdue
-                ? { label: "Atrasada", cls: "bg-(--danger-badge) text-(--danger-text)" }
+                ? { label: "Atrasada", title: undefined, cls: "bg-(--danger-badge) text-(--danger-text)" }
                 : row.status === "pending"
-                  ? { label: "Pendente", cls: "bg-(--warning-badge) text-(--warning-dark)" }
+                  ? { label: "Pendente", title: "Previsto: ainda não confirmado", cls: "bg-(--warning-badge) text-(--warning-dark)" }
                   : null;
               const catColor = row.category_name ? iconColors.fg : "var(--text-light)";
 
@@ -540,7 +544,10 @@ export function TransactionsTable({
                   {/* Situação: coluna própria no computador. */}
                   <span className="hidden w-[92px] shrink-0 justify-end md:flex">
                     {status ? (
-                      <span className={`inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-bold ${status.cls}`}>
+                      <span
+                        title={status.title}
+                        className={`inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-bold whitespace-nowrap ${status.cls}`}
+                      >
                         {status.label}
                       </span>
                     ) : null}
@@ -560,7 +567,10 @@ export function TransactionsTable({
                       <Money cents={row.amount_cents} currency={currency} />
                     </span>
                     {status ? (
-                      <span className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold md:hidden ${status.cls}`}>
+                      <span
+                        title={status.title}
+                        className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold whitespace-nowrap md:hidden ${status.cls}`}
+                      >
                         {status.label}
                       </span>
                     ) : null}
