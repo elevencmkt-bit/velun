@@ -385,7 +385,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { list: [
         "Tire o print da lista de lançamentos, com as datas aparecendo. Pode rolar e tirar vários: o trecho repetido entre um print e outro entra uma vez só.",
         "Comece o primeiro print com uma data à vista; uma linha sem data acima dela fica de fora.",
-        "Os lançamentos **Pending** do app entram marcados como **Pendente** (passe o mouse: "pendente no banco") e contam no saldo, como no app. Na revisão dá pra desligar e trazer só o que já foi lançado.",
+        "Os lançamentos **Pending** do app entram marcados como **Pendente** (passe o mouse: “pendente no banco”) e contam no saldo, como no app. Na revisão dá pra desligar e trazer só o que já foi lançado.",
         "Quando o banco lança, o próximo print ou extrato substitui o pendente pelo lançamento de verdade, sem duplicar: com o mesmo valor, ou com o mesmo nome e um valor um pouco diferente (gorjeta, posto).",
         "Pendente que passa uma semana sem lançar aparece em **Transações** pra você conferir: pode ter sido só uma reserva (posto, hotel). Se sumiu do app, apague; se aconteceu, mantenha.",
         "A linha mais antiga do print só confere com a de baixo dela. Se o saldo do Velun também não fecha com ela, ela fica de fora (o aviso diz qual): pra entrar, tire o print mostrando também a linha de baixo.",
